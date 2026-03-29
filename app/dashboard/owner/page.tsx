@@ -1,1026 +1,1242 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Lang = 'en' | 'es';
 type StoreTheme = 'light' | 'dark';
-type BillingState = 'good' | 'warning' | 'overdue';
-type OrderStage = 'placed' | 'preparing' | 'ready' | 'cancelled';
+type OrderStatus = 'placed' | 'preparing' | 'ready' | 'cancelled';
+type BillingStatus = 'good' | 'warning' | 'overdue';
 
-type AuthPayload = {
-  user?: {
-    email?: string;
-  };
+type OrderItem = {
+  name: string;
+  qty: number;
 };
 
-type Restaurant = {
+type LiveOrder = {
   id: string;
-  name?: string | null;
-  slug?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  hours?: string | null;
-  stripe_account_id?: string | null;
-  billing_due_date?: string | null;
-  billing_paid?: boolean | null;
-  order_language?: Lang | null;
-  store_theme?: StoreTheme | null;
+  customer: string;
+  total: number;
+  status: OrderStatus;
+  items: OrderItem[];
+  placedAt: string;
 };
 
 type MenuItem = {
   id: string;
-  name?: string | null;
-  price?: number | string | null;
-  description?: string | null;
-  image_url?: string | null;
+  name: string;
+  price: number;
+  image: string;
+  category: string;
 };
 
-type RawOrderRow = {
-  id: string;
-  total?: number | string | null;
-  created_at?: string | null;
-  customer_name?: string | null;
-  payment_status?: string | null;
-  status?: string | null;
-  items?: unknown;
-};
-
-type OrderRow = {
-  id: string;
-  total: number;
-  created_at?: string | null;
-  customer_name: string;
-  payment_status?: string | null;
-  status: OrderStage;
-  items: Array<{ name: string; quantity: number }>;
-};
-
-type StripeStatus = {
-  connected?: boolean;
-  onboardingComplete?: boolean;
-  chargesEnabled?: boolean;
-  payoutsEnabled?: boolean;
-  platformFeePercent?: number | null;
-};
-
-const copy = {
+const ui = {
   en: {
     brand: 'MenuFlow',
-    dashboard: 'Owner Dashboard',
-    welcome: 'Welcome back',
-    subtitle: 'Manage your menu, live orders, billing, and store settings in one place.',
-    signedInAs: 'Signed in as',
-    loading: 'Loading dashboard...',
-    noRestaurant: 'No restaurant found for this account yet.',
-    noSlug: 'Save your store slug first to open the live store.',
-    couldNotLoadDashboard: 'Could not load dashboard.',
-    couldNotLoadStripe: 'Could not load Stripe status.',
-    couldNotSaveBusiness: 'Could not save business information.',
-    saved: 'Saved.',
-    saving: 'Saving...',
-    navDashboard: 'Dashboard',
-    navBuilder: 'Builder',
-    navOrders: 'Orders',
-    navPayments: 'Payments',
-    navStore: 'Store',
-    navRefresh: 'Refresh',
-    navLogout: 'Logout',
-    openBuilder: 'Open Menu Builder',
-    viewStore: 'View Store',
+    overview: 'Overview',
+    dashboard: 'Dashboard',
     liveOrders: 'Live Orders',
-    sendReadyNotice: 'When an order turns green, the customer gets a ready notification.',
-    placed: 'Placed',
-    preparing: 'Almost Ready',
-    ready: 'Ready To Go',
-    cancelled: 'Cancelled',
-    startOrder: 'Start Order',
-    markReady: 'Mark Ready',
-    remove: 'Remove',
-    yourMenu: 'Your Menu',
-    noItems: 'No menu items yet.',
-    recentOrders: 'Recent Orders',
-    noOrders: 'No orders yet.',
-    businessInfo: 'Business Information',
-    businessName: 'Business Name',
-    storeSlug: 'Store Slug',
-    phoneNumber: 'Phone Number',
-    address: 'Address',
-    hours: 'Hours',
-    saveBusiness: 'Save Business Information',
-    settings: 'Owner Settings',
-    orderLanguage: 'Order Language',
-    english: 'English',
-    spanish: 'Spanish',
-    storeTheme: 'Store Theme',
-    light: 'Light',
-    dark: 'Dark',
-    todaySales: "Today's Sales",
-    todayOrders: "Today's Orders",
+    builder: 'Menu Builder',
+    payments: 'Payments',
+    ownerInfo: 'Owner Info',
+    storeSettings: 'Store Settings',
+    logout: 'Logout',
+    search: 'Search',
+    todaysSales: "Today's Sales",
+    todaysOrders: "Today's Orders",
     menuItems: 'Menu Items',
+    billingStatus: 'Billing Status',
     stripeStatus: 'Stripe Status',
     connected: 'Connected',
     notConnected: 'Not Connected',
-    payments: 'Payments',
-    paymentsText: 'Connect Stripe to keep direct ordering live.',
-    refreshStripe: 'Refresh Stripe Status',
-    stripeLoading: 'Loading Stripe...',
-    billing: 'MenuFlow Billing',
-    paymentRequired: 'Payment required to continue',
+    liveOrdersBoard: 'Live Orders',
+    liveOrdersText: 'Manage every order from red to yellow to green inside this dashboard.',
+    billing: 'Billing',
+    billingText: 'Account status for the MenuFlow platform.',
+    topSellingProducts: 'Menu Builder',
+    topSellingProductsText: 'Add, edit, remove, and refresh your menu items.',
+    ownerInformation: 'Owner Information',
+    ownerInformationText: 'Business details used across your owner dashboard and storefront.',
+    orderLanguage: 'Order Language',
+    storeTheme: 'Store Theme',
     cancelledOrders: 'Cancelled Orders',
-    platformFee: 'Platform Fee',
-    onboarding: 'Onboarding',
-    chargesEnabled: 'Charges Enabled',
-    payoutsEnabled: 'Payouts Enabled',
-    liveStorePreview: 'Live Store Preview',
-    paidGood: 'Paid / Active',
-    dueSoon: '7 days before due date',
-    dueNow: 'Payment Due',
+    orderPlaced: 'Placed',
+    orderPreparing: 'Almost Ready',
+    orderReady: 'Ready To Go',
+    orderCancelled: 'Cancelled',
+    startOrder: 'Start Order',
+    markReady: 'Mark Ready',
+    notifyReady: 'Customer notified: order is ready for pickup.',
+    remove: 'Remove',
+    addItem: 'Add Item',
+    refreshMenu: 'Refresh Menu',
+    saveInfo: 'Save Info',
+    businessName: 'Business Name',
+    phone: 'Phone',
+    address: 'Address',
+    hours: 'Hours',
+    languageEnglish: 'English',
+    languageSpanish: 'Spanish',
+    themeLight: 'Light Store',
+    themeDark: 'Dark Store',
+    dueGood: 'Paid / Active',
+    dueWarning: '7 days before due date',
+    dueOverdue: 'Payment Due / Dashboard Lock',
     goToPayment: 'Go To Payment',
-    lockedOut: 'Dashboard locked until MenuFlow payment is completed.',
+    dashboardLocked: 'Dashboard locks when payment is overdue until payment is completed.',
+    quickActions: 'Quick Actions',
+    viewStore: 'View Store',
+    openBuilder: 'Open Builder',
+    businessSaved: 'Owner information saved.',
   },
   es: {
     brand: 'MenuFlow',
-    dashboard: 'Panel del Dueño',
-    welcome: 'Bienvenido de nuevo',
-    subtitle: 'Administra tu menú, órdenes en vivo, facturación y configuración de tienda en un solo lugar.',
-    signedInAs: 'Sesión iniciada como',
-    loading: 'Cargando panel...',
-    noRestaurant: 'Todavía no se encontró un restaurante para esta cuenta.',
-    noSlug: 'Primero guarda el slug de tu tienda para abrirla en vivo.',
-    couldNotLoadDashboard: 'No se pudo cargar el panel.',
-    couldNotLoadStripe: 'No se pudo cargar el estado de Stripe.',
-    couldNotSaveBusiness: 'No se pudo guardar la información del negocio.',
-    saved: 'Guardado.',
-    saving: 'Guardando...',
-    navDashboard: 'Panel',
-    navBuilder: 'Constructor',
-    navOrders: 'Órdenes',
-    navPayments: 'Pagos',
-    navStore: 'Tienda',
-    navRefresh: 'Actualizar',
-    navLogout: 'Salir',
-    openBuilder: 'Abrir Constructor de Menú',
-    viewStore: 'Ver Tienda',
-    liveOrders: 'Órdenes en Vivo',
-    sendReadyNotice: 'Cuando una orden se pone verde, el cliente recibe notificación.',
-    placed: 'Recibido',
-    preparing: 'Casi Listo',
-    ready: 'Listo',
-    cancelled: 'Cancelado',
-    startOrder: 'Iniciar Pedido',
-    markReady: 'Marcar Listo',
-    remove: 'Eliminar',
-    yourMenu: 'Tu Menú',
-    noItems: 'Todavía no hay artículos.',
-    recentOrders: 'Órdenes Recientes',
-    noOrders: 'Todavía no hay órdenes.',
-    businessInfo: 'Información del Negocio',
-    businessName: 'Nombre del Negocio',
-    storeSlug: 'Slug de Tienda',
-    phoneNumber: 'Número de Teléfono',
-    address: 'Dirección',
-    hours: 'Horario',
-    saveBusiness: 'Guardar Información del Negocio',
-    settings: 'Configuración del Dueño',
-    orderLanguage: 'Idioma de Pedidos',
-    english: 'Inglés',
-    spanish: 'Español',
-    storeTheme: 'Tema de Tienda',
-    light: 'Claro',
-    dark: 'Oscuro',
-    todaySales: 'Ventas de Hoy',
-    todayOrders: 'Órdenes de Hoy',
+    overview: 'Resumen',
+    dashboard: 'Panel',
+    liveOrders: 'Pedidos en Vivo',
+    builder: 'Constructor',
+    payments: 'Pagos',
+    ownerInfo: 'Información del Dueño',
+    storeSettings: 'Ajustes de Tienda',
+    logout: 'Salir',
+    search: 'Buscar',
+    todaysSales: 'Ventas de Hoy',
+    todaysOrders: 'Pedidos de Hoy',
     menuItems: 'Artículos del Menú',
+    billingStatus: 'Estado de Facturación',
     stripeStatus: 'Estado de Stripe',
     connected: 'Conectado',
     notConnected: 'No Conectado',
-    payments: 'Pagos',
-    paymentsText: 'Conecta Stripe para mantener pedidos directos en vivo.',
-    refreshStripe: 'Actualizar Estado Stripe',
-    stripeLoading: 'Cargando Stripe...',
-    billing: 'Facturación MenuFlow',
-    paymentRequired: 'Pago requerido para continuar',
-    cancelledOrders: 'Órdenes Canceladas',
-    platformFee: 'Tarifa de Plataforma',
-    onboarding: 'Onboarding',
-    chargesEnabled: 'Cobros Habilitados',
-    payoutsEnabled: 'Pagos Habilitados',
-    liveStorePreview: 'Vista Previa de la Tienda',
-    paidGood: 'Pagado / Activo',
-    dueSoon: 'Faltan 7 días',
-    dueNow: 'Pago Vencido',
+    liveOrdersBoard: 'Pedidos en Vivo',
+    liveOrdersText: 'Administra cada pedido de rojo a amarillo a verde dentro de este panel.',
+    billing: 'Facturación',
+    billingText: 'Estado de tu cuenta para la plataforma MenuFlow.',
+    topSellingProducts: 'Constructor de Menú',
+    topSellingProductsText: 'Agrega, edita, elimina y actualiza tus artículos del menú.',
+    ownerInformation: 'Información del Dueño',
+    ownerInformationText: 'Datos del negocio usados en todo tu panel y storefront.',
+    orderLanguage: 'Idioma de Pedidos',
+    storeTheme: 'Tema de Tienda',
+    cancelledOrders: 'Pedidos Cancelados',
+    orderPlaced: 'Recibido',
+    orderPreparing: 'Casi Listo',
+    orderReady: 'Listo',
+    orderCancelled: 'Cancelado',
+    startOrder: 'Iniciar Pedido',
+    markReady: 'Marcar Listo',
+    notifyReady: 'Cliente notificado: el pedido está listo para recoger.',
+    remove: 'Eliminar',
+    addItem: 'Agregar Artículo',
+    refreshMenu: 'Actualizar Menú',
+    saveInfo: 'Guardar Información',
+    businessName: 'Nombre del Negocio',
+    phone: 'Teléfono',
+    address: 'Dirección',
+    hours: 'Horario',
+    languageEnglish: 'Ingllés',
+    languageSpanish: 'Español',
+    themeLight: 'Tienda Clara',
+    themeDark: 'Tienda Oscura',
+    dueGood: 'Pagado / Activo',
+    dueWarning: '7 días antes del vencimiento',
+    dueOverdue: 'Pago Vencido / Panel Bloqueado',
     goToPayment: 'Ir al Pago',
-    lockedOut: 'Panel bloqueado hasta que el pago de MenuFlow sea completado.',
+    dashboardLocked: 'El panel se bloquea si el pago está vencido hasta que se complete.',
+    quickActions: 'Acciones Rápidas',
+    viewStore: 'Ver Tienda',
+    openBuilder: 'Abrir Constructor',
+    businessSaved: 'Información guardada.',
   },
 } as const;
 
-function dayKey(value: string) {
-  const date = new Date(value);
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function money(value: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 }
 
-function parseItems(items: unknown): Array<{ name: string; quantity: number }> {
-  if (Array.isArray(items)) {
-    return items.map((item: any) => ({
-      name: String(item?.name || item?.title || 'Item'),
-      quantity: Math.max(1, Number(item?.quantity || item?.qty || 1)),
-    }));
-  }
-  if (typeof items === 'string') {
-    try {
-      const parsed = JSON.parse(items);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item: any) => ({
-          name: String(item?.name || item?.title || 'Item'),
-          quantity: Math.max(1, Number(item?.quantity || item?.qty || 1)),
-        }));
-      }
-    } catch {}
-  }
-  return [];
+function orderStatusClass(status: OrderStatus) {
+  if (status === 'placed' || status === 'cancelled') return 'status-red';
+  if (status === 'preparing') return 'status-yellow';
+  return 'status-green';
 }
 
-function normalizeStatus(raw?: string | null): OrderStage {
-  const value = String(raw || '').toLowerCase();
-  if (['ready', 'complete', 'completed', 'done', 'green'].includes(value)) return 'ready';
-  if (['preparing', 'in_progress', 'in progress', 'almost_ready', 'almost ready', 'yellow'].includes(value)) return 'preparing';
-  if (['cancelled', 'canceled'].includes(value)) return 'cancelled';
-  return 'placed';
-}
-
-function billingState(restaurant: Restaurant | null): BillingState {
-  if (restaurant?.billing_paid) return 'good';
-  if (!restaurant?.billing_due_date) return 'good';
-  const due = new Date(restaurant.billing_due_date);
-  if (Number.isNaN(due.getTime())) return 'good';
-  const today = new Date();
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.ceil((due.getTime() - start.getTime()) / 86400000);
-  if (diffDays <= 0) return 'overdue';
-  if (diffDays <= 7) return 'warning';
-  return 'good';
+function billingClass(status: BillingStatus) {
+  if (status === 'good') return 'billing-green';
+  if (status === 'warning') return 'billing-yellow';
+  return 'billing-red';
 }
 
 export default function OwnerDashboardPage() {
   const router = useRouter();
-  const [lang, setLang] = useState<Lang>('en');
-  const t = copy[lang];
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
 
-  const [businessName, setBusinessName] = useState('');
-  const [storeSlug, setStoreSlug] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [businessAddress, setBusinessAddress] = useState('');
-  const [businessHours, setBusinessHours] = useState('');
+  const [lang, setLang] = useState<Lang>('en');
+  const t = ui[lang];
+
   const [orderLanguage, setOrderLanguage] = useState<Lang>('en');
   const [storeTheme, setStoreTheme] = useState<StoreTheme>('light');
+  const [billingStatus, setBillingStatus] = useState<BillingStatus>('warning');
+  const [stripeConnected] = useState(true);
+  const [message, setMessage] = useState('');
 
-  const [savingBusiness, setSavingBusiness] = useState(false);
-  const [stripeLoading, setStripeLoading] = useState(false);
+  const [businessName, setBusinessName] = useState('MenuFlow Demo Kitchen');
+  const [phone, setPhone] = useState('(323) 555-2010');
+  const [address, setAddress] = useState('Compton, CA');
+  const [hours, setHours] = useState('Mon–Sun • 10 AM – 8 PM');
 
-  async function loadDashboard() {
-    try {
-      setLoading(true);
-      setMessage('');
+  const [orders, setOrders] = useState<LiveOrder[]>([
+    {
+      id: 'MF-1024',
+      customer: 'Andrea',
+      total: 38,
+      status: 'placed',
+      placedAt: '1:02 PM',
+      items: [
+        { name: 'Chicken Plate', qty: 2 },
+        { name: 'Lemonade', qty: 1 },
+      ],
+    },
+    {
+      id: 'MF-1025',
+      customer: 'Carlos',
+      total: 22,
+      status: 'preparing',
+      placedAt: '1:05 PM',
+      items: [{ name: 'Tacos', qty: 3 }],
+    },
+    {
+      id: 'MF-1026',
+      customer: 'Maya',
+      total: 17,
+      status: 'ready',
+      placedAt: '1:08 PM',
+      items: [
+        { name: 'Quesadilla', qty: 1 },
+        { name: 'Horchata', qty: 1 },
+      ],
+    },
+    {
+      id: 'MF-1027',
+      customer: 'Leo',
+      total: 12,
+      status: 'cancelled',
+      placedAt: '1:10 PM',
+      items: [{ name: 'Fries', qty: 1 }],
+    },
+  ]);
 
-      const authRes = await fetch('/api/auth/me', { cache: 'no-store' });
-      const authPayload: AuthPayload = await authRes.json().catch(() => ({}));
-      const email = authPayload?.user?.email || '';
-      setUserEmail(email);
+  const [items, setItems] = useState<MenuItem[]>([
+    {
+      id: 'item-1',
+      name: 'Chicken Plate',
+      price: 14,
+      category: 'Plates',
+      image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'item-2',
+      name: 'Tacos',
+      price: 10,
+      category: 'Street Food',
+      image: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'item-3',
+      name: 'Loaded Fries',
+      price: 11,
+      category: 'Sides',
+      image: 'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      id: 'item-4',
+      name: 'Lemonade',
+      price: 4,
+      category: 'Drinks',
+      image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80',
+    },
+  ]);
 
-      if (!email) {
-        throw new Error(t.couldNotLoadDashboard);
-      }
+  const activeOrders = useMemo(() => orders.filter((order) => order.status !== 'cancelled'), [orders]);
+  const cancelledOrders = useMemo(() => orders.filter((order) => order.status === 'cancelled'), [orders]);
+  const todaysSales = useMemo(() => activeOrders.reduce((sum, order) => sum + order.total, 0), [activeOrders]);
+  const dashboardLocked = billingStatus === 'overdue';
 
-      const restaurantRes = await fetch(`/api/restaurants/by-owner-email?email=${encodeURIComponent(email)}`, {
-        cache: 'no-store',
-      });
-      const restaurantPayload = await restaurantRes.json().catch(() => ({}));
-      const currentRestaurant: Restaurant | null = restaurantPayload?.restaurant || null;
-      setRestaurant(currentRestaurant);
-
-      if (!currentRestaurant?.id) {
-        setLoading(false);
-        setMessage(t.noRestaurant);
-        return;
-      }
-
-      setBusinessName(currentRestaurant.name || '');
-      setStoreSlug(currentRestaurant.slug || '');
-      setPhoneNumber(currentRestaurant.phone || '');
-      setBusinessAddress(currentRestaurant.address || '');
-      setBusinessHours(currentRestaurant.hours || '');
-      setOrderLanguage(currentRestaurant.order_language || 'en');
-      setStoreTheme(currentRestaurant.store_theme || 'light');
-
-      const [menuRes, ordersRes] = await Promise.all([
-        fetch(`/api/menu-items/by-restaurant?restaurantId=${encodeURIComponent(currentRestaurant.id)}`, { cache: 'no-store' }),
-        fetch(`/api/orders/by-restaurant?restaurantId=${encodeURIComponent(currentRestaurant.id)}`, { cache: 'no-store' }),
-      ]);
-
-      const menuPayload = await menuRes.json().catch(() => ({}));
-      const ordersPayload = await ordersRes.json().catch(() => ({}));
-
-      setMenuItems(Array.isArray(menuPayload?.items) ? menuPayload.items : []);
-
-      const normalizedOrders: OrderRow[] = Array.isArray(ordersPayload?.orders)
-        ? ordersPayload.orders.map((order: RawOrderRow) => ({
-            id: order.id,
-            total: Number(order.total || 0),
-            created_at: order.created_at,
-            customer_name: String(order.customer_name || 'Guest'),
-            payment_status: order.payment_status || undefined,
-            status: normalizeStatus(order.status || order.payment_status),
-            items: parseItems(order.items),
-          }))
-        : [];
-
-      setOrders(normalizedOrders);
-
-      await refreshStripeStatus(currentRestaurant.id);
-      setLoading(false);
-    } catch (error: any) {
-      setLoading(false);
-      setMessage(error?.message || t.couldNotLoadDashboard);
-    }
-  }
-
-  async function refreshStripeStatus(restaurantIdOverride?: string) {
-    const restaurantId = restaurantIdOverride || restaurant?.id;
-    if (!restaurantId) return;
-    try {
-      setStripeLoading(true);
-      const response = await fetch('/api/connect/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || t.couldNotLoadStripe);
-      setStripeStatus(payload);
-    } catch (error: any) {
-      setMessage(error?.message || t.couldNotLoadStripe);
-    } finally {
-      setStripeLoading(false);
-    }
-  }
-
-  async function handleSaveBusiness() {
-    if (!restaurant?.id) return;
-    try {
-      setSavingBusiness(true);
-      setMessage('');
-
-      const body = {
-        id: restaurant.id,
-        name: businessName,
-        slug: storeSlug,
-        phone: phoneNumber,
-        address: businessAddress,
-        hours: businessHours,
-        order_language: orderLanguage,
-        store_theme: storeTheme,
-      };
-
-      const response = await fetch('/api/restaurants/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload?.error || t.couldNotSaveBusiness);
-      }
-
-      setRestaurant((current) =>
-        current
-          ? {
-              ...current,
-              name: businessName,
-              slug: storeSlug,
-              phone: phoneNumber,
-              address: businessAddress,
-              hours: businessHours,
-              order_language: orderLanguage,
-              store_theme: storeTheme,
-            }
-          : current
-      );
-      setMessage(t.saved);
-    } catch (error: any) {
-      setMessage(error?.message || t.couldNotSaveBusiness);
-    } finally {
-      setSavingBusiness(false);
-    }
-  }
-
-  async function updateOrderStage(orderId: string, stage: OrderStage) {
+  function handleStart(orderId: string) {
     setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status: stage } : order))
+      current.map((order) => (order.id === orderId ? { ...order, status: 'preparing' } : order))
     );
-
-    if (stage === 'ready') {
-      const readyMessage =
-        orderLanguage === 'es'
-          ? '¡Tu pedido está listo para recoger! 🎉'
-          : 'Your order is ready for pickup! 🎉';
-      setMessage(readyMessage);
-    }
-
-    try {
-      await fetch('/api/orders/update-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, status: stage }),
-      });
-    } catch {}
   }
 
-  function removeMenuItem(itemId: string) {
-    setMenuItems((current) => current.filter((item) => item.id !== itemId));
+  function handleReady(orderId: string) {
+    setOrders((current) =>
+      current.map((order) => (order.id === orderId ? { ...order, status: 'ready' } : order))
+    );
+    setMessage(t.notifyReady);
   }
 
-  function handleViewStore() {
-    const slug = restaurant?.slug || storeSlug;
-    if (!slug) {
-      setMessage(t.noSlug);
-      return;
-    }
-    router.push(`/store/${slug}`);
+  function handleRemove(itemId: string) {
+    setItems((current) => current.filter((item) => item.id !== itemId));
   }
 
-  const billing = billingState(restaurant);
-  const dashboardLocked = billing === 'overdue';
-
-  const todaySales = useMemo(() => {
-    const today = dayKey(new Date().toISOString());
-    return orders.reduce((sum, order) => {
-      if (!order.created_at) return sum;
-      if (dayKey(order.created_at) !== today) return sum;
-      return sum + Number(order.total || 0);
-    }, 0);
-  }, [orders]);
-
-  const todayOrders = useMemo(() => {
-    const today = dayKey(new Date().toISOString());
-    return orders.filter((order) => order.created_at && dayKey(order.created_at) === today).length;
-  }, [orders]);
-
-  const liveOrders = orders.filter((order) => order.status !== 'cancelled');
-  const cancelledOrders = orders.filter((order) => order.status === 'cancelled');
-
-  useEffect(() => {
-    void loadDashboard();
-  }, []);
+  function handleSaveInfo() {
+    setMessage(t.businessSaved);
+  }
 
   return (
-    <main className="mf-page">
-      <div className="mf-wrap">
-        <header className="mf-header">
-          <div>
-            <div className="mf-brand">{t.brand}</div>
-            <h1>{t.welcome}</h1>
-            <p>{t.subtitle}</p>
-            <small>{t.signedInAs}: <strong>{userEmail || '--'}</strong></small>
-          </div>
-
-          <div className="mf-actions">
-            <div className="mf-toggleRow">
-              <button className={lang === 'en' ? 'active' : ''} onClick={() => setLang('en')}>EN</button>
-              <button className={lang === 'es' ? 'active' : ''} onClick={() => setLang('es')}>ES</button>
-            </div>
-            <div className="mf-toggleRow">
-              <button onClick={() => router.push('/dashboard/owner/builder')}>{t.openBuilder}</button>
-              <button onClick={handleViewStore}>{t.viewStore}</button>
+    <main className="page-shell">
+      <div className="dashboard-shell">
+        <aside className="sidebar">
+          <div className="brand-block">
+            <div className="brand-mark">M</div>
+            <div>
+              <div className="brand-name">MenuFlow</div>
+              <div className="brand-sub">Owner Control</div>
             </div>
           </div>
-        </header>
 
-        <section className="mf-statGrid">
-          <div className="mf-stat"><span>{t.todaySales}</span><strong>${todaySales.toFixed(2)}</strong></div>
-          <div className="mf-stat"><span>{t.todayOrders}</span><strong>{todayOrders}</strong></div>
-          <div className="mf-stat"><span>{t.menuItems}</span><strong>{menuItems.length}</strong></div>
-          <div className="mf-stat"><span>{t.stripeStatus}</span><strong>{stripeStatus?.connected ? t.connected : t.notConnected}</strong></div>
-        </section>
+          <nav className="nav">
+            <button className="nav-item nav-active">{t.dashboard}</button>
+            <button className="nav-item">{t.liveOrders}</button>
+            <button className="nav-item" onClick={() => router.push('/dashboard/owner/builder')}>{t.builder}</button>
+            <button className="nav-item">{t.payments}</button>
+            <button className="nav-item">{t.ownerInfo}</button>
+            <button className="nav-item">{t.storeSettings}</button>
+          </nav>
 
-        <section className="mf-grid">
-          <div className="mf-card">
-            <h2>{t.liveOrders}</h2>
-            <p className="mf-help">{t.sendReadyNotice}</p>
+          <button className="logout-btn">{t.logout}</button>
+        </aside>
 
-            {dashboardLocked ? (
-              <div className="mf-lockBox mf-red">
-                <strong>{t.paymentRequired}</strong>
-                <p>{t.lockedOut}</p>
-                <button>{t.goToPayment}</button>
+        <section className="content">
+          <div className="topbar">
+            <div>
+              <div className="page-title">{t.overview}</div>
+              <div className="page-subtitle">{t.quickActions}</div>
+            </div>
+
+            <div className="topbar-right">
+              <div className="search-box">{t.search}</div>
+              <div className="lang-switch">
+                <button className={lang === 'en' ? 'switch-active' : ''} onClick={() => setLang('en')}>EN</button>
+                <button className={lang === 'es' ? 'switch-active' : ''} onClick={() => setLang('es')}>ES</button>
               </div>
-            ) : liveOrders.length === 0 ? (
-              <div className="mf-empty">{t.noOrders}</div>
-            ) : (
-              <div className="mf-list">
-                {liveOrders.map((order) => (
-                  <div className={`mf-order ${statusClass(order.status)}`} key={order.id}>
-                    <div className="mf-orderTop">
-                      <div>
-                        <strong>#{order.id.slice(0, 8)} • {order.customer_name}</strong>
-                        <div className="mf-orderItems">
-                          {order.items.length
-                            ? order.items.map((item) => `${item.quantity}x ${item.name}`).join(', ')
-                            : 'Items not available'}
-                        </div>
-                      </div>
-                      <div className="mf-orderRight">
-                        <div className="mf-orderTotal">${order.total.toFixed(2)}</div>
-                        <div className="mf-statusText">
-                          {order.status === 'placed'
-                            ? t.placed
-                            : order.status === 'preparing'
-                            ? t.preparing
-                            : order.status === 'ready'
-                            ? t.ready
-                            : t.cancelled}
-                        </div>
-                      </div>
-                    </div>
+              <button className="ghost-btn" onClick={() => router.push('/dashboard/owner/builder')}>
+                {t.openBuilder}
+              </button>
+              <button className="ghost-btn" onClick={() => router.push('/store/demo-store')}>
+                {t.viewStore}
+              </button>
+            </div>
+          </div>
 
-                    <div className="mf-orderButtons">
-                      {order.status === 'placed' && (
-                        <button className="mf-yellowBtn" onClick={() => void updateOrderStage(order.id, 'preparing')}>
-                          {t.startOrder}
-                        </button>
-                      )}
-                      {order.status === 'preparing' && (
-                        <button className="mf-greenBtn" onClick={() => void updateOrderStage(order.id, 'ready')}>
-                          {t.markReady}
-                        </button>
-                      )}
-                      {order.status === 'ready' && (
-                        <span className="mf-readyTag">{t.ready}</span>
-                      )}
-                    </div>
+          <div className="stats-row">
+            <div className="stat-card">
+              <div className="stat-label">{t.todaysSales}</div>
+              <div className="stat-value">{money(todaysSales)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">{t.todaysOrders}</div>
+              <div className="stat-value">{activeOrders.length}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">{t.menuItems}</div>
+              <div className="stat-value">{items.length}</div>
+            </div>
+            <div className={`stat-card ${billingClass(billingStatus)}`}>
+              <div className="stat-label">{t.billingStatus}</div>
+              <div className="stat-value">
+                {billingStatus === 'good' ? t.dueGood : billingStatus === 'warning' ? t.dueWarning : t.dueOverdue}
+              </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">{t.stripeStatus}</div>
+              <div className="stat-value">{stripeConnected ? t.connected : t.notConnected}</div>
+            </div>
+          </div>
+
+          <div className="main-grid">
+            <div className="left-column">
+              <section className="panel live-orders-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.liveOrdersBoard}</h2>
+                    <p>{t.liveOrdersText}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="mf-stack">
-            <div className="mf-card">
-              <h2>{t.businessInfo}</h2>
-              <div className="mf-fields">
-                <label><span>{t.businessName}</span><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} /></label>
-                <label><span>{t.storeSlug}</span><input value={storeSlug} onChange={(e) => setStoreSlug(e.target.value)} /></label>
-                <label><span>{t.phoneNumber}</span><input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} /></label>
-                <label><span>{t.address}</span><input value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} /></label>
-                <label><span>{t.hours}</span><input value={businessHours} onChange={(e) => setBusinessHours(e.target.value)} /></label>
-              </div>
-              <button className="mf-blackBtn" onClick={() => void handleSaveBusiness()}>
-                {savingBusiness ? t.saving : t.saveBusiness}
-              </button>
-            </div>
-
-            <div className="mf-card">
-              <h2>{t.settings}</h2>
-              <div className="mf-settingRow">
-                <span>{t.orderLanguage}</span>
-                <div className="mf-toggleRow">
-                  <button className={orderLanguage === 'en' ? 'active' : ''} onClick={() => setOrderLanguage('en')}>
-                    {t.english}
-                  </button>
-                  <button className={orderLanguage === 'es' ? 'active' : ''} onClick={() => setOrderLanguage('es')}>
-                    {t.spanish}
-                  </button>
+                  <div className="panel-controls">
+                    <button className="mini-toggle" onClick={() => setBillingStatus('good')}>Green</button>
+                    <button className="mini-toggle" onClick={() => setBillingStatus('warning')}>Yellow</button>
+                    <button className="mini-toggle" onClick={() => setBillingStatus('overdue')}>Red</button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="mf-settingRow">
-                <span>{t.storeTheme}</span>
-                <div className="mf-toggleRow">
-                  <button className={storeTheme === 'light' ? 'active' : ''} onClick={() => setStoreTheme('light')}>
-                    {t.light}
-                  </button>
-                  <button className={storeTheme === 'dark' ? 'active' : ''} onClick={() => setStoreTheme('dark')}>
-                    {t.dark}
-                  </button>
-                </div>
-              </div>
+                {dashboardLocked ? (
+                  <div className="lock-card">
+                    <div className="lock-title">{t.dueOverdue}</div>
+                    <p>{t.dashboardLocked}</p>
+                    <button className="pay-btn">{t.goToPayment}</button>
+                  </div>
+                ) : (
+                  <div className="orders-stack">
+                    {activeOrders.map((order) => (
+                      <div className={`order-card ${orderStatusClass(order.status)}`} key={order.id}>
+                        <div className="order-top">
+                          <div>
+                            <div className="order-id">{order.id}</div>
+                            <div className="order-customer">{order.customer}</div>
+                            <div className="order-items">
+                              {order.items.map((item) => `${item.qty}x ${item.name}`).join(' • ')}
+                            </div>
+                          </div>
+                          <div className="order-right">
+                            <div className="order-total">{money(order.total)}</div>
+                            <div className="order-time">{order.placedAt}</div>
+                          </div>
+                        </div>
 
-              <div className={`mf-billing ${billing === 'good' ? 'mf-green' : billing === 'warning' ? 'mf-yellow' : 'mf-red'}`}>
-                <strong>{t.billing}</strong>
-                <p>
-                  {billing === 'good'
-                    ? t.paidGood
-                    : billing === 'warning'
-                    ? t.dueSoon
-                    : t.dueNow}
-                </p>
-              </div>
-            </div>
+                        <div className="order-bottom">
+                          <span className={`status-pill ${orderStatusClass(order.status)}`}>
+                            {order.status === 'placed'
+                              ? t.orderPlaced
+                              : order.status === 'preparing'
+                              ? t.orderPreparing
+                              : order.status === 'ready'
+                              ? t.orderReady
+                              : t.orderCancelled}
+                          </span>
 
-            <div className="mf-card">
-              <h2>{t.payments}</h2>
-              <p className="mf-help">{t.paymentsText}</p>
-              <div className="mf-miniStats">
-                <div><span>{t.platformFee}</span><strong>{typeof stripeStatus?.platformFeePercent === 'number' ? `${stripeStatus.platformFeePercent}%` : '--'}</strong></div>
-                <div><span>{t.onboarding}</span><strong>{stripeStatus?.onboardingComplete ? t.connected : t.notConnected}</strong></div>
-                <div><span>{t.chargesEnabled}</span><strong>{stripeStatus?.chargesEnabled ? t.connected : '--'}</strong></div>
-                <div><span>{t.payoutsEnabled}</span><strong>{stripeStatus?.payoutsEnabled ? t.connected : '--'}</strong></div>
-              </div>
-              <button className="mf-blackBtn" onClick={() => void refreshStripeStatus()}>
-                {stripeLoading ? t.stripeLoading : t.refreshStripe}
-              </button>
-            </div>
-
-            <div className="mf-card">
-              <h2>{t.yourMenu}</h2>
-              {menuItems.length === 0 ? (
-                <div className="mf-empty">{t.noItems}</div>
-              ) : (
-                <div className="mf-list">
-                  {menuItems.map((item) => (
-                    <div className="mf-menuRow" key={item.id}>
-                      <div>
-                        <strong>{item.name || 'Item'}</strong>
-                        <div className="mf-menuMeta">${Number(item.price || 0).toFixed(2)}</div>
+                          <div className="order-actions">
+                            {order.status === 'placed' && (
+                              <button className="yellow-btn" onClick={() => handleStart(order.id)}>
+                                {t.startOrder}
+                              </button>
+                            )}
+                            {order.status === 'preparing' && (
+                              <button className="green-btn" onClick={() => handleReady(order.id)}>
+                                {t.markReady}
+                              </button>
+                            )}
+                            {order.status === 'ready' && <span className="ready-copy">{t.notifyReady}</span>}
+                          </div>
+                        </div>
                       </div>
-                      <button className="mf-redBtn" onClick={() => removeMenuItem(item.id)}>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="panel builder-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.topSellingProducts}</h2>
+                    <p>{t.topSellingProductsText}</p>
+                  </div>
+                  <div className="panel-controls">
+                    <button className="mini-toggle">{t.addItem}</button>
+                    <button className="mini-toggle">{t.refreshMenu}</button>
+                  </div>
+                </div>
+
+                <div className="item-grid">
+                  {items.map((item) => (
+                    <article className="item-card" key={item.id}>
+                      <div className="item-image-wrap">
+                        <img src={item.image} alt={item.name} className="item-image" />
+                      </div>
+                      <div className="item-name">{item.name}</div>
+                      <div className="item-meta">
+                        <span>{item.category}</span>
+                        <span>{money(item.price)}</span>
+                      </div>
+                      <button className="remove-btn" onClick={() => handleRemove(item.id)}>
                         {t.remove}
                       </button>
-                    </div>
+                    </article>
                   ))}
                 </div>
-              )}
+              </section>
             </div>
 
-            {cancelledOrders.length > 0 && (
-              <div className="mf-card">
-                <h2>{t.cancelledOrders}</h2>
-                <div className="mf-list">
+            <div className="right-column">
+              <section className="panel billing-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.billing}</h2>
+                    <p>{t.billingText}</p>
+                  </div>
+                </div>
+
+                <div className={`billing-box ${billingClass(billingStatus)}`}>
+                  <div className="billing-status-line">
+                    {billingStatus === 'good'
+                      ? t.dueGood
+                      : billingStatus === 'warning'
+                      ? t.dueWarning
+                      : t.dueOverdue}
+                  </div>
+                  <div className="billing-note">{t.dashboardLocked}</div>
+                </div>
+
+                <button className="pay-btn">{t.goToPayment}</button>
+              </section>
+
+              <section className="panel owner-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.ownerInformation}</h2>
+                    <p>{t.ownerInformationText}</p>
+                  </div>
+                </div>
+
+                <div className="info-form">
+                  <label>
+                    <span>{t.businessName}</span>
+                    <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
+                  </label>
+                  <label>
+                    <span>{t.phone}</span>
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  </label>
+                  <label>
+                    <span>{t.address}</span>
+                    <input value={address} onChange={(e) => setAddress(e.target.value)} />
+                  </label>
+                  <label>
+                    <span>{t.hours}</span>
+                    <input value={hours} onChange={(e) => setHours(e.target.value)} />
+                  </label>
+                </div>
+
+                <button className="save-btn" onClick={handleSaveInfo}>{t.saveInfo}</button>
+              </section>
+
+              <section className="panel settings-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.storeSettings}</h2>
+                    <p>{t.ownerInformationText}</p>
+                  </div>
+                </div>
+
+                <div className="setting-row">
+                  <div className="setting-title">{t.orderLanguage}</div>
+                  <div className="toggle-group">
+                    <button className={orderLanguage === 'en' ? 'switch-active' : ''} onClick={() => setOrderLanguage('en')}>
+                      {t.languageEnglish}
+                    </button>
+                    <button className={orderLanguage === 'es' ? 'switch-active' : ''} onClick={() => setOrderLanguage('es')}>
+                      {t.languageSpanish}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="setting-row">
+                  <div className="setting-title">{t.storeTheme}</div>
+                  <div className="toggle-group">
+                    <button className={storeTheme === 'light' ? 'switch-active' : ''} onClick={() => setStoreTheme('light')}>
+                      {t.themeLight}
+                    </button>
+                    <button className={storeTheme === 'dark' ? 'switch-active' : ''} onClick={() => setStoreTheme('dark')}>
+                      {t.themeDark}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <section className="panel cancelled-panel">
+                <div className="panel-head">
+                  <div>
+                    <h2>{t.cancelledOrders}</h2>
+                    <p>Red means the order was cancelled.</p>
+                  </div>
+                </div>
+
+                <div className="cancelled-list">
                   {cancelledOrders.map((order) => (
-                    <div className="mf-order mf-status-red" key={order.id}>
-                      <strong>#{order.id.slice(0, 8)} • {order.customer_name}</strong>
-                      <div className="mf-orderMeta">${order.total.toFixed(2)}</div>
+                    <div key={order.id} className="cancelled-item">
+                      <div>
+                        <div className="order-id">{order.id}</div>
+                        <div className="order-customer">{order.customer}</div>
+                      </div>
+                      <div className="order-total">{money(order.total)}</div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            <div className="mf-card">
-              <h2>{t.liveStorePreview}</h2>
-              <p className="mf-help">/store/{restaurant?.slug || storeSlug || '--'}</p>
-              <button className="mf-blackBtn" onClick={handleViewStore}>{t.viewStore}</button>
+              </section>
             </div>
           </div>
-        </section>
 
-        {message ? <div className="mf-message">{message}</div> : null}
+          {message ? <div className="message-toast">{message}</div> : null}
+        </section>
       </div>
 
       <style jsx>{`
-        .mf-page {
-          min-height: 100vh;
-          background: #f3f1eb;
-          color: #111111;
-          padding: 18px;
+        :global(body) {
+          margin: 0;
+          background: #84ddd0;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          color: #2f3531;
         }
-        .mf-wrap {
-          max-width: 1280px;
-          margin: 0 auto;
-        }
-        .mf-header {
-          display: flex;
-          justify-content: space-between;
-          gap: 24px;
-          align-items: flex-start;
-          background: #ffffff;
-          border-radius: 28px;
+
+        .page-shell {
+          min-height: 100vh;
           padding: 28px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+          background:
+            linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
+            radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 32%),
+            linear-gradient(135deg, #78d9ca 0%, #88ddd0 40%, #7fd9cc 100%);
         }
-        .mf-brand {
-          font-size: 18px;
-          font-weight: 900;
-          letter-spacing: 0.02em;
+
+        .dashboard-shell {
+          max-width: 1440px;
+          margin: 0 auto;
+          background: #f1f3f2;
+          border-radius: 10px;
+          overflow: hidden;
+          display: grid;
+          grid-template-columns: 244px minmax(0, 1fr);
+          box-shadow: 0 16px 60px rgba(35, 53, 49, 0.12);
+          min-height: calc(100vh - 56px);
         }
-        h1 {
-          margin: 10px 0 0 0;
-          font-size: clamp(36px, 6vw, 60px);
-          line-height: 0.98;
-        }
-        p {
-          margin: 10px 0 0 0;
-        }
-        small {
-          display: block;
-          margin-top: 12px;
-          color: #666;
-        }
-        .mf-actions {
+
+        .sidebar {
+          background: #ecefee;
+          border-right: 1px solid #d7dddb;
+          padding: 26px 0 22px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          min-width: 260px;
         }
-        .mf-toggleRow {
+
+        .brand-block {
           display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
+          align-items: center;
+          gap: 12px;
+          padding: 0 24px 24px;
+          border-bottom: 1px solid #d7dddb;
         }
-        .mf-toggleRow button,
-        .mf-blackBtn,
-        .mf-redBtn,
-        .mf-yellowBtn,
-        .mf-greenBtn,
-        .mf-lockBox button {
+
+        .brand-mark {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: #9ce7db;
+          display: grid;
+          place-items: center;
+          font-size: 22px;
+          font-weight: 800;
+          color: #3c7268;
+        }
+
+        .brand-name {
+          font-size: 26px;
+          font-weight: 800;
+          color: #2b332f;
+          line-height: 1;
+        }
+
+        .brand-sub {
+          margin-top: 4px;
+          font-size: 13px;
+          color: #6f7571;
+          font-weight: 600;
+        }
+
+        .nav {
+          padding: 18px 14px 0;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .nav-item,
+        .logout-btn {
           appearance: none;
           border: none;
-          border-radius: 16px;
-          padding: 14px 18px;
-          font-weight: 800;
+          background: transparent;
+          padding: 14px 16px;
+          border-radius: 8px;
+          color: #404641;
+          font-size: 15px;
+          font-weight: 600;
+          text-align: left;
           cursor: pointer;
         }
-        .mf-toggleRow button {
-          background: #ebe7de;
-          color: #111;
+
+        .nav-active {
+          background: #87e6d7;
+          box-shadow: 0 8px 18px rgba(135, 230, 215, 0.35);
         }
-        .mf-toggleRow button.active {
-          background: #111;
-          color: #fff;
+
+        .logout-btn {
+          margin-top: auto;
+          margin-left: 14px;
+          margin-right: 14px;
+          border: 1px solid #d7dddb;
+          background: #f7f9f8;
         }
-        .mf-blackBtn {
-          width: 100%;
-          background: #111;
-          color: #fff;
+
+        .content {
+          padding: 26px 28px 28px;
+          min-width: 0;
         }
-        .mf-redBtn {
-          background: #d92d20;
-          color: #fff;
-        }
-        .mf-yellowBtn {
-          background: #f4b400;
-          color: #111;
-        }
-        .mf-greenBtn {
-          background: #159947;
-          color: #fff;
-        }
-        .mf-statGrid {
-          margin-top: 18px;
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 16px;
-        }
-        .mf-stat {
-          background: #ffffff;
-          border-radius: 24px;
-          padding: 20px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-        }
-        .mf-stat span {
-          display: block;
-          color: #666;
-          font-size: 14px;
-          font-weight: 700;
-        }
-        .mf-stat strong {
-          display: block;
-          margin-top: 12px;
-          font-size: 30px;
-          line-height: 1.05;
-        }
-        .mf-grid {
-          margin-top: 18px;
-          display: grid;
-          grid-template-columns: 1.1fr 0.9fr;
-          gap: 18px;
-        }
-        .mf-stack {
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-        .mf-card {
-          background: #ffffff;
-          border-radius: 28px;
-          padding: 24px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-        }
-        .mf-card h2 {
-          margin: 0 0 14px 0;
-          font-size: 28px;
-          line-height: 1.05;
-        }
-        .mf-help {
-          color: #666;
-          line-height: 1.6;
-        }
-        .mf-fields {
-          display: grid;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-        .mf-fields label span {
-          display: block;
-          font-size: 14px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-        .mf-fields input {
-          width: 100%;
-          box-sizing: border-box;
-          height: 52px;
-          border-radius: 14px;
-          border: 1px solid #ddd6cb;
-          background: #faf8f3;
-          padding: 0 14px;
-          font-size: 16px;
-        }
-        .mf-settingRow {
+
+        .topbar {
           display: flex;
           justify-content: space-between;
-          gap: 14px;
+          gap: 18px;
           align-items: center;
-          margin-bottom: 14px;
+          margin-bottom: 20px;
         }
-        .mf-billing {
-          border-radius: 18px;
-          padding: 16px;
+
+        .page-title {
+          font-size: 18px;
+          font-weight: 800;
+          color: #2d3531;
+        }
+
+        .page-subtitle {
+          margin-top: 4px;
+          font-size: 13px;
+          color: #7a817d;
+          font-weight: 600;
+        }
+
+        .topbar-right {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .search-box {
+          min-width: 280px;
+          height: 38px;
+          border-radius: 6px;
+          background: #ffffff;
+          border: 1px solid #e0e4e2;
+          display: flex;
+          align-items: center;
+          padding: 0 14px;
+          color: #a2aaa6;
+          font-size: 13px;
+        }
+
+        .lang-switch,
+        .toggle-group {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .lang-switch button,
+        .toggle-group button,
+        .ghost-btn,
+        .mini-toggle,
+        .pay-btn,
+        .save-btn,
+        .remove-btn,
+        .yellow-btn,
+        .green-btn {
+          appearance: none;
+          border: none;
+          border-radius: 7px;
+          cursor: pointer;
           font-weight: 700;
         }
-        .mf-green {
-          background: #eaf7ee;
-          color: #116b31;
+
+        .lang-switch button,
+        .toggle-group button,
+        .ghost-btn,
+        .mini-toggle {
+          height: 38px;
+          padding: 0 12px;
+          background: #ffffff;
+          color: #48514c;
+          border: 1px solid #dfe4e2;
         }
-        .mf-yellow {
-          background: #fff6d9;
-          color: #8a6300;
+
+        .switch-active {
+          background: #87e6d7 !important;
+          color: #26463e !important;
+          border-color: #87e6d7 !important;
         }
-        .mf-red {
-          background: #fdecea;
-          color: #8f1d18;
+
+        .stats-row {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 18px;
+          margin-bottom: 20px;
         }
-        .mf-list {
+
+        .stat-card {
+          background: #ffffff;
+          border-radius: 6px;
+          border: 1px solid #e2e6e4;
+          padding: 18px 20px;
+          min-height: 92px;
+        }
+
+        .stat-label {
+          font-size: 14px;
+          color: #6f7671;
+          font-weight: 600;
+        }
+
+        .stat-value {
+          margin-top: 18px;
+          font-size: 28px;
+          line-height: 1;
+          font-weight: 800;
+          color: #2e3531;
+        }
+
+        .main-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+          gap: 20px;
+        }
+
+        .left-column,
+        .right-column {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          min-width: 0;
+        }
+
+        .panel {
+          background: #ffffff;
+          border-radius: 6px;
+          border: 1px solid #e2e6e4;
+          padding: 18px;
+          min-width: 0;
+        }
+
+        .panel-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          align-items: flex-start;
+          margin-bottom: 16px;
+        }
+
+        .panel-head h2 {
+          margin: 0;
+          font-size: 18px;
+          color: #2f3531;
+        }
+
+        .panel-head p {
+          margin: 6px 0 0;
+          color: #7b827e;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .panel-controls {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .orders-stack {
           display: flex;
           flex-direction: column;
           gap: 12px;
         }
-        .mf-order,
-        .mf-menuRow {
-          border-radius: 18px;
-          padding: 14px;
-          background: #faf8f3;
-          border: 1px solid #ebe4da;
+
+        .order-card {
+          border: 1px solid #e2e6e4;
+          border-left-width: 6px;
+          border-radius: 8px;
+          padding: 14px 16px;
+          background: #fbfcfc;
         }
-        .mf-status-red {
-          border-left: 8px solid #d92d20;
-        }
-        .mf-status-yellow {
-          border-left: 8px solid #f4b400;
-        }
-        .mf-status-green {
-          border-left: 8px solid #159947;
-        }
-        .mf-orderTop {
+
+        .order-top,
+        .order-bottom {
           display: flex;
           justify-content: space-between;
           gap: 14px;
           align-items: flex-start;
         }
-        .mf-orderItems,
-        .mf-orderMeta,
-        .mf-menuMeta {
-          color: #666;
-          margin-top: 6px;
-          line-height: 1.5;
-        }
-        .mf-orderTotal {
-          font-weight: 900;
-        }
-        .mf-statusText {
-          font-weight: 900;
-          margin-top: 6px;
-        }
-        .mf-orderButtons {
-          margin-top: 12px;
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-        .mf-readyTag {
-          display: inline-block;
-          background: #eaf7ee;
-          color: #116b31;
-          border-radius: 999px;
-          padding: 10px 14px;
-          font-weight: 900;
-        }
-        .mf-menuRow {
-          display: flex;
-          justify-content: space-between;
-          gap: 14px;
+
+        .order-bottom {
+          margin-top: 14px;
           align-items: center;
         }
-        .mf-empty {
-          background: #faf8f3;
-          border: 1px solid #ebe4da;
-          border-radius: 18px;
-          padding: 16px;
-          color: #666;
-          font-weight: 700;
+
+        .order-id {
+          font-size: 14px;
+          color: #6f7671;
+          font-weight: 800;
         }
-        .mf-miniStats {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 14px;
+
+        .order-customer {
+          margin-top: 4px;
+          font-size: 18px;
+          font-weight: 800;
+          color: #2f3531;
         }
-        .mf-miniStats div {
-          background: #faf8f3;
-          border: 1px solid #ebe4da;
-          border-radius: 18px;
-          padding: 14px;
+
+        .order-items {
+          margin-top: 6px;
+          color: #79817d;
+          font-size: 13px;
         }
-        .mf-miniStats span {
-          display: block;
-          color: #666;
+
+        .order-right {
+          text-align: right;
+        }
+
+        .order-total {
+          font-size: 20px;
+          font-weight: 800;
+          color: #2f3531;
+        }
+
+        .order-time {
+          margin-top: 6px;
+          font-size: 13px;
+          color: #7d847f;
+        }
+
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 34px;
+          padding: 0 14px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 800;
+          border: 1px solid transparent;
+        }
+
+        .status-red {
+          border-left-color: #db524e;
+        }
+
+        .status-yellow {
+          border-left-color: #d6a42a;
+        }
+
+        .status-green {
+          border-left-color: #4bb88a;
+        }
+
+        .status-pill.status-red {
+          background: #fef0ef;
+          color: #b43c39;
+          border-color: #f5c1be;
+        }
+
+        .status-pill.status-yellow {
+          background: #fff7e3;
+          color: #a5790e;
+          border-color: #f3dfad;
+        }
+
+        .status-pill.status-green {
+          background: #ecfbf5;
+          color: #26865f;
+          border-color: #bde8d3;
+        }
+
+        .order-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .yellow-btn,
+        .green-btn,
+        .remove-btn,
+        .pay-btn,
+        .save-btn {
+          height: 38px;
+          padding: 0 14px;
+        }
+
+        .yellow-btn {
+          background: #ffe59b;
+          color: #745704;
+        }
+
+        .green-btn {
+          background: #bdf1db;
+          color: #20724f;
+        }
+
+        .ready-copy {
+          color: #2f8b61;
           font-size: 13px;
           font-weight: 700;
         }
-        .mf-miniStats strong {
+
+        .lock-card {
+          border-radius: 8px;
+          border: 1px solid #f3c8c6;
+          background: #fff2f1;
+          padding: 18px;
+        }
+
+        .lock-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #ae3633;
+        }
+
+        .lock-card p {
+          color: #985350;
+          font-size: 13px;
+          line-height: 1.55;
+          margin: 8px 0 14px;
+        }
+
+        .pay-btn {
+          background: #db524e;
+          color: white;
+        }
+
+        .item-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .item-card {
+          background: #f9fbfa;
+          border: 1px solid #e2e6e4;
+          border-radius: 6px;
+          padding: 12px;
+        }
+
+        .item-image-wrap {
+          aspect-ratio: 1 / 1;
+          border-radius: 4px;
+          overflow: hidden;
+          background: #eef2f0;
+        }
+
+        .item-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
           display: block;
-          margin-top: 8px;
         }
-        .mf-lockBox {
-          border-radius: 18px;
+
+        .item-name {
+          margin-top: 10px;
+          font-size: 18px;
+          font-weight: 800;
+          color: #2f3531;
+        }
+
+        .item-meta {
+          margin-top: 6px;
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          color: #7a817d;
+          font-size: 13px;
+        }
+
+        .remove-btn {
+          margin-top: 10px;
+          width: 100%;
+          background: #db524e;
+          color: white;
+        }
+
+        .billing-box {
+          border-radius: 8px;
           padding: 16px;
+          border: 1px solid transparent;
         }
-        .mf-lockBox p {
+
+        .billing-status-line {
+          font-size: 17px;
+          font-weight: 800;
+        }
+
+        .billing-note {
           margin-top: 8px;
-          margin-bottom: 12px;
+          font-size: 13px;
+          line-height: 1.55;
         }
-        .mf-message {
-          margin-top: 18px;
-          background: #111;
-          color: #fff;
-          border-radius: 18px;
-          padding: 14px 16px;
+
+        .billing-green {
+          background: #eef9f5;
+          border-color: #bfe5d4;
+        }
+
+        .billing-yellow {
+          background: #fff9e9;
+          border-color: #f2dfaf;
+        }
+
+        .billing-red {
+          background: #fff1f0;
+          border-color: #f0c3c0;
+        }
+
+        .billing-panel .pay-btn {
+          margin-top: 14px;
+          width: 100%;
+        }
+
+        .info-form {
+          display: grid;
+          gap: 12px;
+        }
+
+        .info-form label span {
+          display: block;
+          font-size: 12px;
+          font-weight: 800;
+          color: #6f7671;
+          margin-bottom: 6px;
+        }
+
+        .info-form input {
+          width: 100%;
+          box-sizing: border-box;
+          height: 40px;
+          border: 1px solid #dfe4e2;
+          border-radius: 6px;
+          background: #fbfcfc;
+          padding: 0 12px;
+          font-size: 14px;
+          color: #2f3531;
+        }
+
+        .save-btn {
+          margin-top: 14px;
+          width: 100%;
+          background: #87e6d7;
+          color: #21443b;
+        }
+
+        .setting-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: center;
+          padding: 10px 0;
+          border-top: 1px solid #edf1ef;
+        }
+
+        .setting-row:first-of-type {
+          border-top: none;
+          padding-top: 0;
+        }
+
+        .setting-title {
+          font-size: 14px;
           font-weight: 700;
+          color: #2f3531;
         }
-        @media (max-width: 1024px) {
-          .mf-statGrid {
+
+        .cancelled-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .cancelled-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          border: 1px solid #f0c8c6;
+          background: #fff4f3;
+          border-radius: 8px;
+          padding: 12px 14px;
+        }
+
+        .message-toast {
+          position: fixed;
+          right: 20px;
+          bottom: 20px;
+          background: #2f3531;
+          color: white;
+          border-radius: 10px;
+          padding: 14px 16px;
+          font-size: 14px;
+          font-weight: 700;
+          box-shadow: 0 14px 40px rgba(47, 53, 49, 0.2);
+          z-index: 10;
+        }
+
+        @media (max-width: 1280px) {
+          .stats-row {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .item-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
-          .mf-grid {
+        }
+
+        @media (max-width: 1080px) {
+          .dashboard-shell {
+            grid-template-columns: 1fr;
+          }
+
+          .sidebar {
+            border-right: none;
+            border-bottom: 1px solid #d7dddb;
+          }
+
+          .nav {
+            flex-direction: row;
+            flex-wrap: wrap;
+          }
+
+          .logout-btn {
+            margin-top: 12px;
+          }
+
+          .main-grid {
             grid-template-columns: 1fr;
           }
         }
-        @media (max-width: 680px) {
-          .mf-page {
+
+        @media (max-width: 760px) {
+          .page-shell {
             padding: 12px;
           }
-          .mf-header {
-            flex-direction: column;
-            padding: 22px;
+
+          .content {
+            padding: 18px;
           }
-          .mf-actions {
-            width: 100%;
-            min-width: 0;
-          }
-          .mf-statGrid,
-          .mf-miniStats {
-            grid-template-columns: 1fr;
-          }
-          .mf-settingRow,
-          .mf-orderTop,
-          .mf-menuRow {
+
+          .topbar,
+          .order-top,
+          .order-bottom,
+          .setting-row {
             flex-direction: column;
             align-items: flex-start;
+          }
+
+          .topbar-right {
+            justify-content: flex-start;
+          }
+
+          .search-box {
+            min-width: 0;
+            width: 100%;
+          }
+
+          .stats-row {
+            grid-template-columns: 1fr;
+          }
+
+          .item-grid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
     </main>
   );
 }
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mf-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
