@@ -88,6 +88,9 @@ const ui = {
     viewStore: 'View Store',
     openBuilder: 'Open Builder',
     businessSaved: 'Owner information saved.',
+    red: 'Red',
+    yellow: 'Yellow',
+    green: 'Green',
   },
   es: {
     brand: 'MenuFlow',
@@ -133,8 +136,8 @@ const ui = {
     phone: 'Teléfono',
     address: 'Dirección',
     hours: 'Horario',
-    languageEnglish: 'Ingllés',
-    languageSpanish: 'Español',
+    languageEnglish: 'English',
+    languageSpanish: 'Spanish',
     themeLight: 'Tienda Clara',
     themeDark: 'Tienda Oscura',
     dueGood: 'Pagado / Activo',
@@ -146,11 +149,18 @@ const ui = {
     viewStore: 'Ver Tienda',
     openBuilder: 'Abrir Constructor',
     businessSaved: 'Información guardada.',
+    red: 'Rojo',
+    yellow: 'Amarillo',
+    green: 'Verde',
   },
 } as const;
 
 function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function orderStatusClass(status: OrderStatus) {
@@ -254,20 +264,33 @@ export default function OwnerDashboardPage() {
     },
   ]);
 
-  const activeOrders = useMemo(() => orders.filter((order) => order.status !== 'cancelled'), [orders]);
-  const cancelledOrders = useMemo(() => orders.filter((order) => order.status === 'cancelled'), [orders]);
-  const todaysSales = useMemo(() => activeOrders.reduce((sum, order) => sum + order.total, 0), [activeOrders]);
+  const activeOrders = useMemo(
+    () => orders.filter((order) => order.status !== 'cancelled'),
+    [orders]
+  );
+  const cancelledOrders = useMemo(
+    () => orders.filter((order) => order.status === 'cancelled'),
+    [orders]
+  );
+  const todaysSales = useMemo(
+    () => activeOrders.reduce((sum, order) => sum + order.total, 0),
+    [activeOrders]
+  );
   const dashboardLocked = billingStatus === 'overdue';
 
   function handleStart(orderId: string) {
     setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status: 'preparing' } : order))
+      current.map((order) =>
+        order.id === orderId ? { ...order, status: 'preparing' } : order
+      )
     );
   }
 
   function handleReady(orderId: string) {
     setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status: 'ready' } : order))
+      current.map((order) =>
+        order.id === orderId ? { ...order, status: 'ready' } : order
+      )
     );
     setMessage(t.notifyReady);
   }
@@ -295,7 +318,12 @@ export default function OwnerDashboardPage() {
           <nav className="nav">
             <button className="nav-item nav-active">{t.dashboard}</button>
             <button className="nav-item">{t.liveOrders}</button>
-            <button className="nav-item" onClick={() => router.push('/dashboard/owner/builder')}>{t.builder}</button>
+            <button
+              className="nav-item"
+              onClick={() => router.push('/dashboard/owner/builder')}
+            >
+              {t.builder}
+            </button>
             <button className="nav-item">{t.payments}</button>
             <button className="nav-item">{t.ownerInfo}</button>
             <button className="nav-item">{t.storeSettings}</button>
@@ -314,13 +342,29 @@ export default function OwnerDashboardPage() {
             <div className="topbar-right">
               <div className="search-box">{t.search}</div>
               <div className="lang-switch">
-                <button className={lang === 'en' ? 'switch-active' : ''} onClick={() => setLang('en')}>EN</button>
-                <button className={lang === 'es' ? 'switch-active' : ''} onClick={() => setLang('es')}>ES</button>
+                <button
+                  className={lang === 'en' ? 'switch-active' : ''}
+                  onClick={() => setLang('en')}
+                >
+                  EN
+                </button>
+                <button
+                  className={lang === 'es' ? 'switch-active' : ''}
+                  onClick={() => setLang('es')}
+                >
+                  ES
+                </button>
               </div>
-              <button className="ghost-btn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <button
+                className="ghost-btn"
+                onClick={() => router.push('/dashboard/owner/builder')}
+              >
                 {t.openBuilder}
               </button>
-              <button className="ghost-btn" onClick={() => router.push('/store/demo-store')}>
+              <button
+                className="ghost-btn"
+                onClick={() => router.push('/store/demo-store')}
+              >
                 {t.viewStore}
               </button>
             </div>
@@ -341,13 +385,19 @@ export default function OwnerDashboardPage() {
             </div>
             <div className={`stat-card ${billingClass(billingStatus)}`}>
               <div className="stat-label">{t.billingStatus}</div>
-              <div className="stat-value">
-                {billingStatus === 'good' ? t.dueGood : billingStatus === 'warning' ? t.dueWarning : t.dueOverdue}
+              <div className="stat-value stat-small">
+                {billingStatus === 'good'
+                  ? t.dueGood
+                  : billingStatus === 'warning'
+                  ? t.dueWarning
+                  : t.dueOverdue}
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-label">{t.stripeStatus}</div>
-              <div className="stat-value">{stripeConnected ? t.connected : t.notConnected}</div>
+              <div className="stat-value stat-small">
+                {stripeConnected ? t.connected : t.notConnected}
+              </div>
             </div>
           </div>
 
@@ -360,9 +410,24 @@ export default function OwnerDashboardPage() {
                     <p>{t.liveOrdersText}</p>
                   </div>
                   <div className="panel-controls">
-                    <button className="mini-toggle" onClick={() => setBillingStatus('good')}>Green</button>
-                    <button className="mini-toggle" onClick={() => setBillingStatus('warning')}>Yellow</button>
-                    <button className="mini-toggle" onClick={() => setBillingStatus('overdue')}>Red</button>
+                    <button
+                      className="mini-toggle"
+                      onClick={() => setBillingStatus('good')}
+                    >
+                      {t.green}
+                    </button>
+                    <button
+                      className="mini-toggle"
+                      onClick={() => setBillingStatus('warning')}
+                    >
+                      {t.yellow}
+                    </button>
+                    <button
+                      className="mini-toggle"
+                      onClick={() => setBillingStatus('overdue')}
+                    >
+                      {t.red}
+                    </button>
                   </div>
                 </div>
 
@@ -373,15 +438,20 @@ export default function OwnerDashboardPage() {
                     <button className="pay-btn">{t.goToPayment}</button>
                   </div>
                 ) : (
-                  <div className="orders-stack">
+                  <div className="orders-grid">
                     {activeOrders.map((order) => (
-                      <div className={`order-card ${orderStatusClass(order.status)}`} key={order.id}>
+                      <div
+                        className={`order-card ${orderStatusClass(order.status)}`}
+                        key={order.id}
+                      >
                         <div className="order-top">
                           <div>
                             <div className="order-id">{order.id}</div>
                             <div className="order-customer">{order.customer}</div>
                             <div className="order-items">
-                              {order.items.map((item) => `${item.qty}x ${item.name}`).join(' • ')}
+                              {order.items
+                                .map((item) => `${item.qty}x ${item.name}`)
+                                .join(' • ')}
                             </div>
                           </div>
                           <div className="order-right">
@@ -391,7 +461,9 @@ export default function OwnerDashboardPage() {
                         </div>
 
                         <div className="order-bottom">
-                          <span className={`status-pill ${orderStatusClass(order.status)}`}>
+                          <span
+                            className={`status-pill ${orderStatusClass(order.status)}`}
+                          >
                             {order.status === 'placed'
                               ? t.orderPlaced
                               : order.status === 'preparing'
@@ -403,16 +475,24 @@ export default function OwnerDashboardPage() {
 
                           <div className="order-actions">
                             {order.status === 'placed' && (
-                              <button className="yellow-btn" onClick={() => handleStart(order.id)}>
+                              <button
+                                className="yellow-btn"
+                                onClick={() => handleStart(order.id)}
+                              >
                                 {t.startOrder}
                               </button>
                             )}
                             {order.status === 'preparing' && (
-                              <button className="green-btn" onClick={() => handleReady(order.id)}>
+                              <button
+                                className="green-btn"
+                                onClick={() => handleReady(order.id)}
+                              >
                                 {t.markReady}
                               </button>
                             )}
-                            {order.status === 'ready' && <span className="ready-copy">{t.notifyReady}</span>}
+                            {order.status === 'ready' && (
+                              <span className="ready-copy">{t.notifyReady}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -444,7 +524,10 @@ export default function OwnerDashboardPage() {
                         <span>{item.category}</span>
                         <span>{money(item.price)}</span>
                       </div>
-                      <button className="remove-btn" onClick={() => handleRemove(item.id)}>
+                      <button
+                        className="remove-btn"
+                        onClick={() => handleRemove(item.id)}
+                      >
                         {t.remove}
                       </button>
                     </article>
@@ -454,111 +537,133 @@ export default function OwnerDashboardPage() {
             </div>
 
             <div className="right-column">
-              <section className="panel billing-panel">
-                <div className="panel-head">
-                  <div>
-                    <h2>{t.billing}</h2>
-                    <p>{t.billingText}</p>
-                  </div>
-                </div>
-
-                <div className={`billing-box ${billingClass(billingStatus)}`}>
-                  <div className="billing-status-line">
-                    {billingStatus === 'good'
-                      ? t.dueGood
-                      : billingStatus === 'warning'
-                      ? t.dueWarning
-                      : t.dueOverdue}
-                  </div>
-                  <div className="billing-note">{t.dashboardLocked}</div>
-                </div>
-
-                <button className="pay-btn">{t.goToPayment}</button>
-              </section>
-
-              <section className="panel owner-panel">
-                <div className="panel-head">
-                  <div>
-                    <h2>{t.ownerInformation}</h2>
-                    <p>{t.ownerInformationText}</p>
-                  </div>
-                </div>
-
-                <div className="info-form">
-                  <label>
-                    <span>{t.businessName}</span>
-                    <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
-                  </label>
-                  <label>
-                    <span>{t.phone}</span>
-                    <input value={phone} onChange={(e) => setPhone(e.target.value)} />
-                  </label>
-                  <label>
-                    <span>{t.address}</span>
-                    <input value={address} onChange={(e) => setAddress(e.target.value)} />
-                  </label>
-                  <label>
-                    <span>{t.hours}</span>
-                    <input value={hours} onChange={(e) => setHours(e.target.value)} />
-                  </label>
-                </div>
-
-                <button className="save-btn" onClick={handleSaveInfo}>{t.saveInfo}</button>
-              </section>
-
-              <section className="panel settings-panel">
-                <div className="panel-head">
-                  <div>
-                    <h2>{t.storeSettings}</h2>
-                    <p>{t.ownerInformationText}</p>
-                  </div>
-                </div>
-
-                <div className="setting-row">
-                  <div className="setting-title">{t.orderLanguage}</div>
-                  <div className="toggle-group">
-                    <button className={orderLanguage === 'en' ? 'switch-active' : ''} onClick={() => setOrderLanguage('en')}>
-                      {t.languageEnglish}
-                    </button>
-                    <button className={orderLanguage === 'es' ? 'switch-active' : ''} onClick={() => setOrderLanguage('es')}>
-                      {t.languageSpanish}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="setting-row">
-                  <div className="setting-title">{t.storeTheme}</div>
-                  <div className="toggle-group">
-                    <button className={storeTheme === 'light' ? 'switch-active' : ''} onClick={() => setStoreTheme('light')}>
-                      {t.themeLight}
-                    </button>
-                    <button className={storeTheme === 'dark' ? 'switch-active' : ''} onClick={() => setStoreTheme('dark')}>
-                      {t.themeDark}
-                    </button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="panel cancelled-panel">
-                <div className="panel-head">
-                  <div>
-                    <h2>{t.cancelledOrders}</h2>
-                    <p>Red means the order was cancelled.</p>
-                  </div>
-                </div>
-
-                <div className="cancelled-list">
-                  {cancelledOrders.map((order) => (
-                    <div key={order.id} className="cancelled-item">
-                      <div>
-                        <div className="order-id">{order.id}</div>
-                        <div className="order-customer">{order.customer}</div>
-                      </div>
-                      <div className="order-total">{money(order.total)}</div>
+              <div className="right-grid">
+                <section className="panel billing-panel">
+                  <div className="panel-head">
+                    <div>
+                      <h2>{t.billing}</h2>
+                      <p>{t.billingText}</p>
                     </div>
-                  ))}
-                </div>
-              </section>
+                  </div>
+
+                  <div className={`billing-box ${billingClass(billingStatus)}`}>
+                    <div className="billing-status-line">
+                      {billingStatus === 'good'
+                        ? t.dueGood
+                        : billingStatus === 'warning'
+                        ? t.dueWarning
+                        : t.dueOverdue}
+                    </div>
+                    <div className="billing-note">{t.dashboardLocked}</div>
+                  </div>
+
+                  <button className="pay-btn full-width">{t.goToPayment}</button>
+                </section>
+
+                <section className="panel owner-panel">
+                  <div className="panel-head">
+                    <div>
+                      <h2>{t.ownerInformation}</h2>
+                      <p>{t.ownerInformationText}</p>
+                    </div>
+                  </div>
+
+                  <div className="info-form">
+                    <label>
+                      <span>{t.businessName}</span>
+                      <input
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>{t.phone}</span>
+                      <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    </label>
+                    <label>
+                      <span>{t.address}</span>
+                      <input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>{t.hours}</span>
+                      <input value={hours} onChange={(e) => setHours(e.target.value)} />
+                    </label>
+                  </div>
+
+                  <button className="save-btn full-width" onClick={handleSaveInfo}>
+                    {t.saveInfo}
+                  </button>
+                </section>
+
+                <section className="panel settings-panel">
+                  <div className="panel-head">
+                    <div>
+                      <h2>{t.storeSettings}</h2>
+                      <p>{t.ownerInformationText}</p>
+                    </div>
+                  </div>
+
+                  <div className="setting-row">
+                    <div className="setting-title">{t.orderLanguage}</div>
+                    <div className="toggle-group">
+                      <button
+                        className={orderLanguage === 'en' ? 'switch-active' : ''}
+                        onClick={() => setOrderLanguage('en')}
+                      >
+                        {t.languageEnglish}
+                      </button>
+                      <button
+                        className={orderLanguage === 'es' ? 'switch-active' : ''}
+                        onClick={() => setOrderLanguage('es')}
+                      >
+                        {t.languageSpanish}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="setting-row">
+                    <div className="setting-title">{t.storeTheme}</div>
+                    <div className="toggle-group">
+                      <button
+                        className={storeTheme === 'light' ? 'switch-active' : ''}
+                        onClick={() => setStoreTheme('light')}
+                      >
+                        {t.themeLight}
+                      </button>
+                      <button
+                        className={storeTheme === 'dark' ? 'switch-active' : ''}
+                        onClick={() => setStoreTheme('dark')}
+                      >
+                        {t.themeDark}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="panel cancelled-panel">
+                  <div className="panel-head">
+                    <div>
+                      <h2>{t.cancelledOrders}</h2>
+                      <p>Red means the order was cancelled.</p>
+                    </div>
+                  </div>
+
+                  <div className="cancelled-list">
+                    {cancelledOrders.map((order) => (
+                      <div key={order.id} className="cancelled-item">
+                        <div>
+                          <div className="order-id">{order.id}</div>
+                          <div className="order-customer">{order.customer}</div>
+                        </div>
+                        <div className="order-total">{money(order.total)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
 
@@ -570,7 +675,8 @@ export default function OwnerDashboardPage() {
         :global(body) {
           margin: 0;
           background: #84ddd0;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+            'Segoe UI', sans-serif;
           color: #2f3531;
         }
 
@@ -578,8 +684,8 @@ export default function OwnerDashboardPage() {
           min-height: 100vh;
           padding: 28px;
           background:
-            linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04)),
-            radial-gradient(circle at top left, rgba(255,255,255,0.18), transparent 32%),
+            linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
+            radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 32%),
             linear-gradient(135deg, #78d9ca 0%, #88ddd0 40%, #7fd9cc 100%);
         }
 
@@ -745,7 +851,7 @@ export default function OwnerDashboardPage() {
         .toggle-group button,
         .ghost-btn,
         .mini-toggle {
-          height: 38px;
+          min-height: 38px;
           padding: 0 12px;
           background: #ffffff;
           color: #48514c;
@@ -771,6 +877,9 @@ export default function OwnerDashboardPage() {
           border: 1px solid #e2e6e4;
           padding: 18px 20px;
           min-height: 92px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         .stat-label {
@@ -787,10 +896,16 @@ export default function OwnerDashboardPage() {
           color: #2e3531;
         }
 
+        .stat-small {
+          font-size: 18px;
+          line-height: 1.25;
+        }
+
         .main-grid {
           display: grid;
-          grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+          grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.95fr);
           gap: 20px;
+          align-items: start;
         }
 
         .left-column,
@@ -799,6 +914,24 @@ export default function OwnerDashboardPage() {
           flex-direction: column;
           gap: 20px;
           min-width: 0;
+        }
+
+        .right-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+        }
+
+        .right-grid .billing-panel,
+        .right-grid .owner-panel,
+        .right-grid .settings-panel,
+        .right-grid .cancelled-panel {
+          min-width: 0;
+        }
+
+        .right-grid .billing-panel,
+        .right-grid .settings-panel {
+          grid-column: span 2;
         }
 
         .panel {
@@ -836,9 +969,9 @@ export default function OwnerDashboardPage() {
           flex-wrap: wrap;
         }
 
-        .orders-stack {
-          display: flex;
-          flex-direction: column;
+        .orders-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 12px;
         }
 
@@ -848,6 +981,10 @@ export default function OwnerDashboardPage() {
           border-radius: 8px;
           padding: 14px 16px;
           background: #fbfcfc;
+          min-height: 220px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         .order-top,
@@ -880,6 +1017,7 @@ export default function OwnerDashboardPage() {
           margin-top: 6px;
           color: #79817d;
           font-size: 13px;
+          line-height: 1.5;
         }
 
         .order-right {
@@ -953,7 +1091,7 @@ export default function OwnerDashboardPage() {
         .remove-btn,
         .pay-btn,
         .save-btn {
-          height: 38px;
+          min-height: 40px;
           padding: 0 14px;
         }
 
@@ -971,6 +1109,8 @@ export default function OwnerDashboardPage() {
           color: #2f8b61;
           font-size: 13px;
           font-weight: 700;
+          max-width: 210px;
+          text-align: right;
         }
 
         .lock-card {
@@ -998,9 +1138,13 @@ export default function OwnerDashboardPage() {
           color: white;
         }
 
+        .full-width {
+          width: 100%;
+        }
+
         .item-grid {
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 14px;
         }
 
@@ -1052,6 +1196,7 @@ export default function OwnerDashboardPage() {
           border-radius: 8px;
           padding: 16px;
           border: 1px solid transparent;
+          margin-bottom: 14px;
         }
 
         .billing-status-line {
@@ -1078,11 +1223,6 @@ export default function OwnerDashboardPage() {
         .billing-red {
           background: #fff1f0;
           border-color: #f0c3c0;
-        }
-
-        .billing-panel .pay-btn {
-          margin-top: 14px;
-          width: 100%;
         }
 
         .info-form {
@@ -1112,7 +1252,6 @@ export default function OwnerDashboardPage() {
 
         .save-btn {
           margin-top: 14px;
-          width: 100%;
           background: #87e6d7;
           color: #21443b;
         }
@@ -1122,7 +1261,7 @@ export default function OwnerDashboardPage() {
           justify-content: space-between;
           gap: 14px;
           align-items: center;
-          padding: 10px 0;
+          padding: 12px 0;
           border-top: 1px solid #edf1ef;
         }
 
@@ -1168,13 +1307,26 @@ export default function OwnerDashboardPage() {
           z-index: 10;
         }
 
-        @media (max-width: 1280px) {
+        @media (max-width: 1380px) {
           .stats-row {
             grid-template-columns: repeat(3, minmax(0, 1fr));
           }
 
+          .orders-grid {
+            grid-template-columns: 1fr;
+          }
+
           .item-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .right-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .right-grid .billing-panel,
+          .right-grid .settings-panel {
+            grid-column: span 1;
           }
         }
 
@@ -1200,6 +1352,10 @@ export default function OwnerDashboardPage() {
           .main-grid {
             grid-template-columns: 1fr;
           }
+
+          .item-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
         }
 
         @media (max-width: 760px) {
@@ -1212,8 +1368,6 @@ export default function OwnerDashboardPage() {
           }
 
           .topbar,
-          .order-top,
-          .order-bottom,
           .setting-row {
             flex-direction: column;
             align-items: flex-start;
@@ -1229,11 +1383,42 @@ export default function OwnerDashboardPage() {
           }
 
           .stats-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
           .item-grid {
             grid-template-columns: 1fr;
+          }
+
+          .order-top,
+          .order-bottom {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .order-right,
+          .ready-copy {
+            text-align: left;
+          }
+
+          .order-actions {
+            justify-content: flex-start;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .stats-row {
+            grid-template-columns: 1fr;
+          }
+
+          .nav {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .brand-block {
+            padding-left: 18px;
+            padding-right: 18px;
           }
         }
       `}</style>
