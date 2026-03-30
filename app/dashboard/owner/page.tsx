@@ -1,10 +1,9 @@
-
 'use client';
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import {
   Area,
   AreaChart,
@@ -16,7 +15,6 @@ import {
 } from 'recharts';
 
 type Lang = 'en' | 'es';
-type OwnerOrderLanguage = 'en' | 'es';
 type FilterKey = 'all' | 'new' | 'yellow' | 'green';
 type RangeKey = 'week' | 'lastWeek' | 'month' | 'lastMonth';
 
@@ -24,7 +22,7 @@ type RestaurantRecord = {
   id: string;
   name: string | null;
   slug: string | null;
-  plan: string | null;
+  plan?: string | null;
   owner_email?: string | null;
   stripe_account_id?: string | null;
   theme?: string | null;
@@ -34,11 +32,11 @@ type RestaurantRecord = {
 
 type MenuItemRecord = {
   id: string;
-  restaurant_id: string;
+  restaurant_id?: string;
   name: string | null;
-  price: number | string | null;
-  description: string | null;
-  image_url: string | null;
+  price?: number | string | null;
+  description?: string | null;
+  image_url?: string | null;
   created_at?: string | null;
 };
 
@@ -63,6 +61,17 @@ type ChartPoint = {
   day: string;
   value: number;
 };
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  body: string;
+};
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 const copy = {
   en: {
@@ -103,10 +112,16 @@ const copy = {
     viewAll: 'View All',
     loading: 'Loading dashboard...',
     signOut: 'Sign Out',
-    orderLanguage: 'Order Language',
+    languageLabel: 'Dashboard + Order Language',
+    english: 'English',
+    spanish: 'Spanish',
     noLiveOrders: 'No live orders yet',
     noBilling: 'No billing activity yet',
     noCancelled: 'No cancelled orders',
+    notifications: 'Notifications',
+    noNotifications: 'No new notifications',
+    progressToday: 'Today progress',
+    salesVsLastWeek: 'vs last week',
   },
   es: {
     ownerControl: 'Control del dueño',
@@ -146,10 +161,16 @@ const copy = {
     viewAll: 'Ver todo',
     loading: 'Cargando dashboard...',
     signOut: 'Cerrar sesión',
-    orderLanguage: 'Idioma de pedidos',
+    languageLabel: 'Idioma del dashboard + pedidos',
+    english: 'English',
+    spanish: 'Spanish',
     noLiveOrders: 'Todavía no hay pedidos activos',
     noBilling: 'Todavía no hay actividad de facturación',
     noCancelled: 'No hay pedidos cancelados',
+    notifications: 'Notificaciones',
+    noNotifications: 'No hay notificaciones nuevas',
+    progressToday: 'Progreso de hoy',
+    salesVsLastWeek: 'vs semana pasada',
   },
 } as const;
 
@@ -267,7 +288,6 @@ function StatCard(props: {
   suffix?: string;
 }) {
   const { title, value, accent, prefix, suffix } = props;
-
   return (
     <div className="statCard">
       <div className="statTitle">{title}</div>
@@ -653,9 +673,7 @@ function BellIcon() {
 
 export default function DashboardPage() {
   const router = useRouter();
-
   const [lang, setLang] = useState<Lang>('en');
-  const [orderLanguage, setOrderLanguage] = useState<OwnerOrderLanguage>('en');
   const [loading, setLoading] = useState(true);
   const [ownerName, setOwnerName] = useState('Owner');
   const [restaurant, setRestaurant] = useState<RestaurantRecord | null>(null);
@@ -671,7 +689,8 @@ export default function DashboardPage() {
   const [billingFilter, setBillingFilter] = useState<FilterKey>('all');
   const [range, setRange] = useState<RangeKey>('week');
   const [savingLanguage, setSavingLanguage] = useState(false);
-
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const t = copy[lang];
 
   useEffect(() => {
@@ -679,10 +698,7 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
+        const { data: { session } } = await supabase.auth.getSession();
         const user = session?.user;
         if (!user) {
           router.push('/auth/login');
@@ -690,29 +706,26 @@ export default function DashboardPage() {
         }
 
         const metaName = typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : '';
-        const metaBusiness =
-          typeof user.user_metadata?.business_name === 'string' ? user.user_metadata.business_name : '';
-
+        const metaBusiness = typeof user.user_metadata?.business_name === 'string' ? user.user_metadata.business_name : '';
         if (mounted) setOwnerName(metaName || metaBusiness || 'Owner');
 
         const { data: restaurantData, error: restaurantError } = await supabase
           .from('restaurants')
-          .select(
-            'id, name, slug, plan, owner_email, stripe_account_id, theme, owner_order_language, order_language'
-          )
+          .select('id, name, slug, plan, owner_email, stripe_account_id, theme, owner_order_language, order_language')
           .eq('owner_id', user.id)
           .maybeSingle();
 
         if (restaurantError) throw restaurantError;
-
         const r = restaurantData as RestaurantRecord | null;
+
         if (mounted) {
           setRestaurant(r);
-          const savedLang =
-            (r?.owner_order_language || r?.order_language || 'en').toString().toLowerCase() === 'es'
-              ? 'es'
-              : 'en';
-          setOrderLanguage(savedLang);
+          const savedLang = (r?.owner_order_language || r?.order_language || 'en')
+            .toString()
+            .toLowerCase() === 'es'
+            ? 'es'
+            : 'en';
+          setLang(savedLang);
         }
 
         if (r?.id) {
@@ -733,8 +746,12 @@ export default function DashboardPage() {
               .catch(() => null),
           ]);
 
-          if (!itemsRes.error && mounted) setMenuItems((itemsRes.data || []) as MenuItemRecord[]);
-          if (!ordersRes.error && mounted) setOrders((ordersRes.data || []) as OrderRecord[]);
+          if (!itemsRes.error && mounted) {
+            setMenuItems((itemsRes.data || []) as MenuItemRecord[]);
+          }
+          if (!ordersRes.error && mounted) {
+            setOrders((ordersRes.data || []) as OrderRecord[]);
+          }
           if (stripeRes && mounted) {
             setStripe({
               connected: !!stripeRes.connected,
@@ -752,7 +769,6 @@ export default function DashboardPage() {
     }
 
     void load();
-
     return () => {
       mounted = false;
     };
@@ -804,7 +820,6 @@ export default function DashboardPage() {
       const amount = safeNumber(order.total || 0);
       const created = order.created_at ? new Date(order.created_at) : null;
       if (!created || Number.isNaN(created.getTime())) return;
-
       const createdDay = startOfDay(created);
 
       if (createdDay.getTime() === today.getTime()) {
@@ -907,23 +922,35 @@ export default function DashboardPage() {
 
   const storeLink = restaurant?.slug ? `/store/${restaurant.slug}` : '/dashboard/owner/builder';
 
+  const notifications = useMemo<NotificationItem[]>(() => {
+    if (!orders.length) return [];
+    return orders.slice(0, 5).map((order) => ({
+      id: order.id,
+      title: `${displayStatus(order.status)} • ${currency(safeNumber(order.total || 0))}`,
+      body: order.customer_name || order.items_summary || 'New order activity',
+    }));
+  }, [orders]);
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push('/auth/login');
   }
 
-  async function handleSetOrderLanguage(next: OwnerOrderLanguage) {
-    setOrderLanguage(next);
+  async function handleSetLanguage(next: Lang) {
+    setLang(next);
     if (!restaurant?.id) return;
-
     setSavingLanguage(true);
+
     const tryOwnerField = await supabase
       .from('restaurants')
       .update({ owner_order_language: next })
       .eq('id', restaurant.id);
 
     if (tryOwnerField.error) {
-      await supabase.from('restaurants').update({ order_language: next }).eq('id', restaurant.id);
+      await supabase
+        .from('restaurants')
+        .update({ order_language: next })
+        .eq('id', restaurant.id);
     }
 
     setSavingLanguage(false);
@@ -978,10 +1005,10 @@ export default function DashboardPage() {
             <span>{t.payments}</span>
           </a>
 
-          <a href="#owner-info" className="navItem">
+          <Link href="/dashboard/owner/info" className="navItem">
             <OwnerIcon />
             <span>{t.ownerInfo}</span>
-          </a>
+          </Link>
 
           <Link href="/dashboard/owner/settings" className="navItem">
             <SettingsIcon />
@@ -1006,26 +1033,31 @@ export default function DashboardPage() {
           <div className="topbarLeft">
             <div className="ownerControlBlock">
               <div className="ownerControlLabel">{t.ownerControl}</div>
-              <div className="ownerWelcome">
-                {t.welcome}, {ownerName}
-              </div>
+              <div className="ownerWelcome">{t.welcome}, {ownerName}</div>
             </div>
           </div>
 
           <div className="topbarRight">
             <label className="languageControl">
-              <span className="languageLabel">{t.orderLanguage}</span>
-              <select
-                className="languageSelect"
-                value={orderLanguage}
-                onChange={(e) => {
-                  void handleSetOrderLanguage(e.target.value as OwnerOrderLanguage);
-                }}
-                disabled={savingLanguage}
-              >
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-              </select>
+              <span className="languageLabel">{t.languageLabel}</span>
+              <div className="pillGroup">
+                <button
+                  type="button"
+                  className={lang === 'en' ? 'pillButton active' : 'pillButton'}
+                  onClick={() => void handleSetLanguage('en')}
+                  disabled={savingLanguage}
+                >
+                  {t.english}
+                </button>
+                <button
+                  type="button"
+                  className={lang === 'es' ? 'pillButton active' : 'pillButton'}
+                  onClick={() => void handleSetLanguage('es')}
+                  disabled={savingLanguage}
+                >
+                  {t.spanish}
+                </button>
+              </div>
             </label>
 
             <Link href="/dashboard/owner/builder" className="topActionButton topActionPrimary">
@@ -1058,37 +1090,30 @@ export default function DashboardPage() {
               />
             </div>
 
+            <section className="heroSummaryRow">
+              <div className="heroSummaryCard">
+                <div className="heroSummaryLabel">{t.progressToday}</div>
+                <div className="heroSummaryMain">{currency(salesOverview.todaySales)}</div>
+                <div className="heroSummarySub">
+                  {salesOverview.todayOrders} {t.todayOrders.toLowerCase()} • {Math.abs(salesOverview.revenueChange).toFixed(1)}% {t.salesVsLastWeek}
+                </div>
+              </div>
+            </section>
+
             <section className="card chartCard">
               <div className="cardHeader chartHeader">
                 <h2>{t.salesOverview}</h2>
-
                 <div className="tabGroup">
-                  <button
-                    type="button"
-                    className={range === 'week' ? 'tabButton tabButtonActive' : 'tabButton'}
-                    onClick={() => setRange('week')}
-                  >
+                  <button type="button" className={range === 'week' ? 'tabButton tabButtonActive' : 'tabButton'} onClick={() => setRange('week')}>
                     {t.thisWeek}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'lastWeek' ? 'tabButton tabButtonActive' : 'tabButton'}
-                    onClick={() => setRange('lastWeek')}
-                  >
+                  <button type="button" className={range === 'lastWeek' ? 'tabButton tabButtonActive' : 'tabButton'} onClick={() => setRange('lastWeek')}>
                     {t.lastWeek}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'month' ? 'tabButton tabButtonActive' : 'tabButton'}
-                    onClick={() => setRange('month')}
-                  >
+                  <button type="button" className={range === 'month' ? 'tabButton tabButtonActive' : 'tabButton'} onClick={() => setRange('month')}>
                     {t.thisMonth}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'lastMonth' ? 'tabButton tabButtonActive' : 'tabButton'}
-                    onClick={() => setRange('lastMonth')}
-                  >
+                  <button type="button" className={range === 'lastMonth' ? 'tabButton tabButtonActive' : 'tabButton'} onClick={() => setRange('lastMonth')}>
                     {t.lastMonth}
                   </button>
                 </div>
@@ -1103,25 +1128,10 @@ export default function DashboardPage() {
                         <stop offset="100%" stopColor="#84d7d2" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-
                     <CartesianGrid vertical={false} stroke="#edf0f4" />
-                    <XAxis
-                      dataKey="day"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: '#7e8897', fontSize: 13 }}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: '#9aa4b0', fontSize: 12 }}
-                      tickFormatter={(value: number) => `$${value}`}
-                      width={48}
-                    />
-                    <Tooltip
-                      content={<RevenueTooltip />}
-                      cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }}
-                    />
+                    <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: '#7e8897', fontSize: 13 }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fill: '#9aa4b0', fontSize: 12 }} tickFormatter={(value: number) => `$${value}`} width={48} />
+                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }} />
                     <Area
                       type="monotone"
                       dataKey="value"
@@ -1164,11 +1174,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="orderList">
-                  {filteredLiveOrders.length ? (
-                    filteredLiveOrders.map((order) => <OrderCard key={order.id} order={order} />)
-                  ) : (
-                    <EmptyState text={t.noLiveOrders} />
-                  )}
+                  {filteredLiveOrders.length ? filteredLiveOrders.map((order) => <OrderCard key={order.id} order={order} />) : <EmptyState text={t.noLiveOrders} />}
                 </div>
 
                 <div className="panelFooter">
@@ -1216,26 +1222,18 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="orderList">
-                  {filteredBillingOrders.length ? (
-                    filteredBillingOrders.map((order) => <OrderCard key={order.id} order={order} />)
-                  ) : (
-                    <EmptyState text={t.noBilling} />
-                  )}
+                  {filteredBillingOrders.length ? filteredBillingOrders.map((order) => <OrderCard key={order.id} order={order} />) : <EmptyState text={t.noBilling} />}
                 </div>
               </section>
             </div>
 
-            <section id="owner-info" className="card cancelledCard">
+            <section className="card cancelledCard">
               <div className="cardHeader">
                 <h2>{t.cancelledOrders}</h2>
               </div>
 
               <div className="orderList">
-                {cancelledOrders.length ? (
-                  cancelledOrders.slice(0, 4).map((order) => <OrderCard key={order.id} order={order} />)
-                ) : (
-                  <EmptyState text={t.noCancelled} />
-                )}
+                {cancelledOrders.length ? cancelledOrders.slice(0, 4).map((order) => <OrderCard key={order.id} order={order} />) : <EmptyState text={t.noCancelled} />}
               </div>
             </section>
           </section>
@@ -1243,7 +1241,7 @@ export default function DashboardPage() {
           <section className="mobileOnly">
             <header className="mobileHeader">
               <div className="mobileHeaderTop">
-                <button className="iconButton" type="button" aria-label="Menu">
+                <button className="iconButton" type="button" aria-label="Menu" onClick={() => setMobileMenuOpen(true)}>
                   <MenuIcon />
                 </button>
 
@@ -1252,7 +1250,7 @@ export default function DashboardPage() {
                   <span>MenuFlow</span>
                 </div>
 
-                <button className="iconButton" type="button" aria-label="Notifications">
+                <button className="iconButton" type="button" aria-label="Notifications" onClick={() => setNotificationsOpen(true)}>
                   <BellIcon />
                 </button>
               </div>
@@ -1261,25 +1259,20 @@ export default function DashboardPage() {
             <section className="mobileHeroCard">
               <div className="mobileHeroLeft">
                 <div className="mobileHeroLabel">{t.ownerControl}</div>
-                <h1 className="mobileHeroTitle">
-                  {t.welcome}, {ownerName}
-                </h1>
+                <h1 className="mobileHeroTitle">{t.welcome}, {ownerName}</h1>
               </div>
 
               <div className="mobileHeroRight">
                 <label className="mobileLanguageControl">
-                  <span>{t.orderLanguage}</span>
-                  <select
-                    className="languageSelect mobileSelect"
-                    value={orderLanguage}
-                    onChange={(e) => {
-                      void handleSetOrderLanguage(e.target.value as OwnerOrderLanguage);
-                    }}
-                    disabled={savingLanguage}
-                  >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                  </select>
+                  <span>{t.languageLabel}</span>
+                  <div className="pillGroup mobilePillGroup">
+                    <button type="button" className={lang === 'en' ? 'pillButton active' : 'pillButton'} onClick={() => void handleSetLanguage('en')} disabled={savingLanguage}>
+                      {t.english}
+                    </button>
+                    <button type="button" className={lang === 'es' ? 'pillButton active' : 'pillButton'} onClick={() => void handleSetLanguage('es')} disabled={savingLanguage}>
+                      {t.spanish}
+                    </button>
+                  </div>
                 </label>
 
                 <div className="mobileTopButtons">
@@ -1317,10 +1310,12 @@ export default function DashboardPage() {
                 <span className="mobileMiniStatLabel">{t.todayOrders}</span>
                 <strong>{salesOverview.todayOrders}</strong>
               </div>
+
               <div className="mobileMiniStatCard">
                 <span className="mobileMiniStatLabel">{t.menuItems}</span>
                 <strong>{menuItems.length}</strong>
               </div>
+
               <div className="mobileMiniStatCard mobileMiniStatWide">
                 <span className="mobileMiniStatLabel">{t.weekRevenue}</span>
                 <strong>{currency(salesOverview.weekSales)}</strong>
@@ -1330,34 +1325,19 @@ export default function DashboardPage() {
             <section className="mobileCard mobileGraphCard">
               <div className="mobileGraphHeader premiumGraphHeader">
                 <h2>{t.salesOverview}</h2>
+
                 <div className="mobileTabRow">
-                  <button
-                    type="button"
-                    className={range === 'week' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
-                    onClick={() => setRange('week')}
-                  >
-                    {lang === 'en' ? 'Week' : 'Semana'}
+                  <button type="button" className={range === 'week' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'} onClick={() => setRange('week')}>
+                    {t.thisWeek}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'lastWeek' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
-                    onClick={() => setRange('lastWeek')}
-                  >
-                    {lang === 'en' ? 'Last' : 'Pasada'}
+                  <button type="button" className={range === 'lastWeek' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'} onClick={() => setRange('lastWeek')}>
+                    {t.lastWeek}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'month' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
-                    onClick={() => setRange('month')}
-                  >
-                    {lang === 'en' ? 'Month' : 'Mes'}
+                  <button type="button" className={range === 'month' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'} onClick={() => setRange('month')}>
+                    {t.thisMonth}
                   </button>
-                  <button
-                    type="button"
-                    className={range === 'lastMonth' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
-                    onClick={() => setRange('lastMonth')}
-                  >
-                    {lang === 'en' ? 'Prev' : 'Anterior'}
+                  <button type="button" className={range === 'lastMonth' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'} onClick={() => setRange('lastMonth')}>
+                    {t.lastMonth}
                   </button>
                 </div>
               </div>
@@ -1371,19 +1351,10 @@ export default function DashboardPage() {
                         <stop offset="100%" stopColor="#84d7d2" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-
                     <CartesianGrid vertical={false} stroke="#edf0f4" />
-                    <XAxis
-                      dataKey="day"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: '#7e8897', fontSize: 12 }}
-                    />
+                    <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: '#7e8897', fontSize: 12 }} />
                     <YAxis hide />
-                    <Tooltip
-                      content={<RevenueTooltip />}
-                      cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }}
-                    />
+                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }} />
                     <Area
                       type="monotone"
                       dataKey="value"
@@ -1424,13 +1395,7 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              {filteredLiveOrders.length ? (
-                filteredLiveOrders.slice(0, 4).map((order) => (
-                  <MobileOrderCard key={`mobile-${order.id}`} order={order} />
-                ))
-              ) : (
-                <EmptyState text={t.noLiveOrders} />
-              )}
+              {filteredLiveOrders.length ? filteredLiveOrders.slice(0, 4).map((order) => <MobileOrderCard key={`mobile-${order.id}`} order={order} />) : <EmptyState text={t.noLiveOrders} />}
             </section>
 
             <section className="mobileCard mobileBillingCard">
@@ -1469,13 +1434,7 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              {filteredBillingOrders.length ? (
-                filteredBillingOrders.slice(0, 3).map((order) => (
-                  <MobileOrderCard key={`mobile-billing-${order.id}`} order={order} />
-                ))
-              ) : (
-                <EmptyState text={t.noBilling} />
-              )}
+              {filteredBillingOrders.length ? filteredBillingOrders.slice(0, 3).map((order) => <MobileOrderCard key={`mobile-billing-${order.id}`} order={order} />) : <EmptyState text={t.noBilling} />}
             </section>
 
             <section className="mobileCard">
@@ -1483,17 +1442,67 @@ export default function DashboardPage() {
                 <span>{t.cancelledOrders}</span>
               </div>
 
-              {cancelledOrders.length ? (
-                cancelledOrders.slice(0, 3).map((order) => (
-                  <MobileOrderCard key={`mobile-cancelled-${order.id}`} order={order} />
-                ))
-              ) : (
-                <EmptyState text={t.noCancelled} />
-              )}
+              {cancelledOrders.length ? cancelledOrders.slice(0, 3).map((order) => <MobileOrderCard key={`mobile-cancelled-${order.id}`} order={order} />) : <EmptyState text={t.noCancelled} />}
             </section>
           </section>
         </div>
       </section>
+
+      {mobileMenuOpen ? (
+        <div className="overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="drawerHeader">
+              <div className="brandCard mobileDrawerBrand">
+                <div className="brandMark">M</div>
+                <div className="brandName">MenuFlow</div>
+              </div>
+              <button className="closeBtn" onClick={() => setMobileMenuOpen(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="drawerLinks">
+              <Link href="/dashboard/owner" onClick={() => setMobileMenuOpen(false)}>
+                {t.dashboard}
+              </Link>
+              <Link href="/dashboard/owner/orders" onClick={() => setMobileMenuOpen(false)}>
+                {t.liveOrders}
+              </Link>
+              <Link href="/dashboard/owner/builder" onClick={() => setMobileMenuOpen(false)}>
+                {t.menuBuilder}
+              </Link>
+              <Link href="/dashboard/owner/info" onClick={() => setMobileMenuOpen(false)}>
+                {t.ownerInfo}
+              </Link>
+              <Link href="/dashboard/owner/settings" onClick={() => setMobileMenuOpen(false)}>
+                {t.storeSettings}
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {notificationsOpen ? (
+        <div className="overlay" onClick={() => setNotificationsOpen(false)}>
+          <div className="drawer notificationsDrawer" onClick={(e) => e.stopPropagation()}>
+            <div className="drawerHeader">
+              <strong>{t.notifications}</strong>
+              <button className="closeBtn" onClick={() => setNotificationsOpen(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="notificationsList">
+              {notifications.length ? notifications.map((item) => (
+                <div key={item.id} className="notificationCard">
+                  <strong>{item.title}</strong>
+                  <span>{item.body}</span>
+                </div>
+              )) : <div className="emptyNotification">{t.noNotifications}</div>}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <style jsx>{`
         :global(html),
@@ -1501,14 +1510,7 @@ export default function DashboardPage() {
           margin: 0;
           padding: 0;
           background: #efeff2;
-          font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            'Segoe UI',
-            sans-serif;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           color: #111827;
         }
 
@@ -1524,7 +1526,7 @@ export default function DashboardPage() {
         .pageShell {
           min-height: 100vh;
           background: radial-gradient(circle at top, rgba(255, 255, 255, 0.86), rgba(240, 241, 244, 0.94));
-          padding: 28px;
+          padding: 28px 28px 110px;
         }
 
         .sidebar {
@@ -1696,17 +1698,31 @@ export default function DashboardPage() {
           font-weight: 600;
         }
 
-        .languageSelect {
-          min-width: 168px;
-          height: 44px;
-          border-radius: 14px;
+        .pillGroup {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           border: 1px solid #e5e9ee;
           background: #fff;
-          padding: 0 14px;
-          font: inherit;
-          color: #111827;
-          outline: none;
+          padding: 4px;
+          border-radius: 16px;
           box-shadow: 0 8px 20px rgba(20, 23, 28, 0.03);
+        }
+
+        .pillButton {
+          border: 0;
+          background: transparent;
+          min-height: 36px;
+          padding: 0 14px;
+          border-radius: 12px;
+          color: #6b7280;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .pillButton.active {
+          background: #eff6f5;
+          color: #2f6463;
         }
 
         .topActionButton,
@@ -1784,6 +1800,41 @@ export default function DashboardPage() {
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 12px;
           margin-bottom: 14px;
+        }
+
+        .heroSummaryRow {
+          margin-bottom: 14px;
+        }
+
+        .heroSummaryCard {
+          min-height: 100px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, #ffffff 0%, #f7fafb 100%);
+          border: 1px solid #e8ebef;
+          padding: 18px 20px;
+          box-shadow: 0 14px 34px rgba(20, 23, 28, 0.04);
+        }
+
+        .heroSummaryLabel {
+          color: #67707f;
+          font-size: 0.95rem;
+          font-weight: 700;
+        }
+
+        .heroSummaryMain {
+          margin-top: 8px;
+          font-size: 2rem;
+          line-height: 1;
+          font-weight: 800;
+          letter-spacing: -0.04em;
+          color: #111827;
+        }
+
+        .heroSummarySub {
+          margin-top: 10px;
+          color: #67707f;
+          font-size: 0.92rem;
+          font-weight: 600;
         }
 
         .card,
@@ -2013,9 +2064,8 @@ export default function DashboardPage() {
           font-weight: 700;
         }
 
-        .mobileSelect {
-          width: 100%;
-          min-width: 100%;
+        .mobilePillGroup {
+          width: fit-content;
         }
 
         .mobileTopButtons {
@@ -2175,23 +2225,108 @@ export default function DashboardPage() {
           margin-bottom: 12px;
         }
 
+        .overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.34);
+          z-index: 80;
+          display: flex;
+          justify-content: flex-start;
+        }
+
+        .drawer {
+          width: 82%;
+          max-width: 340px;
+          height: 100%;
+          background: #fff;
+          box-shadow: 20px 0 50px rgba(15, 23, 42, 0.18);
+          padding: 18px 16px;
+          overflow: auto;
+        }
+
+        .notificationsDrawer {
+          margin-left: auto;
+          width: 88%;
+          max-width: 380px;
+        }
+
+        .drawerHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .mobileDrawerBrand {
+          padding: 0;
+        }
+
+        .closeBtn {
+          width: 38px;
+          height: 38px;
+          border: 1px solid #e5e7eb;
+          background: #fff;
+          border-radius: 12px;
+          cursor: pointer;
+          font-size: 1rem;
+        }
+
+        .drawerLinks {
+          display: grid;
+          gap: 8px;
+        }
+
+        .drawerLinks a {
+          min-height: 48px;
+          display: flex;
+          align-items: center;
+          padding: 0 14px;
+          border-radius: 14px;
+          background: #f8fafc;
+          font-weight: 700;
+          color: #111827;
+        }
+
+        .notificationsList {
+          display: grid;
+          gap: 10px;
+        }
+
+        .notificationCard {
+          border: 1px solid #e8ebef;
+          background: #fff;
+          border-radius: 16px;
+          padding: 12px;
+          display: grid;
+          gap: 6px;
+        }
+
+        .notificationCard strong {
+          color: #111827;
+          font-size: 0.96rem;
+        }
+
+        .notificationCard span,
+        .emptyNotification {
+          color: #6b7280;
+          font-size: 0.92rem;
+        }
+
         @media (max-width: 1180px) {
           .pageShell {
-            padding: 18px;
+            padding: 18px 18px 110px;
           }
-
           .sidebar {
             width: 196px;
             left: 18px;
             top: 18px;
             bottom: 18px;
           }
-
           .mainArea {
             margin-left: 214px;
             padding-left: 18px;
           }
-
           .statsRow {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
@@ -2199,27 +2334,23 @@ export default function DashboardPage() {
 
         @media (max-width: 900px) {
           .pageShell {
-            padding: 16px;
+            padding: 16px 16px 110px;
           }
-
           .sidebar,
           .desktopTopbar,
           .desktopOnly {
             display: none;
           }
-
           .mainArea {
             margin-left: 0;
             padding-left: 0;
           }
-
           .contentGrid {
             padding: 0;
             border: 0;
             background: transparent;
             box-shadow: none;
           }
-
           .mobileOnly {
             display: block;
           }
@@ -2227,45 +2358,34 @@ export default function DashboardPage() {
 
         @media (max-width: 560px) {
           .pageShell {
-            padding: 12px;
+            padding: 12px 12px 110px;
           }
-
           .mobileHeaderTop {
             height: 70px;
             padding: 0 12px;
           }
-
           .mobileBrand {
             font-size: 1.15rem;
             gap: 10px;
           }
-
           .mobileBrandMark {
             width: 36px;
             height: 36px;
             border-radius: 12px;
             font-size: 1rem;
           }
-
           .mobileHeroCard,
           .mobileSalesHero,
           .mobileCard,
           .mobileMiniStatCard {
             border-radius: 20px;
           }
-
           .mobileHeroTitle {
             font-size: 1.8rem;
           }
-
           .mobileHeroValue {
             font-size: 2.2rem;
           }
-
-          .mobileTopButtons {
-            grid-template-columns: 1fr 1fr;
-          }
-
           .mobileChartWrapPremium {
             height: 240px;
           }
@@ -2275,17 +2395,14 @@ export default function DashboardPage() {
           .mobileTopButtons {
             grid-template-columns: 1fr;
           }
-
           .mobileSalesHeroTop {
             flex-direction: column;
             align-items: flex-start;
           }
-
           .mobileHeroTrend {
             width: 100%;
             justify-content: flex-start;
           }
-
           .mobileMiniStatsPremium {
             grid-template-columns: 1fr 1fr;
           }
