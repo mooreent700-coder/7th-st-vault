@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -141,12 +142,12 @@ function RevenueTooltip(props: {
 
       <style jsx>{`
         .tooltipCard {
-          background: #66c8c6;
+          background: #67c9c6;
           color: #fff;
           border-radius: 12px;
           padding: 8px 12px;
-          border: 1px solid rgba(255, 255, 255, 0.45);
-          box-shadow: 0 14px 28px rgba(60, 91, 111, 0.16);
+          border: 1px solid rgba(255, 255, 255, 0.42);
+          box-shadow: 0 14px 30px rgba(43, 77, 83, 0.18);
         }
         .tooltipValue {
           font-size: 1.05rem;
@@ -187,19 +188,19 @@ function StatCard(props: {
 
       <style jsx>{`
         .statCard {
-          min-height: 92px;
+          min-height: 94px;
           padding: 16px 18px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          background: rgba(255, 255, 255, 0.88);
-          border: 1px solid #e8ebef;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid #e7eaef;
           border-radius: 18px;
           box-shadow: 0 14px 34px rgba(20, 23, 28, 0.04);
         }
         .statTitle {
           color: #5e6674;
-          font-size: 0.98rem;
+          font-size: 0.96rem;
           font-weight: 500;
         }
         .statValueRow {
@@ -215,7 +216,7 @@ function StatCard(props: {
           transform: translateY(1px);
         }
         .trendNegative {
-          color: #c98282;
+          color: #cf8686;
         }
         .statValue {
           color: #111827;
@@ -544,15 +545,6 @@ function StorefrontIcon() {
   );
 }
 
-function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8" />
-      <path d="m20 20-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function MenuIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -611,7 +603,6 @@ export default function Page() {
         .maybeSingle();
 
       const profile = (profileResult.data || null) as ProfileRow | null;
-
       const welcomeName =
         profile?.business_name || profile?.name || profile?.full_name || 'Owner';
 
@@ -761,24 +752,24 @@ export default function Page() {
       }
     });
 
-    const weekData = Array.from({ length: 7 }).map((_, index) => {
+    const weekData: ChartPoint[] = Array.from({ length: 7 }).map((_, index) => {
       const d = addDays(currentWeekStart, index);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       return { day: DAY_LABELS[d.getDay()], value: weekMap.get(key) || 0 };
     });
 
-    const lastWeekData = Array.from({ length: 7 }).map((_, index) => {
+    const lastWeekData: ChartPoint[] = Array.from({ length: 7 }).map((_, index) => {
       const d = addDays(previousWeekStart, index);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       return { day: DAY_LABELS[d.getDay()], value: prevWeekMap.get(key) || 0 };
     });
 
-    const monthData = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
+    const monthData: ChartPoint[] = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
       day: label,
       value: monthWeekMap.get(label) || 0,
     }));
 
-    const lastMonthData = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
+    const lastMonthData: ChartPoint[] = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
       day: label,
       value: prevMonthWeekMap.get(label) || 0,
     }));
@@ -938,14 +929,10 @@ export default function Page() {
               </select>
             </label>
 
-            <label className="searchField" htmlFor="dashboard-search">
-              <SearchIcon />
-              <input id="dashboard-search" type="text" placeholder="Search" />
-            </label>
-
-            <Link href="/dashboard/owner/builder" className="topActionButton">
+            <Link href="/dashboard/owner/builder" className="topActionButton topActionPrimary">
               Open Builder
             </Link>
+
             <Link href={storeHref} className="topActionButton">
               View Store
             </Link>
@@ -1029,10 +1016,13 @@ export default function Page() {
                       tickLine={false}
                       axisLine={false}
                       tick={{ fill: '#9aa4b0', fontSize: 12 }}
-                      tickFormatter={(value) => `$${value}`}
+                      tickFormatter={(value: number) => `$${value}`}
                       width={48}
                     />
-                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }} />
+                    <Tooltip
+                      content={<RevenueTooltip />}
+                      cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="value"
@@ -1119,7 +1109,11 @@ export default function Page() {
                       <span className="connectedDot" />
                       {stripeConnected ? 'Connected' : 'Incomplete'}
                     </div>
-                    <div className={`connectedPill ${restaurant?.stripe_payouts_enabled ? '' : 'connectedPillMuted'}`}>
+                    <div
+                      className={`connectedPill ${
+                        restaurant?.stripe_payouts_enabled ? '' : 'connectedPillMuted'
+                      }`}
+                    >
                       <span className="connectedDot" />
                       {restaurant?.stripe_payouts_enabled ? 'Payouts enabled' : 'Payouts incomplete'}
                     </div>
@@ -1169,89 +1163,111 @@ export default function Page() {
               </div>
             </header>
 
-            <div className="mobileGreetingCard">
-              <div className="mobileGreetingLabel">Owner Control</div>
-              <div className="mobileGreetingName">Welcome back, {ownerName}</div>
-            </div>
+            <section className="mobileHeroCard">
+              <div className="mobileHeroLeft">
+                <div className="mobileHeroLabel">Owner Control</div>
+                <h1 className="mobileHeroTitle">Welcome back, {ownerName}</h1>
+              </div>
 
-            <div className="mobileControlBar">
-              <label className="mobileLanguageControl">
-                <span>Order Language</span>
-                <select
-                  className="languageSelect mobileSelect"
-                  value={orderLanguage}
-                  onChange={(e) => {
-                    void saveOrderLanguage(e.target.value as OrderLanguage);
-                  }}
-                  disabled={savingLanguage}
-                >
-                  <option value="EN">English</option>
-                  <option value="ES">Spanish</option>
-                </select>
-              </label>
+              <div className="mobileHeroRight">
+                <label className="mobileLanguageControl">
+                  <span>Order Language</span>
+                  <select
+                    className="languageSelect mobileSelect"
+                    value={orderLanguage}
+                    onChange={(e) => {
+                      void saveOrderLanguage(e.target.value as OrderLanguage);
+                    }}
+                    disabled={savingLanguage}
+                  >
+                    <option value="EN">English</option>
+                    <option value="ES">Spanish</option>
+                  </select>
+                </label>
 
-              <div className="mobileTopButtons">
-                <Link href="/dashboard/owner/builder" className="mobileActionButton">
-                  Open Builder
-                </Link>
-                <Link href={storeHref} className="mobileActionButton">
-                  View Store
-                </Link>
+                <div className="mobileTopButtons">
+                  <Link href="/dashboard/owner/builder" className="mobileActionButton mobileActionPrimary">
+                    Open Builder
+                  </Link>
+                  <Link href={storeHref} className="mobileActionButton">
+                    View Store
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <section className="mobileSalesHero">
+              <div className="mobileSalesHeroTop">
+                <div>
+                  <div className="mobileHeroMiniLabel">Today’s Sales</div>
+                  <div className="mobileHeroValue">{currency(salesOverview.todaySales)}</div>
+                </div>
+
+                <div className="mobileHeroTrend">
+                  <span className={`trendArrow ${salesOverview.revenueChange < 0 ? 'trendNegative' : ''}`}>
+                    {salesOverview.revenueChange >= 0 ? '↑' : '↓'}
+                  </span>
+                  <div className="mobileHeroTrendText">
+                    <strong>{Math.abs(salesOverview.revenueChange).toFixed(1)}%</strong>
+                    <span>This Week</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div className="mobileMiniStatsPremium">
+              <div className="mobileMiniStatCard">
+                <span className="mobileMiniStatLabel">Today’s Orders</span>
+                <strong>{salesOverview.todayOrders}</strong>
+              </div>
+              <div className="mobileMiniStatCard">
+                <span className="mobileMiniStatLabel">Menu Items</span>
+                <strong>{menuCount}</strong>
+              </div>
+              <div className="mobileMiniStatCard mobileMiniStatWide">
+                <span className="mobileMiniStatLabel">Revenue This Week</span>
+                <strong>{currency(salesOverview.weekSales)}</strong>
               </div>
             </div>
 
-            <div className="mobileOverviewHeading">
-              <h1>Overview</h1>
-            </div>
-
-            <div className="mobileSalesCard mobileCard">
-              <div className="mobileSalesTop">
-                <div className="mobileLabel">Today's Sales</div>
-                <div className="mobileValue">{currency(salesOverview.todaySales)}</div>
-              </div>
-
-              <div className="mobileSalesSubtle">
-                <span className="tinyDot" />
-                This Week
-              </div>
-            </div>
-
-            <div className="mobileMiniStats">
-              <div className="mobileMiniCard">
-                <div className="mobileLabel">Today's Orders</div>
-                <div className="mobileMiniValue">{salesOverview.todayOrders}</div>
-              </div>
-
-              <div className="mobileMiniCard">
-                <div className="mobileLabel">Menu</div>
-                <div className="mobileMiniValue">{menuCount}</div>
-              </div>
-            </div>
-
-            <div className="mobileRevenueCard mobileCard">
-              <div className="mobileRevenueTop">
-                <div className="mobileLabel">Revenue</div>
-                <div className="mobileValue">{currency(salesOverview.weekSales)}</div>
-              </div>
-
-              <div className="mobileRevenuePill">
-                <span className="tinyDot tinyDotGreen" />
-                {salesOverview.revenueChange >= 0 ? '+' : '-'}
-                {Math.abs(salesOverview.revenueChange).toFixed(1)}%
-              </div>
-            </div>
-
-            <section className="mobileGraphCard mobileCard">
-              <div className="mobileGraphHeader">
+            <section className="mobileCard mobileGraphCard">
+              <div className="mobileGraphHeader premiumGraphHeader">
                 <h2>Sales Overview</h2>
-                <button type="button" className="mobileGraphTab">
-                  This Week
-                </button>
+                <div className="mobileTabRow">
+                  <button
+                    type="button"
+                    className={range === 'week' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
+                    onClick={() => setRange('week')}
+                  >
+                    Week
+                  </button>
+                  <button
+                    type="button"
+                    className={range === 'lastWeek' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
+                    onClick={() => setRange('lastWeek')}
+                  >
+                    Last
+                  </button>
+                  <button
+                    type="button"
+                    className={range === 'month' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
+                    onClick={() => setRange('month')}
+                  >
+                    Month
+                  </button>
+                  <button
+                    type="button"
+                    className={range === 'lastMonth' ? 'mobileTabButton mobileTabButtonActive' : 'mobileTabButton'}
+                    onClick={() => setRange('lastMonth')}
+                  >
+                    Prev
+                  </button>
+                </div>
               </div>
 
-              <div className="mobileChartWrap">
+              <div className="mobileChartWrapPremium">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={salesOverview.weekData} margin={{ top: 10, right: 0, left: -26, bottom: 0 }}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -24, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revenueFillMobile" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#84d7d2" stopOpacity={0.34} />
@@ -1267,7 +1283,10 @@ export default function Page() {
                       tick={{ fill: '#7e8897', fontSize: 12 }}
                     />
                     <YAxis hide />
-                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }} />
+                    <Tooltip
+                      content={<RevenueTooltip />}
+                      cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }}
+                    />
                     <Area
                       type="monotone"
                       dataKey="value"
@@ -1282,7 +1301,7 @@ export default function Page() {
               </div>
             </section>
 
-            <section className="mobileCard">
+            <section className="mobileCard mobileOrdersCard">
               <div className="mobileCardHeader">
                 <span>Live Orders</span>
                 <Link href="/dashboard/orders" className="mobileViewAll">
@@ -1290,14 +1309,34 @@ export default function Page() {
                 </Link>
               </div>
 
-              {liveOrders.length ? (
-                liveOrders.slice(0, 4).map((order) => <MobileOrderCard key={`mobile-${order.id}`} order={order} />)
+              <div className="filterRow mobileFilterRow">
+                {([
+                  { key: 'ALL', label: 'All' },
+                  { key: 'NEW', label: 'New' },
+                  { key: 'YELLOW', label: 'Yellow' },
+                  { key: 'GREEN', label: 'Green' },
+                ] as const).map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={orderFilter === item.key ? 'filterButton filterButtonActive' : 'filterButton'}
+                    onClick={() => setOrderFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredLiveOrders.length ? (
+                filteredLiveOrders.slice(0, 4).map((order) => (
+                  <MobileOrderCard key={`mobile-${order.id}`} order={order} />
+                ))
               ) : (
                 <EmptyState text="No live orders yet" />
               )}
             </section>
 
-            <section className="mobileCard">
+            <section className="mobileCard mobileBillingCard">
               <div className="mobileCardHeader">
                 <span>Billing</span>
               </div>
@@ -1309,14 +1348,38 @@ export default function Page() {
                   <span className="connectedDot" />
                   {stripeConnected ? 'Connected' : 'Incomplete'}
                 </div>
-                <div className={`connectedPill ${restaurant?.stripe_payouts_enabled ? '' : 'connectedPillMuted'}`}>
+                <div
+                  className={`connectedPill ${
+                    restaurant?.stripe_payouts_enabled ? '' : 'connectedPillMuted'
+                  }`}
+                >
                   <span className="connectedDot" />
                   {restaurant?.stripe_payouts_enabled ? 'Payouts enabled' : 'Payouts incomplete'}
                 </div>
               </div>
 
-              {billingOrders.length ? (
-                billingOrders.slice(0, 3).map((order) => <MobileOrderCard key={`mobile-billing-${order.id}`} order={order} />)
+              <div className="filterRow mobileFilterRow">
+                {([
+                  { key: 'ALL', label: 'All' },
+                  { key: 'NEW', label: 'New' },
+                  { key: 'YELLOW', label: 'Yellow' },
+                  { key: 'GREEN', label: 'Green' },
+                ] as const).map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={billingFilter === item.key ? 'filterButton filterButtonActive' : 'filterButton'}
+                    onClick={() => setBillingFilter(item.key)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              {filteredBillingOrders.length ? (
+                filteredBillingOrders.slice(0, 3).map((order) => (
+                  <MobileOrderCard key={`mobile-billing-${order.id}`} order={order} />
+                ))
               ) : (
                 <EmptyState text="No billing activity yet" />
               )}
@@ -1328,7 +1391,9 @@ export default function Page() {
               </div>
 
               {cancelledOrders.length ? (
-                cancelledOrders.slice(0, 3).map((order) => <MobileOrderCard key={`mobile-cancelled-${order.id}`} order={order} />)
+                cancelledOrders.slice(0, 3).map((order) => (
+                  <MobileOrderCard key={`mobile-cancelled-${order.id}`} order={order} />
+                ))
               ) : (
                 <EmptyState text="No cancelled orders" />
               )}
@@ -1535,8 +1600,8 @@ export default function Page() {
 
         .languageSelect {
           min-width: 168px;
-          height: 42px;
-          border-radius: 12px;
+          height: 44px;
+          border-radius: 14px;
           border: 1px solid #e5e9ee;
           background: #fff;
           padding: 0 14px;
@@ -1546,40 +1611,13 @@ export default function Page() {
           box-shadow: 0 8px 20px rgba(20, 23, 28, 0.03);
         }
 
-        .searchField {
-          height: 42px;
-          min-width: 220px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 0 14px;
-          background: #fff;
-          border: 1px solid #e5e9ee;
-          border-radius: 12px;
-          color: #9aa3af;
-        }
-
-        .searchField input {
-          border: 0;
-          outline: 0;
-          width: 100%;
-          font: inherit;
-          background: transparent;
-          color: #111827;
-        }
-
-        .searchField input::placeholder {
-          color: #9aa3af;
-        }
-
         .topActionButton,
         .mobileActionButton,
         .viewAllButton,
         .mobileViewAll,
         .tabButton,
         .filterButton,
-        .iconButton,
-        .mobileGraphTab {
+        .iconButton {
           border: 0;
           background: transparent;
           cursor: pointer;
@@ -1588,18 +1626,25 @@ export default function Page() {
 
         .topActionButton,
         .mobileActionButton {
-          height: 42px;
+          height: 44px;
           padding: 0 16px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           border: 1px solid #e5e9ee;
-          border-radius: 12px;
+          border-radius: 14px;
           background: #fff;
           color: #111827;
-          font-weight: 600;
+          font-weight: 700;
           box-shadow: 0 8px 20px rgba(20, 23, 28, 0.03);
           white-space: nowrap;
+        }
+
+        .topActionPrimary,
+        .mobileActionPrimary {
+          background: #0f172a;
+          color: #fff;
+          border-color: #0f172a;
         }
 
         .contentGrid {
@@ -1617,7 +1662,6 @@ export default function Page() {
 
         .overviewHeading h1,
         .cardHeader h2,
-        .mobileOverviewHeading h1,
         .mobileCardHeader span,
         .mobileGraphHeader h2 {
           margin: 0;
@@ -1646,12 +1690,12 @@ export default function Page() {
 
         .card,
         .mobileCard,
-        .mobileGreetingCard,
-        .mobileControlBar,
-        .mobileMiniCard {
-          background: rgba(255, 255, 255, 0.9);
+        .mobileHeroCard,
+        .mobileSalesHero,
+        .mobileMiniStatCard {
+          background: rgba(255, 255, 255, 0.92);
           border: 1px solid #e8ebef;
-          border-radius: 18px;
+          border-radius: 22px;
           box-shadow: 0 14px 34px rgba(20, 23, 28, 0.04);
         }
 
@@ -1696,21 +1740,22 @@ export default function Page() {
         .filterButton,
         .viewAllButton,
         .mobileViewAll,
-        .mobileGraphTab {
+        .mobileTabButton {
           min-height: 36px;
           padding: 0 14px;
           border-radius: 12px;
           background: #fff;
           border: 1px solid #e8ebef;
           color: #6b7280;
-          font-weight: 500;
+          font-weight: 600;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
 
         .tabButtonActive,
-        .filterButtonActive {
+        .filterButtonActive,
+        .mobileTabButtonActive {
           background: #eff6f5;
           color: #4f7f7e;
           border-color: #dce9e8;
@@ -1756,7 +1801,7 @@ export default function Page() {
           background: #f5fbfb;
           border: 1px solid #dfeded;
           color: #4f7f7e;
-          font-weight: 600;
+          font-weight: 700;
           display: inline-flex;
           align-items: center;
           gap: 8px;
@@ -1768,18 +1813,12 @@ export default function Page() {
           color: #7b8594;
         }
 
-        .connectedDot,
-        .tinyDot,
-        .tinyDotGreen {
+        .connectedDot {
           width: 8px;
           height: 8px;
           border-radius: 999px;
           display: inline-block;
           background: #9bc8c7;
-        }
-
-        .tinyDotGreen {
-          background: #76c9a0;
         }
 
         .cancelledCard {
@@ -1839,39 +1878,46 @@ export default function Page() {
           letter-spacing: -0.03em;
         }
 
-        .mobileGreetingCard,
-        .mobileControlBar {
-          padding: 16px;
-          margin-bottom: 12px;
+        .mobileHeroCard {
+          padding: 18px;
+          margin-bottom: 14px;
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 16px;
         }
 
-        .mobileGreetingLabel {
-          font-size: 0.9rem;
-          color: #757e8c;
-          font-weight: 600;
-        }
-
-        .mobileGreetingName {
-          margin-top: 6px;
-          font-size: 1.75rem;
-          line-height: 1.08;
+        .mobileHeroLabel {
+          font-size: 0.92rem;
+          color: #6f7887;
           font-weight: 700;
+        }
+
+        .mobileHeroTitle {
+          margin: 8px 0 0;
+          font-size: 2rem;
+          line-height: 1.04;
+          font-weight: 800;
+          letter-spacing: -0.05em;
           color: #111827;
-          letter-spacing: -0.04em;
+        }
+
+        .mobileHeroRight {
+          display: grid;
+          gap: 12px;
         }
 
         .mobileLanguageControl {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          margin-bottom: 12px;
           color: #6d7684;
           font-size: 0.86rem;
-          font-weight: 600;
+          font-weight: 700;
         }
 
         .mobileSelect {
           width: 100%;
+          min-width: 100%;
         }
 
         .mobileTopButtons {
@@ -1880,100 +1926,155 @@ export default function Page() {
           gap: 10px;
         }
 
-        .mobileOverviewHeading {
-          margin-bottom: 12px;
+        .mobileSalesHero {
+          padding: 18px;
+          margin-bottom: 14px;
+          background: linear-gradient(180deg, #ffffff 0%, #f7fafb 100%);
         }
 
-        .mobileOverviewHeading h1 {
+        .mobileSalesHeroTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+        }
+
+        .mobileHeroMiniLabel {
+          color: #67707f;
+          font-size: 0.95rem;
+          font-weight: 700;
+        }
+
+        .mobileHeroValue {
+          margin-top: 8px;
+          font-size: 2.45rem;
+          line-height: 1;
+          font-weight: 800;
+          letter-spacing: -0.05em;
+          color: #111827;
+        }
+
+        .mobileHeroTrend {
+          min-width: 116px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          padding: 10px 12px;
+          border-radius: 16px;
+          background: #f3f9f8;
+          border: 1px solid #deeceb;
+        }
+
+        .mobileHeroTrendText {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          line-height: 1.1;
+        }
+
+        .mobileHeroTrendText strong {
+          font-size: 1rem;
+          color: #111827;
+        }
+
+        .mobileHeroTrendText span {
+          margin-top: 4px;
+          font-size: 0.78rem;
+          color: #6d7684;
+          font-weight: 700;
+        }
+
+        .trendArrow {
+          color: #66c7c4;
+          font-size: 1.25rem;
+          line-height: 1;
+        }
+
+        .trendNegative {
+          color: #cf8686;
+        }
+
+        .mobileMiniStatsPremium {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .mobileMiniStatCard {
+          min-height: 118px;
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        .mobileMiniStatWide {
+          grid-column: 1 / -1;
+          min-height: 108px;
+        }
+
+        .mobileMiniStatLabel {
+          color: #66707d;
+          font-size: 0.95rem;
+          font-weight: 700;
+        }
+
+        .mobileMiniStatCard strong {
           font-size: 2rem;
           line-height: 1;
+          color: #111827;
+          letter-spacing: -0.04em;
         }
 
         .mobileCard {
           padding: 16px;
         }
 
-        .mobileSalesCard,
-        .mobileRevenueCard,
-        .mobileGraphCard {
-          margin-bottom: 12px;
+        .mobileGraphCard,
+        .mobileOrdersCard,
+        .mobileBillingCard {
+          margin-bottom: 14px;
         }
 
-        .mobileSalesTop,
-        .mobileRevenueTop {
+        .premiumGraphHeader {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .premiumGraphHeader h2 {
+          font-size: 1.18rem;
+        }
+
+        .mobileTabRow {
           display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-        }
-
-        .mobileMiniStats {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin-bottom: 12px;
-        }
-
-        .mobileMiniCard {
-          min-height: 118px;
-          padding: 16px;
-        }
-
-        .mobileLabel {
-          color: #5f6774;
-          font-size: 0.98rem;
-          font-weight: 500;
-        }
-
-        .mobileSalesSubtle {
-          margin-top: 10px;
-          color: #8a93a0;
-          font-size: 0.86rem;
-          display: flex;
-          align-items: center;
           gap: 8px;
+          flex-wrap: wrap;
         }
 
-        .mobileValue {
-          font-size: 2.05rem;
-          font-weight: 700;
-          color: #111827;
-          line-height: 1;
+        .mobileTabButton {
+          min-height: 34px;
+          padding: 0 14px;
         }
 
-        .mobileMiniValue {
-          margin-top: 22px;
-          color: #111827;
-          font-weight: 700;
-          font-size: 2.15rem;
-          line-height: 1;
-        }
-
-        .mobileRevenuePill {
-          margin-top: 14px;
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          min-height: 30px;
-          padding: 0 12px;
-          border-radius: 999px;
-          background: #edf5f2;
-          color: #568d72;
-          font-size: 0.88rem;
-          font-weight: 600;
-        }
-
-        .mobileGraphHeader {
-          margin-bottom: 8px;
-        }
-
-        .mobileGraphHeader h2 {
-          font-size: 1.12rem;
-        }
-
-        .mobileChartWrap {
-          height: 220px;
+        .mobileChartWrapPremium {
+          margin-top: 8px;
+          height: 260px;
           width: 100%;
+        }
+
+        .mobileCardHeader {
+          margin-bottom: 12px;
+        }
+
+        .mobileCardHeader span {
+          font-size: 1.18rem;
+        }
+
+        .mobileFilterRow {
+          margin-bottom: 12px;
         }
 
         .loadingOverlay {
@@ -2061,24 +2162,47 @@ export default function Page() {
             font-size: 1rem;
           }
 
-          .mobileGreetingName {
-            font-size: 1.55rem;
+          .mobileHeroCard,
+          .mobileSalesHero,
+          .mobileCard,
+          .mobileMiniStatCard {
+            border-radius: 20px;
           }
 
-          .mobileOverviewHeading h1 {
-            font-size: 1.95rem;
+          .mobileHeroTitle {
+            font-size: 1.8rem;
           }
 
-          .mobileValue {
-            font-size: 1.9rem;
-          }
-
-          .mobileMiniValue {
-            font-size: 2rem;
+          .mobileHeroValue {
+            font-size: 2.2rem;
           }
 
           .mobileTopButtons {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .mobileChartWrapPremium {
+            height: 240px;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .mobileTopButtons {
             grid-template-columns: 1fr;
+          }
+
+          .mobileSalesHeroTop {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .mobileHeroTrend {
+            width: 100%;
+            justify-content: flex-start;
+          }
+
+          .mobileMiniStatsPremium {
+            grid-template-columns: 1fr 1fr;
           }
         }
       `}</style>
