@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
@@ -49,6 +49,8 @@ const copy = {
     viewStore: 'View Store',
     customer: 'Customer',
     orderReceived: 'Order received',
+    liveNow: 'Live now',
+    connected: 'Realtime connected',
   },
   es: {
     title: 'Pedidos activos',
@@ -63,6 +65,8 @@ const copy = {
     viewStore: 'Ver tienda',
     customer: 'Cliente',
     orderReceived: 'Pedido recibido',
+    liveNow: 'En vivo',
+    connected: 'Tiempo real conectado',
   },
 } as const;
 
@@ -131,6 +135,14 @@ function findOrderImage(order: OrderRecord, menuItems: MenuItemRecord[]) {
   return matched?.image_url || fallbackImage(matched?.name || order.customer_name || 'Order');
 }
 
+function sortOrdersNewest(list: OrderRecord[]) {
+  return [...list].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
 export default function OwnerOrdersPage() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>('en');
@@ -139,6 +151,7 @@ export default function OwnerOrdersPage() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemRecord[]>([]);
   const [filter, setFilter] = useState<FilterKey>('all');
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const t = copy[lang];
 
@@ -184,17 +197,81 @@ export default function OwnerOrdersPage() {
               .select('id, customer_name, total, status, created_at, items_summary')
               .eq('restaurant_id', r.id)
               .order('created_at', { ascending: false })
-              .limit(100),
+              .limit(200),
             supabase.from('menu_items').select('id, name, image_url').eq('restaurant_id', r.id),
           ]);
 
           if (!ordersRes.error && mounted) {
-            setOrders((ordersRes.data || []) as OrderRecord[]);
+            setOrders(sortOrdersNewest((ordersRes.data || []) as OrderRecord[]));
           }
 
           if (!itemsRes.error && mounted) {
             setMenuItems((itemsRes.data || []) as MenuItemRecord[]);
           }
+
+          if (channelRef.current) {
+            supabase.removeChannel(channelRef.current);
+            channelRef.current = null;
+          }
+
+          const channel = supabase
+            .channel(`owner-orders-${r.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'orders',
+                filter: `restaurant_id=eq.${r.id}`,
+              },
+              async (payload) => {
+                const eventType = payload.eventType;
+
+                if (eventType === 'INSERT') {
+                  const inserted = payload.new as OrderRecord;
+                  setOrders((prev) => {
+                    const exists = prev.some((item) => item.id === inserted.id);
+                    if (exists) {
+                      return sortOrdersNewest(
+                        prev.map((item) => (item.id === inserted.id ? { ...item, ...inserted } : item))
+                      );
+                    }
+                    return sortOrdersNewest([inserted, ...prev]);
+                  });
+                  return;
+                }
+
+                if (eventType === 'UPDATE') {
+                  const updated = payload.new as OrderRecord;
+                  setOrders((prev) =>
+                    sortOrdersNewest(
+                      prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+                    )
+                  );
+                  return;
+                }
+
+                if (eventType === 'DELETE') {
+                  const deleted = payload.old as OrderRecord;
+                  setOrders((prev) => prev.filter((item) => item.id !== deleted.id));
+                  return;
+                }
+
+                const refresh = await supabase
+                  .from('orders')
+                  .select('id, customer_name, total, status, created_at, items_summary')
+                  .eq('restaurant_id', r.id)
+                  .order('created_at', { ascending: false })
+                  .limit(200);
+
+                if (!refresh.error) {
+                  setOrders(sortOrdersNewest((refresh.data || []) as OrderRecord[]));
+                }
+              }
+            )
+            .subscribe();
+
+          channelRef.current = channel;
         }
       } catch (error) {
         console.error(error);
@@ -207,6 +284,10 @@ export default function OwnerOrdersPage() {
 
     return () => {
       mounted = false;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [router]);
 
@@ -251,6 +332,10 @@ export default function OwnerOrdersPage() {
     <main className="page">
       <div className="topbar">
         <div>
+          <div className="liveBadgeRow">
+            <span className="liveBadge">{t.liveNow}</span>
+            <span className="liveText">{t.connected}</span>
+          </div>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </div>
@@ -346,6 +431,35 @@ export default function OwnerOrdersPage() {
           justify-content: space-between;
           gap: 16px;
           margin-bottom: 16px;
+        }
+
+        .liveBadgeRow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+          flex-wrap: wrap;
+        }
+
+        .liveBadge {
+          min-height: 28px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: #e8fbf5;
+          color: #0f766e;
+          border: 1px solid #ccefe3;
+          display: inline-flex;
+          align-items: center;
+          font-size: 0.78rem;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+
+        .liveText {
+          color: #64748b;
+          font-size: 0.9rem;
+          font-weight: 700;
         }
 
         .topbar h1 {
