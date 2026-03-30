@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
@@ -170,7 +170,14 @@ function RevenueTooltip({
 }
 
 export default function DashboardPage() {
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(
+    () =>
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      ),
+    []
+  );
 
   const [loading, setLoading] = useState(true);
   const [ownerName, setOwnerName] = useState('Owner');
@@ -190,8 +197,10 @@ export default function DashboardPage() {
       setLoading(true);
 
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const user = session?.user;
 
       if (!user) {
         if (mounted) setLoading(false);
@@ -217,14 +226,13 @@ export default function DashboardPage() {
         .eq('owner_id', user.id)
         .maybeSingle();
 
-      const { data: restaurantByUser } =
-        restaurantByOwner
-          ? { data: null }
-          : await supabase
-              .from('restaurants')
-              .select('*')
-              .eq('user_id', user.id)
-              .maybeSingle();
+      const { data: restaurantByUser } = restaurantByOwner
+        ? { data: null }
+        : await supabase
+            .from('restaurants')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
       const currentRestaurant = (restaurantByOwner || restaurantByUser) as RestaurantRecord | null;
 
@@ -293,12 +301,9 @@ export default function DashboardPage() {
     let todayOrders = 0;
     let weekSales = 0;
     let prevWeekSales = 0;
-    let monthSales = 0;
-    let prevMonthSales = 0;
 
     const weekMap = new Map<string, number>();
     const prevWeekMap = new Map<string, number>();
-
     const monthWeekMap = new Map<string, number>([
       ['W1', 0],
       ['W2', 0],
@@ -349,13 +354,11 @@ export default function DashboardPage() {
       }
 
       if (createdDay >= currentMonthStart && createdDay <= today) {
-        monthSales += amount;
         const weekIndex = Math.min(5, Math.ceil(createdDay.getDate() / 7));
         monthWeekMap.set(`W${weekIndex}`, (monthWeekMap.get(`W${weekIndex}`) || 0) + amount);
       }
 
       if (createdDay >= previousMonthStart && createdDay <= previousMonthEnd) {
-        prevMonthSales += amount;
         const weekIndex = Math.min(5, Math.ceil(createdDay.getDate() / 7));
         prevMonthWeekMap.set(`W${weekIndex}`, (prevMonthWeekMap.get(`W${weekIndex}`) || 0) + amount);
       }
@@ -400,9 +403,6 @@ export default function DashboardPage() {
       todaySales,
       todayOrders,
       weekSales,
-      prevWeekSales,
-      monthSales,
-      prevMonthSales,
       revenueChange,
       weekData,
       lastWeekData,
@@ -539,9 +539,7 @@ export default function DashboardPage() {
           <div className="topbarLeft">
             <div className="ownerControlBlock">
               <div className="ownerControlLabel">Owner Control</div>
-              <div className="ownerWelcome">
-                Welcome back, {ownerName}
-              </div>
+              <div className="ownerWelcome">Welcome back, {ownerName}</div>
             </div>
           </div>
 
@@ -597,7 +595,7 @@ export default function DashboardPage() {
               <div className="cardHeader chartHeader">
                 <h2>Sales Overview</h2>
 
-                <div className="tabGroup" aria-label="Chart range">
+                <div className="tabGroup">
                   <button
                     type="button"
                     className={range === 'week' ? 'tabButton tabButtonActive' : 'tabButton'}
@@ -672,9 +670,9 @@ export default function DashboardPage() {
               <section className="card">
                 <div className="cardHeader">
                   <h2>Live Orders</h2>
-                  <button type="button" className="viewAllButton">
+                  <Link href="/dashboard/orders" className="viewAllButton">
                     View All
-                  </button>
+                  </Link>
                 </div>
 
                 <div className="filterRow">
@@ -825,7 +823,7 @@ export default function DashboardPage() {
 
             <div className="mobileSalesCard mobileCard">
               <div className="mobileSalesTop">
-                <div className="mobileLabel">Today&apos;s Sales</div>
+                <div className="mobileLabel">Today's Sales</div>
                 <div className="mobileValue">{currency(salesOverview.todaySales)}</div>
               </div>
 
@@ -837,7 +835,7 @@ export default function DashboardPage() {
 
             <div className="mobileMiniStats">
               <div className="mobileMiniCard">
-                <div className="mobileLabel">Today&apos;s Orders</div>
+                <div className="mobileLabel">Today's Orders</div>
                 <div className="mobileMiniValue">{salesOverview.todayOrders}</div>
               </div>
 
@@ -1602,59 +1600,6 @@ export default function DashboardPage() {
           width: 100%;
         }
 
-        .mobileOrderCard {
-          border: 1px solid #e8ebef;
-          border-radius: 16px;
-          padding: 12px;
-          background: #fff;
-        }
-
-        .mobileOrderCard + .mobileOrderCard {
-          margin-top: 10px;
-        }
-
-        .mobileOrderTop,
-        .mobileOrderBottom {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .mobileOrderId {
-          color: #3a404a;
-          font-weight: 700;
-          font-size: 0.96rem;
-        }
-
-        .mobileOrderAmount {
-          color: #111827;
-          font-weight: 800;
-          font-size: 1rem;
-        }
-
-        .mobileOrderMiddle {
-          margin: 8px 0 12px;
-        }
-
-        .mobileOrderCustomer {
-          color: #111827;
-          font-weight: 700;
-          font-size: 1rem;
-        }
-
-        .mobileOrderSummary {
-          margin-top: 5px;
-          color: #68727f;
-          font-size: 0.9rem;
-          line-height: 1.4;
-        }
-
-        .mobileOrderTime {
-          color: #7f8795;
-          font-size: 0.86rem;
-        }
-
         .loadingOverlay {
           position: fixed;
           right: 18px;
@@ -1784,14 +1729,9 @@ function StatCard({
 
       <div className="statValueRow">
         {accent === 'trend' ? (
-          <span className={`trendArrow ${prefix === '-' ? 'trendNegative' : ''}`}>
-            {prefix === '-' ? '↓' : '↑'}
-          </span>
+          <span className={`trendArrow ${prefix === '↓' ? 'trendNegative' : ''}`}>{prefix || '↑'}</span>
         ) : null}
-        <span className="statValue">
-          {accent === 'trend' && prefix === '-' ? '-' : ''}
-          {value}
-        </span>
+        <span className="statValue">{value}</span>
         {suffix ? <span className="statSuffix">{suffix}</span> : null}
       </div>
 
