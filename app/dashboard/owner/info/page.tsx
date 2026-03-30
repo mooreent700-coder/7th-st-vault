@@ -3,489 +3,225 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-type Lang = 'en' | 'es';
-
-type OwnerForm = {
-  name: string;
-  phone: string;
-  address: string;
-};
-
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const copy = {
-  en: {
-    eyebrow: 'Owner Info',
-    title: 'Business details',
-    subtitle: 'Update the core business information your customers and storefront rely on.',
-    languageLabel: 'Page Language',
-    english: 'English',
-    spanish: 'Spanish',
-    name: 'Business Name',
-    phone: 'Phone Number',
-    address: 'Address',
-    save: 'Save Changes',
-    saving: 'Saving...',
-    saved: 'Saved successfully',
-    error: 'Something went wrong',
-  },
-  es: {
-    eyebrow: 'Información del dueño',
-    title: 'Detalles del negocio',
-    subtitle: 'Actualiza la información principal del negocio que usa tu tienda y tus clientes.',
-    languageLabel: 'Idioma de la página',
-    english: 'English',
-    spanish: 'Spanish',
-    name: 'Nombre del negocio',
-    phone: 'Número de teléfono',
-    address: 'Dirección',
-    save: 'Guardar cambios',
-    saving: 'Guardando...',
-    saved: 'Guardado correctamente',
-    error: 'Algo salió mal',
-  },
-} as const;
+function generateSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 
 export default function OwnerInfoPage() {
+  const [restaurant, setRestaurant] = useState<any>(null);
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugAvailable, setSlugAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [lang, setLang] = useState<Lang>('en');
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [form, setForm] = useState<OwnerForm>({
-    name: '',
-    phone: '',
-    address: '',
-  });
 
-  const t = copy[lang];
-
+  // LOAD
   useEffect(() => {
-    let mounted = true;
+    async function load() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) return;
 
-    async function loadData() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+      const { data } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('owner_id', user.id)
+        .maybeSingle();
 
-        const user = session?.user;
-        if (!user) {
-          if (mounted) setLoading(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('restaurants')
-          .select('id, name, phone, address, owner_order_language, order_language')
-          .eq('owner_id', user.id)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (!mounted) return;
-
-        if (data) {
-          setRestaurantId(data.id || null);
-          setForm({
-            name: data.name || '',
-            phone: data.phone || '',
-            address: data.address || '',
-          });
-
-          const savedLang =
-            (data.owner_order_language || data.order_language || 'en')
-              .toString()
-              .toLowerCase() === 'es'
-              ? 'es'
-              : 'en';
-
-          setLang(savedLang);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (mounted) setLoading(false);
+      if (data) {
+        setRestaurant(data);
+        setName(data.name || '');
+        setSlug(data.slug || '');
       }
+
+      setLoading(false);
     }
 
-    void loadData();
-
-    return () => {
-      mounted = false;
-    };
+    load();
   }, []);
 
-  function updateField<K extends keyof OwnerForm>(key: K, value: OwnerForm[K]) {
-    setForm((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  }
+  // 🔒 CHECK SLUG AVAILABILITY
+  async function checkSlug(value: string) {
+    const { data } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('slug', value)
+      .maybeSingle();
 
-  async function handleSave() {
-    if (!restaurantId) return;
-
-    setSaving(true);
-    setStatusMessage('');
-
-    try {
-      const { error } = await supabase
-        .from('restaurants')
-        .update({
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          address: form.address.trim(),
-        })
-        .eq('id', restaurantId);
-
-      if (error) throw error;
-
-      setStatusMessage(t.saved);
-    } catch (error) {
-      console.error(error);
-      setStatusMessage(t.error);
-    } finally {
-      setSaving(false);
+    if (!data) {
+      setSlugAvailable(true);
+    } else if (restaurant && data.id === restaurant.id) {
+      setSlugAvailable(true);
+    } else {
+      setSlugAvailable(false);
     }
   }
 
-  if (loading) {
-    return (
-      <main className="pageShell">
-        <div className="pageWrap">
-          <section className="heroCard">
-            <div className="loadingState">Loading...</div>
-          </section>
-        </div>
+  // HANDLE NAME CHANGE
+  function handleNameChange(value: string) {
+    setName(value);
 
-        <style jsx>{`
-          .pageShell {
-            min-height: 100vh;
-            background: radial-gradient(circle at top, rgba(255, 255, 255, 0.88), rgba(240, 241, 244, 0.96));
-            padding: 20px;
-          }
-          .pageWrap {
-            max-width: 920px;
-            margin: 0 auto;
-          }
-          .heroCard {
-            border-radius: 28px;
-            border: 1px solid #e8ebef;
-            background: rgba(255, 255, 255, 0.92);
-            box-shadow: 0 20px 50px rgba(20, 23, 28, 0.05);
-            padding: 28px;
-          }
-          .loadingState {
-            min-height: 240px;
-            display: grid;
-            place-items: center;
-            font-size: 1rem;
-            font-weight: 700;
-            color: #111827;
-          }
-        `}</style>
-      </main>
-    );
+    const newSlug = generateSlug(value);
+    setSlug(newSlug);
+
+    checkSlug(newSlug);
   }
 
+  // SAVE
+  async function save() {
+    if (!restaurant) return;
+
+    if (!slugAvailable) {
+      alert('Name already taken');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('restaurants')
+      .update({
+        name,
+        slug,
+      })
+      .eq('id', restaurant.id);
+
+    if (error) {
+      alert('Error saving');
+    } else {
+      alert('Saved!');
+    }
+  }
+
+  const fullLink = `https://menuflow-app-mu.vercel.app/store/${slug}`;
+
+  if (loading) return <div className="center">Loading...</div>;
+
   return (
-    <main className="pageShell">
-      <div className="pageWrap">
-        <section className="heroCard">
-          <div className="heroTop">
-            <div className="heroCopy">
-              <div className="eyebrow">{t.eyebrow}</div>
-              <h1>{t.title}</h1>
-              <p>{t.subtitle}</p>
+    <main className="page">
+      <div className="card">
+        <h1>Business Setup</h1>
+        <p className="sub">This is your ordering link customers will use</p>
+
+        {/* BUSINESS NAME */}
+        <div className="field">
+          <label>Business Name</label>
+          <input
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder="TT Foods"
+          />
+        </div>
+
+        {/* LINK PREVIEW */}
+        <div className="field">
+          <label>Your Live Ordering Link</label>
+          <div className="linkBox">{fullLink}</div>
+
+          {!slugAvailable && (
+            <div className="error">
+              Name already taken — try something else
             </div>
+          )}
+        </div>
 
-            <div className="languageBlock">
-              <span>{t.languageLabel}</span>
-              <div className="pillGroup">
-                <button
-                  type="button"
-                  className={lang === 'en' ? 'pillButton active' : 'pillButton'}
-                  onClick={() => setLang('en')}
-                >
-                  {t.english}
-                </button>
-                <button
-                  type="button"
-                  className={lang === 'es' ? 'pillButton active' : 'pillButton'}
-                  onClick={() => setLang('es')}
-                >
-                  {t.spanish}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* QR CODE */}
+        <div className="qrBox">
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(fullLink)}`}
+          />
+          <p>Scan to order</p>
+        </div>
 
-        <section className="formCard">
-          <div className="fieldGrid">
-            <label className="field">
-              <span>{t.name}</span>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => updateField('name', e.target.value)}
-                placeholder={t.name}
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.phone}</span>
-              <input
-                type="text"
-                value={form.phone}
-                onChange={(e) => updateField('phone', e.target.value)}
-                placeholder={t.phone}
-              />
-            </label>
-
-            <label className="field fieldFull">
-              <span>{t.address}</span>
-              <input
-                type="text"
-                value={form.address}
-                onChange={(e) => updateField('address', e.target.value)}
-                placeholder={t.address}
-              />
-            </label>
-          </div>
-
-          <div className="footerRow">
-            <div className="statusText">{statusMessage}</div>
-
-            <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
-              {saving ? t.saving : t.save}
-            </button>
-          </div>
-        </section>
+        <button onClick={save} className="saveBtn">
+          Save
+        </button>
       </div>
 
       <style jsx>{`
-        .pageShell {
+        .page {
           min-height: 100vh;
-          background: radial-gradient(circle at top, rgba(255, 255, 255, 0.88), rgba(240, 241, 244, 0.96));
           padding: 20px;
-        }
-
-        .pageWrap {
-          max-width: 920px;
-          margin: 0 auto;
-          display: grid;
-          gap: 16px;
-        }
-
-        .heroCard,
-        .formCard {
-          border-radius: 28px;
-          border: 1px solid #e8ebef;
-          background: rgba(255, 255, 255, 0.92);
-          box-shadow: 0 20px 50px rgba(20, 23, 28, 0.05);
-        }
-
-        .heroCard {
-          padding: 28px;
-        }
-
-        .formCard {
-          padding: 28px;
-        }
-
-        .heroTop {
           display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 20px;
-          flex-wrap: wrap;
+          justify-content: center;
+          background: #f4f4f6;
+          font-family: Inter;
         }
 
-        .heroCopy {
-          max-width: 560px;
-        }
-
-        .eyebrow {
-          color: #64748b;
-          font-size: 0.95rem;
-          font-weight: 700;
-          margin-bottom: 10px;
+        .card {
+          width: 100%;
+          max-width: 500px;
+          background: white;
+          padding: 24px;
+          border-radius: 20px;
         }
 
         h1 {
-          margin: 0;
-          color: #0f172a;
-          font-size: 2.2rem;
-          line-height: 1;
+          font-size: 22px;
           font-weight: 800;
-          letter-spacing: -0.04em;
         }
 
-        p {
-          margin: 14px 0 0;
+        .sub {
           color: #6b7280;
-          font-size: 1rem;
-          line-height: 1.65;
-          font-weight: 500;
-        }
-
-        .languageBlock {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          min-width: 220px;
-        }
-
-        .languageBlock span {
-          color: #64748b;
-          font-size: 0.84rem;
-          font-weight: 700;
-        }
-
-        .pillGroup {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          border: 1px solid #e5e9ee;
-          background: #fff;
-          padding: 4px;
-          border-radius: 18px;
-          box-shadow: 0 8px 20px rgba(20, 23, 28, 0.03);
-        }
-
-        .pillButton {
-          border: 0;
-          background: transparent;
-          min-height: 42px;
-          padding: 0 16px;
-          border-radius: 14px;
-          color: #6b7280;
-          font-weight: 700;
-          cursor: pointer;
-        }
-
-        .pillButton.active {
-          background: #eff6f5;
-          color: #2f6463;
-        }
-
-        .fieldGrid {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
+          margin-bottom: 20px;
         }
 
         .field {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
+          margin-bottom: 16px;
         }
 
-        .fieldFull {
-          grid-column: 1 / -1;
+        input {
+          width: 100%;
+          height: 44px;
+          border-radius: 10px;
+          border: 1px solid #ddd;
+          padding: 0 12px;
         }
 
-        .field span {
-          color: #334155;
-          font-size: 0.95rem;
+        .linkBox {
+          background: #f1f5f9;
+          padding: 12px;
+          border-radius: 10px;
+          font-weight: 600;
+          word-break: break-all;
+        }
+
+        .error {
+          color: red;
+          font-size: 13px;
+          margin-top: 6px;
+        }
+
+        .qrBox {
+          text-align: center;
+          margin: 20px 0;
+        }
+
+        .qrBox img {
+          border-radius: 12px;
+        }
+
+        .saveBtn {
+          width: 100%;
+          height: 48px;
+          background: black;
+          color: white;
+          border-radius: 12px;
           font-weight: 700;
         }
 
-        .field input {
-          height: 58px;
-          width: 100%;
-          border-radius: 18px;
-          border: 1px solid #dfe5ec;
-          background: #fff;
-          color: #0f172a;
-          padding: 0 18px;
-          font-size: 1rem;
-          font-weight: 600;
-          outline: none;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .field input::placeholder {
-          color: #9aa4b2;
-          font-weight: 600;
-        }
-
-        .field input:focus {
-          border-color: #b9c8d9;
-          box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.35);
-        }
-
-        .footerRow {
-          margin-top: 22px;
+        .center {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 14px;
-          flex-wrap: wrap;
-        }
-
-        .statusText {
-          min-height: 24px;
-          color: #6b7280;
-          font-size: 0.92rem;
-          font-weight: 700;
-        }
-
-        .saveButton {
-          min-width: 220px;
-          height: 56px;
-          border: 0;
-          border-radius: 18px;
-          background: #0f172a;
-          color: #fff;
-          font-size: 1rem;
-          font-weight: 800;
-          cursor: pointer;
-          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
-        }
-
-        .saveButton:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
-
-        @media (max-width: 700px) {
-          .pageShell {
-            padding: 12px;
-          }
-
-          .heroCard,
-          .formCard {
-            border-radius: 24px;
-            padding: 20px;
-          }
-
-          h1 {
-            font-size: 1.8rem;
-          }
-
-          .fieldGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .field input {
-            height: 54px;
-            border-radius: 16px;
-          }
-
-          .saveButton {
-            width: 100%;
-            min-width: 0;
-          }
-
-          .footerRow {
-            align-items: stretch;
-          }
+          justify-content: center;
+          height: 100vh;
         }
       `}</style>
     </main>
