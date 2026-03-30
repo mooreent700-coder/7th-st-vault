@@ -57,23 +57,23 @@ type ChartPoint = {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function startOfDay(date: Date): Date {
+function startOfDay(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function addDays(date: Date, days: number): Date {
+function addDays(date: Date, days: number) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
 }
 
-function currency(value: number): string {
+function currency(value: number) {
   return `$${Math.round(value).toLocaleString()}`;
 }
 
-function safeNumber(value: unknown): number {
+function safeNumber(value: unknown) {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {
     const cleaned = value.replace(/[^0-9.-]/g, '');
@@ -83,14 +83,14 @@ function safeNumber(value: unknown): number {
   return 0;
 }
 
-function formatTime(value?: string | null): string {
+function formatTime(value?: string | null) {
   if (!value) return '--';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function displayStatus(status?: string | null): string {
+function displayStatus(status?: string | null) {
   if (!status) return 'New';
   const s = status.toLowerCase();
   if (s.includes('cancel')) return 'Cancelled';
@@ -101,7 +101,7 @@ function displayStatus(status?: string | null): string {
   return status;
 }
 
-function getStatusClass(status?: string | null): string {
+function getStatusClass(status?: string | null) {
   const s = displayStatus(status).toLowerCase();
   if (s.includes('cancel')) return 'status-red';
   if (s.includes('ready')) return 'status-yellow';
@@ -109,7 +109,7 @@ function getStatusClass(status?: string | null): string {
   return 'status-neutral';
 }
 
-function filterOrders(list: OrderRow[], filter: OrderFilter): OrderRow[] {
+function filterOrders(list: OrderRow[], filter: OrderFilter) {
   if (filter === 'ALL') return list;
   if (filter === 'NEW') {
     return list.filter((item) => {
@@ -130,7 +130,7 @@ function RevenueTooltip(props: {
   active?: boolean;
   payload?: Array<{ value: number }>;
   label?: string;
-}): JSX.Element | null {
+}) {
   const { active, payload, label } = props;
   if (!active || !payload || !payload.length) return null;
 
@@ -169,7 +169,7 @@ function StatCard(props: {
   accent?: 'trend';
   prefix?: string;
   suffix?: string;
-}): JSX.Element {
+}) {
   const { title, value, accent, prefix, suffix } = props;
 
   return (
@@ -233,7 +233,7 @@ function StatCard(props: {
   );
 }
 
-function EmptyState(props: { text: string }): JSX.Element {
+function EmptyState(props: { text: string }) {
   return (
     <div className="emptyState">
       {props.text}
@@ -256,7 +256,7 @@ function EmptyState(props: { text: string }): JSX.Element {
   );
 }
 
-function OrderCard(props: { order: OrderRow }): JSX.Element {
+function OrderCard(props: { order: OrderRow }) {
   const { order } = props;
   const customer = order.customer_name || order.customer || 'Customer';
   const summary =
@@ -374,7 +374,7 @@ function OrderCard(props: { order: OrderRow }): JSX.Element {
   );
 }
 
-function MobileOrderCard(props: { order: OrderRow }): JSX.Element {
+function MobileOrderCard(props: { order: OrderRow }) {
   const { order } = props;
   const customer = order.customer_name || order.customer || 'Customer';
   const summary =
@@ -479,7 +479,7 @@ function MobileOrderCard(props: { order: OrderRow }): JSX.Element {
   );
 }
 
-function NavIcon(): JSX.Element {
+function NavIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" strokeWidth="1.8" />
@@ -488,7 +488,7 @@ function NavIcon(): JSX.Element {
   );
 }
 
-function OrdersIcon(): JSX.Element {
+function OrdersIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.8" />
@@ -497,7 +497,7 @@ function OrdersIcon(): JSX.Element {
   );
 }
 
-function BuilderIcon(): JSX.Element {
+function BuilderIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M4 17.5V6.5A2.5 2.5 0 0 1 6.5 4h7L20 10.5v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5Z" stroke="currentColor" strokeWidth="1.8" />
@@ -507,7 +507,7 @@ function BuilderIcon(): JSX.Element {
   );
 }
 
-function PaymentsIcon(): JSX.Element {
+function PaymentsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" stroke="currentColor" strokeWidth="1.8" />
@@ -516,7 +516,7 @@ function PaymentsIcon(): JSX.Element {
   );
 }
 
-function OwnerIcon(): JSX.Element {
+function OwnerIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="1.8" />
@@ -525,7 +525,7 @@ function OwnerIcon(): JSX.Element {
   );
 }
 
-function SettingsIcon(): JSX.Element {
+function SettingsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" strokeWidth="1.8" />
@@ -534,7 +534,7 @@ function SettingsIcon(): JSX.Element {
   );
 }
 
-function StorefrontIcon(): JSX.Element {
+function StorefrontIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M4 10.5h16v7A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5v-7Z" stroke="currentColor" strokeWidth="1.8" />
@@ -544,7 +544,7 @@ function StorefrontIcon(): JSX.Element {
   );
 }
 
-function SearchIcon(): JSX.Element {
+function SearchIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="11" cy="11" r="6" stroke="currentColor" strokeWidth="1.8" />
@@ -553,7 +553,7 @@ function SearchIcon(): JSX.Element {
   );
 }
 
-function MenuIcon(): JSX.Element {
+function MenuIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -561,7 +561,7 @@ function MenuIcon(): JSX.Element {
   );
 }
 
-function BellIcon(): JSX.Element {
+function BellIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M15 18H9m9-1V11a6 6 0 1 0-12 0v6l-2 2h16l-2-2Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -569,7 +569,7 @@ function BellIcon(): JSX.Element {
   );
 }
 
-export default function Page(): JSX.Element {
+export default function Page() {
   const supabase = useMemo(
     () =>
       createClient(
@@ -579,21 +579,21 @@ export default function Page(): JSX.Element {
     []
   );
 
-  const [loading, setLoading] = useState<boolean>(true);
-  const [ownerName, setOwnerName] = useState<string>('Owner');
+  const [loading, setLoading] = useState(true);
+  const [ownerName, setOwnerName] = useState('Owner');
   const [restaurant, setRestaurant] = useState<RestaurantRecord | null>(null);
-  const [menuCount, setMenuCount] = useState<number>(0);
+  const [menuCount, setMenuCount] = useState(0);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [range, setRange] = useState<RangeKey>('week');
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('ALL');
   const [billingFilter, setBillingFilter] = useState<OrderFilter>('ALL');
   const [orderLanguage, setOrderLanguage] = useState<OrderLanguage>('EN');
-  const [savingLanguage, setSavingLanguage] = useState<boolean>(false);
+  const [savingLanguage, setSavingLanguage] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    async function loadDashboard(): Promise<void> {
+    async function loadDashboard() {
       setLoading(true);
 
       const sessionResult = await supabase.auth.getSession();
@@ -680,7 +680,7 @@ export default function Page(): JSX.Element {
     };
   }, [supabase]);
 
-  const storeHref = useMemo<string>(() => {
+  const storeHref = useMemo(() => {
     if (restaurant?.slug) return `/store/${restaurant.slug}`;
     return '/dashboard/owner/builder';
   }, [restaurant?.slug]);
@@ -761,24 +761,24 @@ export default function Page(): JSX.Element {
       }
     });
 
-    const weekData: ChartPoint[] = Array.from({ length: 7 }).map((_, index) => {
+    const weekData = Array.from({ length: 7 }).map((_, index) => {
       const d = addDays(currentWeekStart, index);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       return { day: DAY_LABELS[d.getDay()], value: weekMap.get(key) || 0 };
     });
 
-    const lastWeekData: ChartPoint[] = Array.from({ length: 7 }).map((_, index) => {
+    const lastWeekData = Array.from({ length: 7 }).map((_, index) => {
       const d = addDays(previousWeekStart, index);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       return { day: DAY_LABELS[d.getDay()], value: prevWeekMap.get(key) || 0 };
     });
 
-    const monthData: ChartPoint[] = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
+    const monthData = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
       day: label,
       value: monthWeekMap.get(label) || 0,
     }));
 
-    const lastMonthData: ChartPoint[] = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
+    const lastMonthData = ['W1', 'W2', 'W3', 'W4', 'W5'].map((label) => ({
       day: label,
       value: prevMonthWeekMap.get(label) || 0,
     }));
@@ -798,36 +798,36 @@ export default function Page(): JSX.Element {
     };
   }, [orders]);
 
-  const chartData = useMemo<ChartPoint[]>(() => {
+  const chartData = useMemo(() => {
     if (range === 'week') return salesOverview.weekData;
     if (range === 'lastWeek') return salesOverview.lastWeekData;
     if (range === 'month') return salesOverview.monthData;
     return salesOverview.lastMonthData;
   }, [range, salesOverview]);
 
-  const liveOrders = useMemo<OrderRow[]>(() => {
+  const liveOrders = useMemo(() => {
     return orders.filter((item) => {
       const status = displayStatus(item.status).toLowerCase();
       return status !== 'cancelled' && status !== 'completed';
     });
   }, [orders]);
 
-  const billingOrders = useMemo<OrderRow[]>(() => {
+  const billingOrders = useMemo(() => {
     return orders.filter((item) => {
       const status = displayStatus(item.status).toLowerCase();
       return status === 'cancelled' || status === 'completed' || status === 'new' || status === 'preparing';
     });
   }, [orders]);
 
-  const cancelledOrders = useMemo<OrderRow[]>(() => {
+  const cancelledOrders = useMemo(() => {
     return orders.filter((item) => displayStatus(item.status).toLowerCase() === 'cancelled');
   }, [orders]);
 
-  const filteredLiveOrders = useMemo<OrderRow[]>(() => {
+  const filteredLiveOrders = useMemo(() => {
     return filterOrders(liveOrders, orderFilter).slice(0, 6);
   }, [liveOrders, orderFilter]);
 
-  const filteredBillingOrders = useMemo<OrderRow[]>(() => {
+  const filteredBillingOrders = useMemo(() => {
     return filterOrders(billingOrders, billingFilter).slice(0, 4);
   }, [billingOrders, billingFilter]);
 
@@ -837,7 +837,7 @@ export default function Page(): JSX.Element {
     !!restaurant?.stripe_payouts_enabled ||
     !!restaurant?.stripe_account_id;
 
-  async function saveOrderLanguage(nextLanguage: OrderLanguage): Promise<void> {
+  async function saveOrderLanguage(nextLanguage: OrderLanguage) {
     if (!restaurant?.id) {
       setOrderLanguage(nextLanguage);
       return;
@@ -1029,7 +1029,7 @@ export default function Page(): JSX.Element {
                       tickLine={false}
                       axisLine={false}
                       tick={{ fill: '#9aa4b0', fontSize: 12 }}
-                      tickFormatter={(value: number) => `$${value}`}
+                      tickFormatter={(value) => `$${value}`}
                       width={48}
                     />
                     <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#d7e4e6', strokeDasharray: '4 4' }} />
