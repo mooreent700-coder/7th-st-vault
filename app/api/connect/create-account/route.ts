@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { supabase } from "@/lib/supabase";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+if (!stripeSecretKey) {
+  throw new Error("Missing STRIPE_SECRET_KEY");
+}
+
+const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2026-03-25.dahlia",
 });
 
@@ -56,7 +62,7 @@ export async function POST(req: Request) {
     }
 
     const account = await stripe.accounts.create({
-      type: "standard",
+      type: "express",
       country,
       email: email || restaurant.owner_email || undefined,
       capabilities: {
@@ -79,6 +85,7 @@ export async function POST(req: Request) {
       .from("restaurants")
       .update({
         stripe_account_id: account.id,
+        stripe_connected: false,
         stripe_onboarding_complete: false,
         stripe_charges_enabled: Boolean(account.charges_enabled),
         stripe_payouts_enabled: Boolean(account.payouts_enabled),
