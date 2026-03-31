@@ -1,7 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -51,100 +57,108 @@ const EMPTY_HOURS: HoursState = {
   sun: { enabled: false, open: '09:00', close: '17:00' },
 };
 
-const LABELS: Record<Lang, Record<string, string>> = {
+const COPY = {
   en: {
     eyebrow: 'Store Builder',
     title: 'Build your store in minutes!',
-    subtitle: 'Update your store information, upload images, and menu items.',
+    subtitle: 'Update your store information, upload logo and hero images, and manage your menu.',
     back: 'Back to Dashboard',
     preview: 'Live Store Preview',
     viewStore: 'View Store',
-    images: 'Upload Store Banner',
     business: 'Business Info',
+    images: 'Store Images',
+    menu: 'Menu',
     storeName: 'Store Name',
     phone: 'Phone',
     address: 'Address',
     hours: 'Business Hours',
-    signedIn: 'Signed in as:',
-    save: 'Save Changes',
+    saveBusiness: 'Save Business Info',
     saving: 'Saving...',
-    menu: 'Menu',
-    addItem: 'Add Menu Item',
+    currentMenu: 'Current Menu',
+    noItems: 'No menu items yet.',
     itemName: 'Item Name',
     price: 'Price',
     description: 'Description',
     uploadMenuImage: 'Upload Menu Image',
+    uploadHeroImage: 'Upload Store Banner',
+    uploadLogoImage: 'Upload Logo Image',
     uploadHint: 'Click to upload • PNG, JPG, or WEBP',
     imageOptional: 'Image optional',
-    currentMenu: 'Current Menu',
-    items: 'items',
-    noItems: 'No menu items yet.',
+    addMenuItem: 'Add Menu Item',
+    adding: 'Adding...',
+    remove: 'Remove',
+    changeImage: 'Change Image',
     loading: 'Loading builder...',
-    uploadFailed: 'Upload failed.',
-    saveFailed: 'Save failed.',
     loadFailed: 'Failed to load builder.',
+    saveFailed: 'Save failed.',
+    saveSuccess: 'Business info saved.',
+    uploadFailed: 'Upload failed.',
+    addFailed: 'Could not add menu item.',
+    deleteFailed: 'Could not remove menu item.',
     itemAdded: 'Menu item added.',
-    builderFailed: 'Builder action failed.',
-    notSignedIn: 'You are not signed in.',
+    itemRemoved: 'Menu item removed.',
     noBusiness: 'Business name missing',
     noUrl: 'No URL yet',
-    changeImage: 'Change Image',
-    uploadStoreBanner: 'Upload Store Banner',
     closed: 'Closed',
     noHours: 'No hours selected yet',
-    remove: 'Remove',
     previewTab: 'Preview',
     businessTab: 'Business',
     imagesTab: 'Images',
     menuTab: 'Menu',
+    items: 'items',
+    notSignedIn: 'You are not signed in.',
   },
   es: {
     eyebrow: 'Store Builder',
     title: '¡Construye tu tienda en minutos!',
-    subtitle: 'Actualiza la información de tu tienda, sube imágenes y productos.',
+    subtitle: 'Actualiza la información de tu tienda, sube logo e imagen principal y administra tu menú.',
     back: 'Volver al Panel',
     preview: 'Vista Previa de la Tienda',
     viewStore: 'Ver Tienda',
-    images: 'Subir Banner de la Tienda',
     business: 'Información del Negocio',
-    storeName: 'Nombre',
+    images: 'Imágenes de la Tienda',
+    menu: 'Menú',
+    storeName: 'Nombre del Negocio',
     phone: 'Teléfono',
     address: 'Dirección',
     hours: 'Horario',
-    signedIn: 'Sesión iniciada como:',
-    save: 'Guardar Cambios',
+    saveBusiness: 'Guardar Información',
     saving: 'Guardando...',
-    menu: 'Menú',
-    addItem: 'Agregar Producto',
+    currentMenu: 'Menú Actual',
+    noItems: 'Todavía no hay productos.',
     itemName: 'Nombre del Producto',
     price: 'Precio',
     description: 'Descripción',
     uploadMenuImage: 'Subir Imagen del Menú',
+    uploadHeroImage: 'Subir Banner de la Tienda',
+    uploadLogoImage: 'Subir Logo',
     uploadHint: 'Haz clic para subir • PNG, JPG o WEBP',
     imageOptional: 'Imagen opcional',
-    currentMenu: 'Menú Actual',
-    items: 'productos',
-    noItems: 'Todavía no hay productos.',
-    loading: 'Cargando builder...',
-    uploadFailed: 'La subida falló.',
-    saveFailed: 'No se pudo guardar.',
-    loadFailed: 'No se pudo cargar el builder.',
-    itemAdded: 'Producto agregado.',
-    builderFailed: 'La acción falló.',
-    notSignedIn: 'No has iniciado sesión.',
-    noBusiness: 'Falta nombre del negocio',
-    noUrl: 'Todavía no hay URL',
+    addMenuItem: 'Agregar Producto',
+    adding: 'Agregando...',
+    remove: 'Eliminar',
     changeImage: 'Cambiar Imagen',
-    uploadStoreBanner: 'Subir Banner de la Tienda',
+    loading: 'Cargando builder...',
+    loadFailed: 'No se pudo cargar el builder.',
+    saveFailed: 'No se pudo guardar.',
+    saveSuccess: 'Información guardada.',
+    uploadFailed: 'La subida falló.',
+    addFailed: 'No se pudo agregar el producto.',
+    deleteFailed: 'No se pudo eliminar el producto.',
+    itemAdded: 'Producto agregado.',
+    itemRemoved: 'Producto eliminado.',
+    noBusiness: 'Falta el nombre',
+    noUrl: 'Todavía no hay URL',
     closed: 'Cerrado',
     noHours: 'Todavía no hay horario',
-    remove: 'Eliminar',
     previewTab: 'Preview',
     businessTab: 'Business',
     imagesTab: 'Images',
     menuTab: 'Menu',
+    items: 'productos',
+    notSignedIn: 'No has iniciado sesión.',
   },
-};
+} as const;
 
 const DAY_LABELS: Record<Lang, Record<DayKey, string>> = {
   en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' },
@@ -162,7 +176,7 @@ function slugify(value: string) {
 }
 
 function cloneHours(): HoursState {
-  return JSON.parse(JSON.stringify(EMPTY_HOURS));
+  return JSON.parse(JSON.stringify(EMPTY_HOURS)) as HoursState;
 }
 
 function parseHours(value: string | null): HoursState {
@@ -204,17 +218,30 @@ function formatPrice(value: number | string | null | undefined) {
   return `$${n.toFixed(2)}`;
 }
 
+async function uploadPublicFile(bucket: string, prefix: string, file: File) {
+  const path = createFilePath(prefix, file);
+
+  const uploaded = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+  });
+
+  if (uploaded.error) throw uploaded.error;
+
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
 export default function BuilderPage() {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>('en');
-  const t = LABELS[lang];
+  const t = COPY[lang];
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingBusiness, setSavingBusiness] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
-  const [heroUploading, setHeroUploading] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  const [userEmail, setUserEmail] = useState('');
   const [restaurantId, setRestaurantId] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [slug, setSlug] = useState('');
@@ -224,6 +251,7 @@ export default function BuilderPage() {
   const [heroUrl, setHeroUrl] = useState('');
   const [heroPreview, setHeroPreview] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
+  const [logoPreview, setLogoPreview] = useState('');
 
   const [menuName, setMenuName] = useState('');
   const [menuPrice, setMenuPrice] = useState('');
@@ -233,10 +261,12 @@ export default function BuilderPage() {
   const [menuItems, setMenuItems] = useState<MenuItemRow[]>([]);
 
   const heroInputRef = useRef<HTMLInputElement | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const menuInputRef = useRef<HTMLInputElement | null>(null);
 
   const safeSlug = useMemo(() => slugify(slug || businessName), [slug, businessName]);
   const previewHero = heroPreview || heroUrl;
+  const previewLogo = logoPreview || logoUrl;
   const menuCountText = `${menuItems.length} ${t.items}`;
 
   const hoursSummary = useMemo(() => {
@@ -250,7 +280,7 @@ export default function BuilderPage() {
   useEffect(() => {
     let mounted = true;
 
-    async function load() {
+    async function loadBuilder() {
       try {
         const {
           data: { session },
@@ -265,8 +295,6 @@ export default function BuilderPage() {
           router.push('/auth/login');
           return;
         }
-
-        if (mounted) setUserEmail(user.email || '');
 
         let { data: restaurant, error } = await supabase
           .from('restaurants')
@@ -331,7 +359,7 @@ export default function BuilderPage() {
       }
     }
 
-    void load();
+    void loadBuilder();
 
     return () => {
       mounted = false;
@@ -341,22 +369,10 @@ export default function BuilderPage() {
   useEffect(() => {
     return () => {
       if (heroPreview.startsWith('blob:')) URL.revokeObjectURL(heroPreview);
+      if (logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
       if (menuImagePreview.startsWith('blob:')) URL.revokeObjectURL(menuImagePreview);
     };
-  }, [heroPreview, menuImagePreview]);
-
-  async function uploadFile(bucket: string, prefix: string, file: File) {
-    const path = createFilePath(prefix, file);
-
-    const upload = await supabase.storage.from(bucket).upload(path, file, {
-      cacheControl: '3600',
-      upsert: true,
-    });
-
-    if (upload.error) throw upload.error;
-
-    return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
-  }
+  }, [heroPreview, logoPreview, menuImagePreview]);
 
   async function refreshMenuItems(id: string) {
     const items = await supabase
@@ -369,30 +385,47 @@ export default function BuilderPage() {
     setMenuItems((items.data || []) as MenuItemRow[]);
   }
 
-  async function handleHeroUpload(e: ChangeEvent<HTMLInputElement>) {
+  async function handleImageUpload(kind: 'hero' | 'logo', e: ChangeEvent<HTMLInputElement>) {
     try {
       const file = e.target.files?.[0];
       if (!file || !restaurantId) return;
 
-      if (heroPreview.startsWith('blob:')) URL.revokeObjectURL(heroPreview);
-      setHeroPreview(URL.createObjectURL(file));
-      setHeroUploading(true);
+      const previewUrl = URL.createObjectURL(file);
 
-      const publicUrl = await uploadFile('heroes', 'hero', file);
+      if (kind === 'hero') {
+        if (heroPreview.startsWith('blob:')) URL.revokeObjectURL(heroPreview);
+        setHeroPreview(previewUrl);
+        setUploadingHero(true);
+      } else {
+        if (logoPreview.startsWith('blob:')) URL.revokeObjectURL(logoPreview);
+        setLogoPreview(previewUrl);
+        setUploadingLogo(true);
+      }
+
+      const publicUrl = await uploadPublicFile('heroes', kind, file);
 
       const updated = await supabase
         .from('restaurants')
-        .update({ hero_url: publicUrl })
+        .update(kind === 'hero' ? { hero_url: publicUrl } : { logo_url: publicUrl })
         .eq('id', restaurantId);
 
       if (updated.error) throw updated.error;
 
-      setHeroUrl(publicUrl);
-      setHeroPreview('');
+      if (kind === 'hero') {
+        setHeroUrl(publicUrl);
+        setHeroPreview('');
+      } else {
+        setLogoUrl(publicUrl);
+        setLogoPreview('');
+      }
     } catch (error: any) {
       alert(error?.message || t.uploadFailed);
     } finally {
-      setHeroUploading(false);
+      if (kind === 'hero') {
+        setUploadingHero(false);
+      } else {
+        setUploadingLogo(false);
+      }
       if (e.target) e.target.value = '';
     }
   }
@@ -400,43 +433,46 @@ export default function BuilderPage() {
   function handleMenuImageSelect(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
 
-    if (menuImagePreview.startsWith('blob:')) URL.revokeObjectURL(menuImagePreview);
+    if (menuImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(menuImagePreview);
+    }
 
     setMenuImageFile(file);
-
-    if (file) {
-      setMenuImagePreview(URL.createObjectURL(file));
-    } else {
-      setMenuImagePreview('');
-    }
+    setMenuImagePreview(file ? URL.createObjectURL(file) : '');
   }
 
   function handleHoursToggle(day: DayKey) {
     setHours((prev) => ({
       ...prev,
-      [day]: { ...prev[day], enabled: !prev[day].enabled },
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled,
+      },
     }));
   }
 
   function handleHoursTimeChange(day: DayKey, field: 'open' | 'close', value: string) {
     setHours((prev) => ({
       ...prev,
-      [day]: { ...prev[day], [field]: value },
+      [day]: {
+        ...prev[day],
+        [field]: value,
+      },
     }));
   }
 
-  async function handleSave(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleSaveBusiness() {
     if (!restaurantId) return;
 
     try {
-      setSaving(true);
-      const cleanSlug = slugify(businessName);
+      setSavingBusiness(true);
+      const cleanName = businessName.trim();
+      const cleanSlug = slugify(cleanName || slug);
 
       const updated = await supabase
         .from('restaurants')
         .update({
-          name: businessName.trim() || null,
+          name: cleanName || null,
           slug: cleanSlug || null,
           phone: phone.trim() || null,
           address: address.trim() || null,
@@ -447,11 +483,11 @@ export default function BuilderPage() {
       if (updated.error) throw updated.error;
 
       setSlug(cleanSlug);
-      alert(t.businessSaved);
+      alert(t.saveSuccess);
     } catch (error: any) {
       alert(error?.message || t.saveFailed);
     } finally {
-      setSaving(false);
+      setSavingBusiness(false);
     }
   }
 
@@ -465,19 +501,19 @@ export default function BuilderPage() {
       const cleanDescription = menuDescription.trim();
 
       if (!cleanName) {
-        alert(t.builderFailed);
+        alert(t.addFailed);
         return;
       }
 
-      const priceNumber = menuPrice.trim() ? Number(menuPrice) : null;
+      const priceNumber = menuPrice.trim() ? Number(menuPrice.trim()) : null;
       if (menuPrice.trim() && Number.isNaN(priceNumber)) {
-        alert('Price must be a valid number.');
+        alert(t.addFailed);
         return;
       }
 
       let imageUrl: string | null = null;
       if (menuImageFile) {
-        imageUrl = await uploadFile('menu-items', 'menu-item', menuImageFile);
+        imageUrl = await uploadPublicFile('menu-items', 'menu-item', menuImageFile);
       }
 
       const inserted = await supabase.from('menu_items').insert({
@@ -500,7 +536,7 @@ export default function BuilderPage() {
       await refreshMenuItems(restaurantId);
       alert(t.itemAdded);
     } catch (error: any) {
-      alert(error?.message || t.builderFailed);
+      alert(error?.message || t.addFailed);
     } finally {
       setAddingItem(false);
     }
@@ -511,8 +547,9 @@ export default function BuilderPage() {
       const deleted = await supabase.from('menu_items').delete().eq('id', id);
       if (deleted.error) throw deleted.error;
       await refreshMenuItems(restaurantId);
+      alert(t.itemRemoved);
     } catch (error: any) {
-      alert(error?.message || t.builderFailed);
+      alert(error?.message || t.deleteFailed);
     }
   }
 
@@ -548,7 +585,7 @@ export default function BuilderPage() {
 
   return (
     <main className="page">
-      <form onSubmit={handleSave} className="builderWrap">
+      <div className="builderWrap">
         <section className="heroCard">
           <div className="eyebrow">{t.eyebrow}</div>
           <h1 className="heroTitle">{t.title}</h1>
@@ -574,12 +611,15 @@ export default function BuilderPage() {
 
             <div className="previewPhone">
               <div className="previewHeader">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo preview" className="previewLogo" />
+                {previewLogo ? (
+                  <img src={previewLogo} alt="Logo preview" className="previewLogo" />
                 ) : (
                   <div className="previewLogoFallback">M</div>
                 )}
-                <div className="previewBusiness">{businessName || t.noBusiness}</div>
+
+                <div className="previewHeaderText">
+                  <div className="previewBusiness">{businessName || t.noBusiness}</div>
+                </div>
               </div>
 
               {previewHero ? (
@@ -589,6 +629,30 @@ export default function BuilderPage() {
               ) : (
                 <div className="previewHeroPlaceholder">{t.changeImage}</div>
               )}
+
+              <div className="previewMenuList">
+                {menuItems.length === 0 ? (
+                  <div className="previewEmpty">{t.noItems}</div>
+                ) : (
+                  menuItems.slice(0, 3).map((item) => (
+                    <div key={item.id} className="previewMenuItem">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name || 'Menu item'} className="previewMenuThumb" />
+                      ) : (
+                        <div className="previewMenuThumb fallbackThumb" />
+                      )}
+
+                      <div className="previewMenuInfo">
+                        <div className="previewMenuTop">
+                          <div className="previewMenuName">{item.name || ''}</div>
+                          <div className="previewMenuPrice">{formatPrice(item.price)}</div>
+                        </div>
+                        {item.description ? <div className="previewMenuDesc">{item.description}</div> : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
 
               <button type="button" className="viewStoreButton" onClick={handleViewStore}>
                 {t.viewStore}
@@ -601,24 +665,48 @@ export default function BuilderPage() {
           <div className="sectionTitle">{t.images}</div>
 
           <input
-            ref={heroInputRef}
+            ref={logoInputRef}
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            onChange={handleHeroUpload}
+            onChange={(e) => void handleImageUpload('logo', e)}
             className="hiddenInput"
           />
 
-          <button type="button" className="bannerUploadCard" onClick={() => heroInputRef.current?.click()}>
+          <button type="button" className="imageUploadCard" onClick={() => logoInputRef.current?.click()}>
+            {previewLogo ? (
+              <>
+                <div className="logoPreviewWrap">
+                  <img src={previewLogo} alt="Logo preview" className="logoPreviewImage" />
+                </div>
+                <div className="changeImageBar">{uploadingLogo ? t.loading : t.changeImage}</div>
+              </>
+            ) : (
+              <>
+                <span className="uploadTitle">{t.uploadLogoImage}</span>
+                <span className="uploadText">{t.uploadHint}</span>
+              </>
+            )}
+          </button>
+
+          <input
+            ref={heroInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => void handleImageUpload('hero', e)}
+            className="hiddenInput"
+          />
+
+          <button type="button" className="imageUploadCard secondUpload" onClick={() => heroInputRef.current?.click()}>
             {previewHero ? (
               <>
                 <div className="bannerPreviewWrap">
                   <img src={previewHero} alt="Hero banner" className="bannerPreview" />
                 </div>
-                <div className="changeImageBar">{heroUploading ? t.loading : t.changeImage}</div>
+                <div className="changeImageBar">{uploadingHero ? t.loading : t.changeImage}</div>
               </>
             ) : (
               <>
-                <span className="uploadTitle">{t.uploadStoreBanner}</span>
+                <span className="uploadTitle">{t.uploadHeroImage}</span>
                 <span className="uploadText">{t.uploadHint}</span>
               </>
             )}
@@ -690,12 +778,11 @@ export default function BuilderPage() {
                 <div className="hoursSummary">{hoursSummary}</div>
               </div>
             </div>
-
-            <div className="field">
-              <label className="label">{t.signedIn}</label>
-              <input className="input" value={userEmail} disabled />
-            </div>
           </div>
+
+          <button type="button" className="primaryButton businessSaveButton" disabled={savingBusiness} onClick={() => void handleSaveBusiness()}>
+            {savingBusiness ? t.saving : t.saveBusiness}
+          </button>
         </section>
 
         <section className="sectionCard" id="menu-section">
@@ -748,8 +835,8 @@ export default function BuilderPage() {
               </button>
             </div>
 
-            <button type="button" className="primaryButton" disabled={addingItem} onClick={handleAddMenuItem}>
-              {addingItem ? t.loading : t.addItem}
+            <button type="button" className="primaryButton" disabled={addingItem} onClick={() => void handleAddMenuItem()}>
+              {addingItem ? t.adding : t.addMenuItem}
             </button>
           </div>
 
@@ -775,7 +862,7 @@ export default function BuilderPage() {
 
                     {item.description ? <div className="menuItemDescription">{item.description}</div> : null}
 
-                    <button type="button" className="removeButton" onClick={() => handleDeleteMenuItem(item.id)}>
+                    <button type="button" className="removeButton" onClick={() => void handleDeleteMenuItem(item.id)}>
                       {t.remove}
                     </button>
                   </div>
@@ -784,10 +871,6 @@ export default function BuilderPage() {
             )}
           </div>
         </section>
-
-        <button type="submit" className="saveButton" disabled={saving}>
-          {saving ? t.saving : t.save}
-        </button>
 
         <nav className="bottomNav">
           <button type="button" className="navButton" onClick={() => document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
@@ -803,7 +886,7 @@ export default function BuilderPage() {
             <span className="navLabel">{t.menuTab}</span>
           </button>
         </nav>
-      </form>
+      </div>
 
       <style jsx>{`
         .page {
@@ -925,6 +1008,10 @@ export default function BuilderPage() {
           gap: 12px;
           margin-bottom: 16px;
         }
+        .previewHeaderText {
+          min-width: 0;
+          flex: 1;
+        }
         .previewLogo,
         .previewLogoFallback {
           width: 64px;
@@ -975,10 +1062,64 @@ export default function BuilderPage() {
           padding: 20px;
           border: 1px dashed rgba(20, 33, 50, 0.14);
         }
+        .previewMenuList {
+          display: grid;
+          gap: 12px;
+          margin-top: 16px;
+        }
+        .previewEmpty {
+          border-radius: 18px;
+          background: #f7f8fb;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          padding: 18px;
+          color: #6c7685;
+          font-size: 16px;
+          font-weight: 700;
+        }
+        .previewMenuItem {
+          display: grid;
+          grid-template-columns: 72px 1fr;
+          gap: 12px;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          background: #fff;
+          border-radius: 18px;
+          padding: 10px;
+        }
+        .previewMenuThumb,
+        .fallbackThumb {
+          width: 72px;
+          height: 72px;
+          border-radius: 14px;
+          object-fit: cover;
+          display: block;
+          background: #eef2f7;
+        }
+        .previewMenuInfo {
+          min-width: 0;
+        }
+        .previewMenuTop {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .previewMenuName,
+        .previewMenuPrice {
+          color: #142132;
+          font-size: 18px;
+          font-weight: 900;
+          line-height: 1.1;
+        }
+        .previewMenuDesc {
+          margin-top: 8px;
+          color: #5a6473;
+          font-size: 14px;
+          line-height: 1.45;
+          font-weight: 700;
+        }
         .viewStoreButton,
         .primaryButton,
-        .saveButton,
-        .bannerUploadCard,
+        .imageUploadCard,
         .menuUploadCard {
           width: 100%;
           border: none;
@@ -988,8 +1129,7 @@ export default function BuilderPage() {
           font-size: 20px;
         }
         .viewStoreButton,
-        .primaryButton,
-        .saveButton {
+        .primaryButton {
           background: #000;
           color: #fff;
           min-height: 68px;
@@ -997,7 +1137,10 @@ export default function BuilderPage() {
         .viewStoreButton {
           margin-top: 16px;
         }
-        .bannerUploadCard,
+        .businessSaveButton {
+          margin-top: 18px;
+        }
+        .imageUploadCard,
         .menuUploadCard {
           min-height: 180px;
           margin-top: 12px;
@@ -1007,6 +1150,22 @@ export default function BuilderPage() {
           padding: 16px;
           position: relative;
           overflow: hidden;
+        }
+        .secondUpload {
+          margin-top: 16px;
+        }
+        .logoPreviewWrap {
+          width: 140px;
+          height: 140px;
+          margin: 0 auto;
+          border-radius: 30px;
+          overflow: hidden;
+        }
+        .logoPreviewImage {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
         .bannerPreviewWrap {
           width: 100%;
@@ -1248,12 +1407,6 @@ export default function BuilderPage() {
           cursor: pointer;
           padding: 0;
         }
-        .saveButton {
-          position: sticky;
-          bottom: 88px;
-          z-index: 20;
-          box-shadow: 0 16px 30px rgba(15, 23, 42, 0.15);
-        }
         .bottomNav {
           position: fixed;
           left: 12px;
@@ -1295,15 +1448,6 @@ export default function BuilderPage() {
           }
           .heroCard {
             grid-column: 1 / -1;
-          }
-          .sectionCard:nth-of-type(2),
-          .sectionCard:nth-of-type(3),
-          .sectionCard:nth-of-type(4) {
-            grid-column: 1 / 2;
-          }
-          .saveButton {
-            grid-column: 1 / 2;
-            position: static;
           }
           .bottomNav {
             display: none;
