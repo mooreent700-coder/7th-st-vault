@@ -19,10 +19,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing accountId" }, { status: 400 });
     }
 
-    const origin =
+    const origin = (
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||
-      "http://localhost:3000";
+      "http://localhost:3000"
+    )
+      .trim()
+      .replace(/\/+$/, "");
 
     const link = await stripe.accountLinks.create({
       account: accountId,
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
       type: "account_onboarding",
     });
 
-    return NextResponse.json({ url: link.url });
+    return NextResponse.json({ url: String(link.url).trim() });
   } catch (error: any) {
     console.error("STRIPE ONBOARDING LINK ERROR:", {
       message: error?.message,
