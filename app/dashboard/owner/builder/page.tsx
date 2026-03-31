@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import {
   ChangeEvent,
+  FormEvent,
   useEffect,
   useMemo,
   useRef,
@@ -24,10 +25,6 @@ type RestaurantRow = {
   hero_url: string | null;
   logo_url: string | null;
   owner_email?: string | null;
-  stripe_account_id?: string | null;
-  stripe_connected?: boolean | null;
-  stripe_charges_enabled?: boolean | null;
-  stripe_payouts_enabled?: boolean | null;
 };
 
 type MenuItemRow = {
@@ -38,6 +35,49 @@ type MenuItemRow = {
   description: string | null;
   image_url: string | null;
   created_at?: string | null;
+};
+
+type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+type HoursRow = {
+  enabled: boolean;
+  open: string;
+  close: string;
+};
+
+type HoursState = Record<DayKey, HoursRow>;
+
+const DAY_ORDER: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+const DAY_LABELS: Record<Lang, Record<DayKey, string>> = {
+  en: {
+    mon: 'Mon',
+    tue: 'Tue',
+    wed: 'Wed',
+    thu: 'Thu',
+    fri: 'Fri',
+    sat: 'Sat',
+    sun: 'Sun',
+  },
+  es: {
+    mon: 'Lun',
+    tue: 'Mar',
+    wed: 'Mié',
+    thu: 'Jue',
+    fri: 'Vie',
+    sat: 'Sáb',
+    sun: 'Dom',
+  },
+};
+
+const EMPTY_HOURS: HoursState = {
+  mon: { enabled: false, open: '09:00', close: '17:00' },
+  tue: { enabled: false, open: '09:00', close: '17:00' },
+  wed: { enabled: false, open: '09:00', close: '17:00' },
+  thu: { enabled: false, open: '09:00', close: '17:00' },
+  fri: { enabled: false, open: '09:00', close: '17:00' },
+  sat: { enabled: false, open: '09:00', close: '17:00' },
+  sun: { enabled: false, open: '09:00', close: '17:00' },
 };
 
 const BUCKETS = {
@@ -61,7 +101,7 @@ const copy = {
     storeName: 'Store Name',
     phone: 'Phone',
     address: 'Address',
-    hours: 'Hours',
+    hours: 'Business Hours',
     save: 'Save Changes',
     saving: 'Saving...',
     addMenuItem: 'Add Menu Item',
@@ -93,13 +133,13 @@ const copy = {
     payouts: 'Payouts',
     account: 'Account',
     changeImage: 'Change Image',
-    itemNamePlaceholder: '',
-    pricePlaceholder: '',
-    descriptionPlaceholder: '',
-    storeNamePlaceholder: '',
+    closed: 'Closed',
+    opens: 'Open',
+    closes: 'Close',
+    hoursSummaryEmpty: 'No hours selected yet',
+    uploadStoreBanner: 'Upload Store Banner',
     phonePlaceholder: '',
     addressPlaceholder: '',
-    hoursPlaceholder: '',
   },
   es: {
     eyebrow: 'Store Builder',
@@ -148,13 +188,13 @@ const copy = {
     payouts: 'Pagos',
     account: 'Cuenta',
     changeImage: 'Cambiar Imagen',
-    itemNamePlaceholder: '',
-    pricePlaceholder: '',
-    descriptionPlaceholder: '',
-    storeNamePlaceholder: '',
+    closed: 'Cerrado',
+    opens: 'Abre',
+    closes: 'Cierra',
+    hoursSummaryEmpty: 'Todavía no hay horario',
+    uploadStoreBanner: 'Subir Banner de la Tienda',
     phonePlaceholder: '',
     addressPlaceholder: '',
-    hoursPlaceholder: '',
   },
 } as const;
 
@@ -179,6 +219,45 @@ function slugify(value: string) {
     .replace(/^-|-$/g, '');
 }
 
+function cloneEmptyHours(): HoursState {
+  return JSON.parse(JSON.stringify(EMPTY_HOURS));
+}
+
+function parseHours(value: string | null): HoursState {
+  if (!value) return cloneEmptyHours();
+
+  try {
+    const parsed = JSON.parse(value);
+    const next = cloneEmptyHours();
+    for (const day of DAY_ORDER) {
+      const item = parsed?.[day];
+      if (item && typeof item === 'object') {
+        next[day] = {
+          enabled: Boolean(item.enabled),
+          open: typeof item.open === 'string' && item.open ? item.open : next[day].open,
+          close: typeof item.close === 'string' && item.close ? item.close : next[day].close,
+        };
+      }
+    }
+    return next;
+  } catch {
+    return cloneEmptyHours();
+  }
+}
+
+function serializeHours(hours: HoursState) {
+  return JSON.stringify(hours);
+}
+
+function hoursSummary(hours: HoursState, lang: Lang) {
+  const labels = DAY_LABELS[lang];
+  const rows = DAY_ORDER.filter((day) => hours[day].enabled).map((day) => {
+    const row = hours[day];
+    return `${labels[day]} ${row.open} - ${row.close}`;
+  });
+  return rows.join(' • ');
+}
+
 export default function BuilderPage() {
   const router = useRouter();
 
@@ -192,7 +271,7 @@ export default function BuilderPage() {
   const [slug, setSlug] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [hours, setHours] = useState('');
+  const [hours, setHours] = useState<HoursState>(cloneEmptyHours());
   const [heroUrl, setHeroUrl] = useState('');
   const [heroPreview, setHeroPreview] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -218,7 +297,9 @@ export default function BuilderPage() {
   const menuImageInputRef = useRef<HTMLInputElement | null>(null);
   const heroInputRef = useRef<HTMLInputElement | null>(null);
 
+  const safeSlug = useMemo(() => slugify(slug || businessName), [slug, businessName]);
   const menuCountText = useMemo(() => `${menuItems.length} ${t.items}`, [menuItems.length, t.items]);
+  const summaryText = useMemo(() => hoursSummary(hours, lang) || t.hoursSummaryEmpty, [hours, lang, t.hoursSummaryEmpty]);
 
   useEffect(() => {
     let mounted = true;
@@ -283,7 +364,7 @@ export default function BuilderPage() {
           setSlug(restaurant.slug ?? '');
           setPhone(restaurant.phone ?? '');
           setAddress(restaurant.address ?? '');
-          setHours(restaurant.hours ?? '');
+          setHours(parseHours(restaurant.hours ?? null));
           setHeroUrl(restaurant.hero_url ?? '');
           setLogoUrl(restaurant.logo_url ?? '');
         }
@@ -401,14 +482,34 @@ export default function BuilderPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleHoursToggle = (day: DayKey) => {
+    setHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        enabled: !prev[day].enabled,
+      },
+    }));
+  };
+
+  const handleHoursTimeChange = (day: DayKey, key: 'open' | 'close', value: string) => {
+    setHours((prev) => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleSave = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!restaurantId) return;
 
     try {
       setSaving(true);
 
-      const generatedSlug = slugify(businessName.trim()) || slug;
+      const generatedSlug = slugify(businessName.trim());
 
       const { error } = await supabase
         .from('restaurants')
@@ -417,7 +518,7 @@ export default function BuilderPage() {
           slug: generatedSlug || null,
           phone: phone.trim() || null,
           address: address.trim() || null,
-          hours: hours.trim() || null,
+          hours: serializeHours(hours),
         })
         .eq('id', restaurantId);
 
@@ -442,7 +543,7 @@ export default function BuilderPage() {
       const cleanDescription = menuDescription.trim();
       const priceValue = menuPrice.trim();
 
-      if (!cleanName && !priceValue && !cleanDescription && !menuImageFile) {
+      if (!cleanName) {
         alert(t.builderFailed);
         return;
       }
@@ -495,11 +596,11 @@ export default function BuilderPage() {
   };
 
   const handleViewStore = () => {
-    if (!slug) {
+    if (!safeSlug) {
       alert(t.noSlug);
       return;
     }
-    router.push(`/store/${slug}`);
+    router.push(`/store/${safeSlug}`);
   };
 
   const handleStripeConnect = async () => {
@@ -552,8 +653,20 @@ export default function BuilderPage() {
         <div className="loadingBox">{t.loading}</div>
 
         <style jsx>{`
-          .loadingPage { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f8fd 0%, #eef3fb 100%); padding: 24px; }
-          .loadingBox { color: #142132; font-size: 18px; font-weight: 800; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .loadingPage {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #f6f8fd 0%, #eef3fb 100%);
+            padding: 24px;
+          }
+          .loadingBox {
+            color: #142132;
+            font-size: 18px;
+            font-weight: 800;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
         `}</style>
       </main>
     );
@@ -568,10 +681,17 @@ export default function BuilderPage() {
           <p className="heroText">{t.subtitle}</p>
 
           <div className="topRow">
-            <Link href="/dashboard/owner" className="backLink">{t.back}</Link>
+            <Link href="/dashboard/owner" className="backLink">
+              {t.back}
+            </Link>
+
             <div className="langWrap">
-              <button type="button" className={lang === 'en' ? 'langButton activeLang' : 'langButton'} onClick={() => setLang('en')}>EN</button>
-              <button type="button" className={lang === 'es' ? 'langButton activeLang' : 'langButton'} onClick={() => setLang('es')}>ES</button>
+              <button type="button" className={lang === 'en' ? 'langButton activeLang' : 'langButton'} onClick={() => setLang('en')}>
+                EN
+              </button>
+              <button type="button" className={lang === 'es' ? 'langButton activeLang' : 'langButton'} onClick={() => setLang('es')}>
+                ES
+              </button>
             </div>
           </div>
 
@@ -596,7 +716,9 @@ export default function BuilderPage() {
                 <div className="previewHeroPlaceholder">{t.changeImage}</div>
               )}
 
-              <button type="button" className="viewStoreButton" onClick={handleViewStore}>{t.viewStore}</button>
+              <button type="button" className="viewStoreButton" onClick={handleViewStore}>
+                {t.viewStore}
+              </button>
             </div>
           </div>
         </section>
@@ -622,7 +744,7 @@ export default function BuilderPage() {
               </>
             ) : (
               <>
-                <span className="uploadTitle">{heroUploading ? t.loading : t.banner}</span>
+                <span className="uploadTitle">{t.uploadStoreBanner}</span>
                 <span className="uploadText">{t.uploadHint}</span>
               </>
             )}
@@ -635,27 +757,74 @@ export default function BuilderPage() {
           <div className="fieldGrid">
             <div className="field">
               <label className="label">{t.storeName}</label>
-              <input className="input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder={t.storeNamePlaceholder} />
+              <input className="input" value={businessName} onChange={(e) => setBusinessName(e.target.value)} />
             </div>
 
             <div className="field">
               <label className="label">URL</label>
-              <input className="input" value={slug ? `/store/${slug}` : ''} placeholder={t.noSlug} disabled />
+              <input className="input" value={safeSlug ? `/store/${safeSlug}` : ''} placeholder={t.noSlug} disabled />
             </div>
 
             <div className="field">
               <label className="label">{t.phone}</label>
-              <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t.phonePlaceholder} />
+              <input
+                className="input"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder={t.phonePlaceholder}
+              />
             </div>
 
             <div className="field">
               <label className="label">{t.address}</label>
-              <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t.addressPlaceholder} />
+              <input
+                className="input"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder={t.addressPlaceholder}
+              />
             </div>
 
-            <div className="field">
+            <div className="field fullField">
               <label className="label">{t.hours}</label>
-              <input className="input" value={hours} onChange={(e) => setHours(e.target.value)} placeholder={t.hoursPlaceholder} />
+              <div className="hoursCard">
+                {DAY_ORDER.map((day) => (
+                  <div key={day} className="hoursRow">
+                    <button
+                      type="button"
+                      className={hours[day].enabled ? 'dayToggle activeDay' : 'dayToggle'}
+                      onClick={() => handleHoursToggle(day)}
+                    >
+                      {DAY_LABELS[lang][day]}
+                    </button>
+
+                    <div className="hoursInputs">
+                      <input
+                        type="time"
+                        className="timeInput"
+                        value={hours[day].open}
+                        disabled={!hours[day].enabled}
+                        onChange={(e) => handleHoursTimeChange(day, 'open', e.target.value)}
+                      />
+                      <span className="timeDash">—</span>
+                      <input
+                        type="time"
+                        className="timeInput"
+                        value={hours[day].close}
+                        disabled={!hours[day].enabled}
+                        onChange={(e) => handleHoursTimeChange(day, 'close', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="dayState">{hours[day].enabled ? '' : t.closed}</div>
+                  </div>
+                ))}
+
+                <div className="hoursSummary">{summaryText}</div>
+              </div>
             </div>
 
             <div className="field">
@@ -676,17 +845,17 @@ export default function BuilderPage() {
           <div className="menuAddCard">
             <div className="field">
               <label className="label">{t.itemName}</label>
-              <input className="input" value={menuName} onChange={(e) => setMenuName(e.target.value)} placeholder={t.itemNamePlaceholder} />
+              <input className="input" value={menuName} onChange={(e) => setMenuName(e.target.value)} />
             </div>
 
             <div className="field">
               <label className="label">{t.price}</label>
-              <input className="input" value={menuPrice} onChange={(e) => setMenuPrice(e.target.value)} placeholder={t.pricePlaceholder} inputMode="decimal" />
+              <input className="input" value={menuPrice} onChange={(e) => setMenuPrice(e.target.value)} inputMode="decimal" />
             </div>
 
             <div className="field">
               <label className="label">{t.description}</label>
-              <textarea className="textarea" value={menuDescription} onChange={(e) => setMenuDescription(e.target.value)} placeholder={t.descriptionPlaceholder} />
+              <textarea className="textarea" value={menuDescription} onChange={(e) => setMenuDescription(e.target.value)} />
             </div>
 
             <div className="field">
@@ -740,9 +909,7 @@ export default function BuilderPage() {
                       <div className="menuItemPrice">{formatPrice(item.price)}</div>
                     </div>
 
-                    {item.description ? (
-                      <div className="menuItemDescription">{item.description}</div>
-                    ) : null}
+                    {item.description ? <div className="menuItemDescription">{item.description}</div> : null}
 
                     <button type="button" className="removeButton" onClick={() => handleDeleteMenuItem(item.id)}>
                       {t.remove}
@@ -788,99 +955,605 @@ export default function BuilderPage() {
         </button>
 
         <nav className="bottomNav">
-          <button type="button" className="navButton" onClick={() => document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><span className="navLabel">Preview</span></button>
-          <button type="button" className="navButton" onClick={() => document.getElementById('business-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><span className="navLabel">Business</span></button>
-          <button type="button" className="navButton" onClick={() => document.getElementById('images-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><span className="navLabel">Images</span></button>
-          <button type="button" className="navButton" onClick={() => document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><span className="navLabel">Menu</span></button>
-          <button type="button" className="navButton" onClick={() => document.getElementById('payments-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}><span className="navLabel">Payments</span></button>
+          <button type="button" className="navButton" onClick={() => document.getElementById('preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="navLabel">Preview</span>
+          </button>
+          <button type="button" className="navButton" onClick={() => document.getElementById('business-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="navLabel">Business</span>
+          </button>
+          <button type="button" className="navButton" onClick={() => document.getElementById('images-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="navLabel">Images</span>
+          </button>
+          <button type="button" className="navButton" onClick={() => document.getElementById('menu-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="navLabel">Menu</span>
+          </button>
+          <button type="button" className="navButton" onClick={() => document.getElementById('payments-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="navLabel">Payments</span>
+          </button>
         </nav>
       </form>
 
       <style jsx>{`
-        .page { min-height: 100vh; background: linear-gradient(180deg, #f6f8fd 0%, #eef3fb 100%); color: #142132; padding: 16px; padding-bottom: 120px; overflow-x: hidden; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        .builderWrap { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
-        .heroCard, .sectionCard { background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(20, 33, 50, 0.08); border-radius: 30px; padding: 24px; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05); }
-        .eyebrow { color: #70798a; font-size: 18px; font-weight: 900; margin-bottom: 10px; }
-        .heroTitle { margin: 0; font-size: clamp(40px, 9vw, 68px); line-height: 0.95; letter-spacing: -0.06em; font-weight: 900; color: #142132; }
-        .heroText { margin: 18px 0 0; color: #5a6473; font-size: 18px; line-height: 1.55; font-weight: 600; max-width: 620px; }
-        .topRow { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; margin-top: 20px; }
-        .backLink { color: #142132; text-decoration: none; font-size: 18px; font-weight: 800; }
-        .langWrap { display: inline-flex; border: 1px solid rgba(20, 33, 50, 0.12); background: #fff; padding: 5px; border-radius: 18px; }
-        .langButton { border: none; background: transparent; color: #6b7686; min-width: 72px; min-height: 52px; border-radius: 14px; font-size: 18px; font-weight: 900; cursor: pointer; }
-        .activeLang { background: #0f172a; color: #fff; }
-        .previewCard { margin-top: 24px; background: #ffffff; border: 1px solid rgba(20, 33, 50, 0.08); border-radius: 26px; padding: 20px; }
-        .sectionTitle { margin: 0 0 14px; color: #142132; font-size: clamp(26px, 5vw, 40px); line-height: 1.02; letter-spacing: -0.04em; font-weight: 900; }
-        .sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-        .sectionMeta { color: #70798a; font-size: 18px; font-weight: 800; margin-top: 6px; }
-        .previewPhone { border-radius: 24px; background: #fbfdff; border: 1px solid rgba(20, 33, 50, 0.08); padding: 18px; }
-        .previewHeader { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-        .previewLogo, .previewLogoFallback { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; flex-shrink: 0; }
-        .previewLogoFallback { display: flex; align-items: center; justify-content: center; background: #000; color: #fff; font-size: 24px; font-weight: 900; }
-        .previewBusiness { font-size: clamp(24px, 5vw, 38px); font-weight: 900; color: #142132; letter-spacing: -0.04em; line-height: 1.05; word-break: break-word; }
-        .previewHeroWrap, .previewHeroPlaceholder { width: 100%; height: 220px; border-radius: 24px; overflow: hidden; background: #eef4ff; display: flex; align-items: center; justify-content: center; }
-        .previewHeroImage { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .previewHeroPlaceholder { color: #5a6473; font-size: 18px; font-weight: 800; text-align: center; padding: 20px; border: 1px dashed rgba(20, 33, 50, 0.14); }
-        .viewStoreButton, .primaryButton, .saveButton, .secondaryButton, .bannerUploadCard, .menuUploadCard { width: 100%; border: none; border-radius: 20px; cursor: pointer; font-weight: 900; font-size: 20px; }
-        .viewStoreButton, .primaryButton, .saveButton { background: #000; color: #fff; min-height: 68px; }
-        .viewStoreButton { margin-top: 16px; }
-        .secondaryButton { min-height: 64px; background: #fff; color: #142132; border: 1px solid rgba(20, 33, 50, 0.12); }
-        .bannerUploadCard, .menuUploadCard { min-height: 180px; margin-top: 12px; background: #f8fafc; color: #142132; border: 2px dashed rgba(20, 33, 50, 0.12); padding: 16px; position: relative; overflow: hidden; }
-        .bannerPreviewWrap { width: 100%; height: 220px; border-radius: 20px; overflow: hidden; }
-        .bannerPreview { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .changeImageBar { position: absolute; left: 16px; right: 16px; bottom: 16px; min-height: 54px; border-radius: 16px; background: rgba(0, 0, 0, 0.82); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; backdrop-filter: blur(6px); }
-        .uploadTitle { display: block; font-size: 22px; font-weight: 900; text-align: center; }
-        .uploadText { display: block; margin-top: 8px; color: #5a6473; font-size: 16px; line-height: 1.45; text-align: center; font-weight: 700; }
-        .small { font-size: 14px; }
-        .fieldGrid { display: grid; gap: 14px; }
-        .field { min-width: 0; }
-        .label { display: block; margin-bottom: 8px; color: #142132; font-size: 16px; font-weight: 800; }
-        .input, .textarea { width: 100%; border-radius: 18px; border: 1px solid rgba(20, 33, 50, 0.1); background: #fff; color: #142132; font-size: 18px; font-weight: 600; padding: 16px 18px; outline: none; box-sizing: border-box; }
-        .input:disabled { color: #7a8493; background: #f7f8fb; }
-        .input { min-height: 60px; }
-        .textarea { min-height: 130px; resize: vertical; }
-        .hiddenInput { display: none; }
-        .menuAddCard { display: grid; gap: 14px; }
-        .menuUploadPreviewWrap { width: 100%; height: 210px; border-radius: 20px; overflow: hidden; }
-        .menuUploadPreview { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .currentMenuTitle { margin-top: 24px; color: #142132; font-size: 22px; font-weight: 900; }
-        .menuList { margin-top: 14px; display: grid; gap: 14px; }
-        .emptyBox { border-radius: 18px; background: #f7f8fb; border: 1px solid rgba(20, 33, 50, 0.08); padding: 22px; color: #6c7685; font-size: 18px; font-weight: 700; }
-        .menuItemCard { border-radius: 24px; background: #fbfcfe; border: 1px solid rgba(20, 33, 50, 0.08); overflow: hidden; }
-        .menuItemImage, .placeholderImage { width: 100%; height: 200px; object-fit: cover; display: block; background: #eef2f7; }
-        .placeholderImage { border-bottom: 1px dashed rgba(20, 33, 50, 0.12); }
-        .menuItemBody { padding: 18px; }
-        .menuItemTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-        .menuItemName { color: #142132; font-size: 22px; font-weight: 900; line-height: 1.08; word-break: break-word; }
-        .menuItemPrice { color: #142132; font-size: 22px; font-weight: 900; flex-shrink: 0; }
-        .menuItemDescription { margin-top: 12px; color: #5a6473; font-size: 17px; line-height: 1.55; font-weight: 700; word-break: break-word; }
-        .removeButton { margin-top: 16px; border: none; background: transparent; color: #dc2626; font-size: 18px; font-weight: 900; cursor: pointer; padding: 0; }
-        .paymentGrid { display: grid; gap: 12px; }
-        .paymentStat { border-radius: 20px; background: #f8f9fc; border: 1px solid rgba(20, 33, 50, 0.08); padding: 18px; }
-        .paymentLabel { color: #6c7685; font-size: 15px; line-height: 1.35; font-weight: 800; }
-        .paymentValue { margin-top: 8px; color: #142132; font-size: 18px; font-weight: 900; word-break: break-word; }
-        .paymentButtons { margin-top: 16px; display: grid; gap: 12px; }
-        .saveButton { position: sticky; bottom: 88px; z-index: 20; box-shadow: 0 16px 30px rgba(15, 23, 42, 0.15); }
-        .bottomNav { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 30; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px; background: rgba(255, 255, 255, 0.94); border: 1px solid rgba(20, 33, 50, 0.08); border-radius: 22px; backdrop-filter: blur(12px); box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12); }
-        .navButton { border: none; background: transparent; min-height: 48px; border-radius: 14px; cursor: pointer; padding: 0 4px; }
-        .navLabel { color: #142132; font-size: 14px; font-weight: 800; line-height: 1.2; }
+        .page {
+          min-height: 100vh;
+          background: linear-gradient(180deg, #f6f8fd 0%, #eef3fb 100%);
+          color: #142132;
+          padding: 16px;
+          padding-bottom: 120px;
+          overflow-x: hidden;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .builderWrap {
+          max-width: 760px;
+          margin: 0 auto;
+          display: grid;
+          gap: 16px;
+        }
+        .heroCard,
+        .sectionCard {
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          border-radius: 30px;
+          padding: 24px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+        }
+        .eyebrow {
+          color: #70798a;
+          font-size: 18px;
+          font-weight: 900;
+          margin-bottom: 10px;
+        }
+        .heroTitle {
+          margin: 0;
+          font-size: clamp(40px, 9vw, 68px);
+          line-height: 0.95;
+          letter-spacing: -0.06em;
+          font-weight: 900;
+          color: #142132;
+        }
+        .heroText {
+          margin: 18px 0 0;
+          color: #5a6473;
+          font-size: 18px;
+          line-height: 1.55;
+          font-weight: 600;
+          max-width: 620px;
+        }
+        .topRow {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 16px;
+          align-items: center;
+          margin-top: 20px;
+        }
+        .backLink {
+          color: #142132;
+          text-decoration: none;
+          font-size: 18px;
+          font-weight: 800;
+        }
+        .langWrap {
+          display: inline-flex;
+          border: 1px solid rgba(20, 33, 50, 0.12);
+          background: #fff;
+          padding: 5px;
+          border-radius: 18px;
+        }
+        .langButton {
+          border: none;
+          background: transparent;
+          color: #6b7686;
+          min-width: 72px;
+          min-height: 52px;
+          border-radius: 14px;
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .activeLang {
+          background: #0f172a;
+          color: #fff;
+        }
+        .previewCard {
+          margin-top: 24px;
+          background: #ffffff;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          border-radius: 26px;
+          padding: 20px;
+        }
+        .sectionTitle {
+          margin: 0 0 14px;
+          color: #142132;
+          font-size: clamp(26px, 5vw, 40px);
+          line-height: 1.02;
+          letter-spacing: -0.04em;
+          font-weight: 900;
+        }
+        .sectionHead {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .sectionMeta {
+          color: #70798a;
+          font-size: 18px;
+          font-weight: 800;
+          margin-top: 6px;
+        }
+        .previewPhone {
+          border-radius: 24px;
+          background: #fbfdff;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          padding: 18px;
+        }
+        .previewHeader {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .previewLogo,
+        .previewLogoFallback {
+          width: 64px;
+          height: 64px;
+          border-radius: 16px;
+          object-fit: cover;
+          flex-shrink: 0;
+        }
+        .previewLogoFallback {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #000;
+          color: #fff;
+          font-size: 24px;
+          font-weight: 900;
+        }
+        .previewBusiness {
+          font-size: clamp(24px, 5vw, 38px);
+          font-weight: 900;
+          color: #142132;
+          letter-spacing: -0.04em;
+          line-height: 1.05;
+          word-break: break-word;
+        }
+        .previewHeroWrap,
+        .previewHeroPlaceholder {
+          width: 100%;
+          height: 220px;
+          border-radius: 24px;
+          overflow: hidden;
+          background: #eef4ff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .previewHeroImage {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .previewHeroPlaceholder {
+          color: #5a6473;
+          font-size: 18px;
+          font-weight: 800;
+          text-align: center;
+          padding: 20px;
+          border: 1px dashed rgba(20, 33, 50, 0.14);
+        }
+        .viewStoreButton,
+        .primaryButton,
+        .saveButton,
+        .secondaryButton,
+        .bannerUploadCard,
+        .menuUploadCard {
+          width: 100%;
+          border: none;
+          border-radius: 20px;
+          cursor: pointer;
+          font-weight: 900;
+          font-size: 20px;
+        }
+        .viewStoreButton,
+        .primaryButton,
+        .saveButton {
+          background: #000;
+          color: #fff;
+          min-height: 68px;
+        }
+        .viewStoreButton {
+          margin-top: 16px;
+        }
+        .secondaryButton {
+          min-height: 64px;
+          background: #fff;
+          color: #142132;
+          border: 1px solid rgba(20, 33, 50, 0.12);
+        }
+        .bannerUploadCard,
+        .menuUploadCard {
+          min-height: 180px;
+          margin-top: 12px;
+          background: #f8fafc;
+          color: #142132;
+          border: 2px dashed rgba(20, 33, 50, 0.12);
+          padding: 16px;
+          position: relative;
+          overflow: hidden;
+        }
+        .bannerPreviewWrap {
+          width: 100%;
+          height: 220px;
+          border-radius: 20px;
+          overflow: hidden;
+        }
+        .bannerPreview {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .changeImageBar {
+          position: absolute;
+          left: 16px;
+          right: 16px;
+          bottom: 16px;
+          min-height: 54px;
+          border-radius: 16px;
+          background: rgba(0, 0, 0, 0.82);
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          font-weight: 900;
+          backdrop-filter: blur(6px);
+        }
+        .uploadTitle {
+          display: block;
+          font-size: 22px;
+          font-weight: 900;
+          text-align: center;
+        }
+        .uploadText {
+          display: block;
+          margin-top: 8px;
+          color: #5a6473;
+          font-size: 16px;
+          line-height: 1.45;
+          text-align: center;
+          font-weight: 700;
+        }
+        .small {
+          font-size: 14px;
+        }
+        .fieldGrid {
+          display: grid;
+          gap: 14px;
+        }
+        .field {
+          min-width: 0;
+        }
+        .fullField {
+          grid-column: 1 / -1;
+        }
+        .label {
+          display: block;
+          margin-bottom: 8px;
+          color: #142132;
+          font-size: 16px;
+          font-weight: 800;
+        }
+        .input,
+        .textarea,
+        .timeInput {
+          width: 100%;
+          border-radius: 18px;
+          border: 1px solid rgba(20, 33, 50, 0.1);
+          background: #fff;
+          color: #142132;
+          font-size: 18px;
+          font-weight: 600;
+          padding: 16px 18px;
+          outline: none;
+          box-sizing: border-box;
+        }
+        .input:disabled,
+        .timeInput:disabled {
+          color: #7a8493;
+          background: #f7f8fb;
+        }
+        .input,
+        .timeInput {
+          min-height: 60px;
+        }
+        .textarea {
+          min-height: 130px;
+          resize: vertical;
+        }
+        .hoursCard {
+          border-radius: 20px;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          background: #fbfdff;
+          padding: 14px;
+          display: grid;
+          gap: 10px;
+        }
+        .hoursRow {
+          display: grid;
+          grid-template-columns: 74px 1fr 70px;
+          gap: 10px;
+          align-items: center;
+        }
+        .dayToggle {
+          min-height: 52px;
+          border-radius: 14px;
+          border: 1px solid rgba(20, 33, 50, 0.1);
+          background: #fff;
+          color: #6b7686;
+          font-weight: 900;
+          font-size: 16px;
+          cursor: pointer;
+        }
+        .activeDay {
+          background: #0f172a;
+          border-color: #0f172a;
+          color: #fff;
+        }
+        .hoursInputs {
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          gap: 8px;
+          align-items: center;
+        }
+        .timeDash {
+          color: #7a8493;
+          font-weight: 800;
+        }
+        .dayState {
+          text-align: right;
+          color: #7a8493;
+          font-size: 14px;
+          font-weight: 800;
+        }
+        .hoursSummary {
+          margin-top: 6px;
+          border-top: 1px solid rgba(20, 33, 50, 0.08);
+          padding-top: 12px;
+          color: #5a6473;
+          font-size: 15px;
+          line-height: 1.5;
+          font-weight: 700;
+        }
+        .hiddenInput {
+          display: none;
+        }
+        .menuAddCard {
+          display: grid;
+          gap: 14px;
+        }
+        .menuUploadPreviewWrap {
+          width: 100%;
+          height: 210px;
+          border-radius: 20px;
+          overflow: hidden;
+        }
+        .menuUploadPreview {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+        .currentMenuTitle {
+          margin-top: 24px;
+          color: #142132;
+          font-size: 22px;
+          font-weight: 900;
+        }
+        .menuList {
+          margin-top: 14px;
+          display: grid;
+          gap: 14px;
+        }
+        .emptyBox {
+          border-radius: 18px;
+          background: #f7f8fb;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          padding: 22px;
+          color: #6c7685;
+          font-size: 18px;
+          font-weight: 700;
+        }
+        .menuItemCard {
+          border-radius: 24px;
+          background: #fbfcfe;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          overflow: hidden;
+        }
+        .menuItemImage,
+        .placeholderImage {
+          width: 100%;
+          height: 200px;
+          object-fit: cover;
+          display: block;
+          background: #eef2f7;
+        }
+        .placeholderImage {
+          border-bottom: 1px dashed rgba(20, 33, 50, 0.12);
+        }
+        .menuItemBody {
+          padding: 18px;
+        }
+        .menuItemTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 14px;
+        }
+        .menuItemName {
+          color: #142132;
+          font-size: 22px;
+          font-weight: 900;
+          line-height: 1.08;
+          word-break: break-word;
+        }
+        .menuItemPrice {
+          color: #142132;
+          font-size: 22px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+        .menuItemDescription {
+          margin-top: 12px;
+          color: #5a6473;
+          font-size: 17px;
+          line-height: 1.55;
+          font-weight: 700;
+          word-break: break-word;
+        }
+        .removeButton {
+          margin-top: 16px;
+          border: none;
+          background: transparent;
+          color: #dc2626;
+          font-size: 18px;
+          font-weight: 900;
+          cursor: pointer;
+          padding: 0;
+        }
+        .paymentGrid {
+          display: grid;
+          gap: 12px;
+        }
+        .paymentStat {
+          border-radius: 20px;
+          background: #f8f9fc;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          padding: 18px;
+        }
+        .paymentLabel {
+          color: #6c7685;
+          font-size: 15px;
+          line-height: 1.35;
+          font-weight: 800;
+        }
+        .paymentValue {
+          margin-top: 8px;
+          color: #142132;
+          font-size: 18px;
+          font-weight: 900;
+          word-break: break-word;
+        }
+        .paymentButtons {
+          margin-top: 16px;
+          display: grid;
+          gap: 12px;
+        }
+        .saveButton {
+          position: sticky;
+          bottom: 88px;
+          z-index: 20;
+          box-shadow: 0 16px 30px rgba(15, 23, 42, 0.15);
+        }
+        .bottomNav {
+          position: fixed;
+          left: 12px;
+          right: 12px;
+          bottom: 12px;
+          z-index: 30;
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 8px;
+          padding: 10px;
+          background: rgba(255, 255, 255, 0.94);
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          border-radius: 22px;
+          backdrop-filter: blur(12px);
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+        }
+        .navButton {
+          border: none;
+          background: transparent;
+          min-height: 48px;
+          border-radius: 14px;
+          cursor: pointer;
+          padding: 0 4px;
+        }
+        .navLabel {
+          color: #142132;
+          font-size: 14px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
         @media (min-width: 900px) {
-          .page { padding-bottom: 40px; }
-          .builderWrap { max-width: 1200px; grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
-          .heroCard { grid-column: 1 / -1; }
-          .sectionCard:nth-of-type(2), .sectionCard:nth-of-type(3), .sectionCard:nth-of-type(4) { grid-column: 1 / 2; }
-          .sectionCard:nth-of-type(5) { grid-column: 2 / 3; grid-row: 2 / span 3; position: sticky; top: 20px; }
-          .saveButton { grid-column: 1 / 2; position: static; }
-          .bottomNav { display: none; }
+          .page {
+            padding-bottom: 40px;
+          }
+          .builderWrap {
+            max-width: 1200px;
+            grid-template-columns: minmax(0, 1fr) 400px;
+            align-items: start;
+          }
+          .heroCard {
+            grid-column: 1 / -1;
+          }
+          .sectionCard:nth-of-type(2),
+          .sectionCard:nth-of-type(3),
+          .sectionCard:nth-of-type(4) {
+            grid-column: 1 / 2;
+          }
+          .sectionCard:nth-of-type(5) {
+            grid-column: 2 / 3;
+            grid-row: 2 / span 3;
+            position: sticky;
+            top: 20px;
+          }
+          .saveButton {
+            grid-column: 1 / 2;
+            position: static;
+          }
+          .bottomNav {
+            display: none;
+          }
         }
         @media (max-width: 560px) {
-          .heroCard, .sectionCard { padding: 20px; border-radius: 24px; }
-          .topRow { grid-template-columns: 1fr; }
-          .langWrap { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
-          .langButton { width: 100%; }
-          .previewHeroWrap, .previewHeroPlaceholder { height: 180px; }
-          .bannerPreviewWrap { height: 180px; }
-          .heroTitle { font-size: clamp(34px, 12vw, 56px); }
-          .sectionTitle { font-size: clamp(24px, 8vw, 34px); }
+          .heroCard,
+          .sectionCard {
+            padding: 20px;
+            border-radius: 24px;
+          }
+          .topRow {
+            grid-template-columns: 1fr;
+          }
+          .langWrap {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+          .langButton {
+            width: 100%;
+          }
+          .previewHeroWrap,
+          .previewHeroPlaceholder {
+            height: 180px;
+          }
+          .bannerPreviewWrap {
+            height: 180px;
+          }
+          .heroTitle {
+            font-size: clamp(34px, 12vw, 56px);
+          }
+          .sectionTitle {
+            font-size: clamp(24px, 8vw, 34px);
+          }
+          .hoursRow {
+            grid-template-columns: 1fr;
+          }
+          .dayState {
+            text-align: left;
+          }
         }
       `}</style>
     </main>
