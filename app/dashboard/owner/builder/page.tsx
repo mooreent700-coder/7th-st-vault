@@ -81,15 +81,16 @@ const copy = {
     logoImage: 'Logo Image',
     uploadHero: 'Upload Hero',
     uploadLogo: 'Upload Logo',
+    changeImage: 'Change Image',
     uploading: 'Uploading...',
     stripeTitle: 'Stripe Payments',
     stripeText:
       'Connect your Stripe account to receive payouts and let MenuFlow take the correct platform fee automatically.',
     platformFee: 'Platform fee',
-    onboarding: 'Onboarding complete',
-    charges: 'Charges enabled',
-    payouts: 'Payouts enabled',
-    incomplete: 'Onboarding incomplete',
+    onboarding: 'Onboarding',
+    charges: 'Charges',
+    payouts: 'Payouts',
+    incomplete: 'Incomplete',
     connectStripe: 'Connect Stripe',
     refreshStripe: 'Refresh Stripe',
     loading: 'Loading builder...',
@@ -109,6 +110,7 @@ const copy = {
     pricePlaceholder: '12.99',
     descriptionPlaceholder: 'Fresh food made to order',
     remove: 'Remove',
+    previewLabel: 'Live storefront preview',
   },
   es: {
     eyebrow: 'Store Builder',
@@ -147,15 +149,16 @@ const copy = {
     logoImage: 'Imagen Logo',
     uploadHero: 'Subir Hero',
     uploadLogo: 'Subir Logo',
+    changeImage: 'Cambiar Imagen',
     uploading: 'Subiendo...',
     stripeTitle: 'Pagos con Stripe',
     stripeText:
       'Conecta tu cuenta de Stripe para recibir pagos y permitir que MenuFlow cobre la tarifa correcta automáticamente.',
     platformFee: 'Tarifa de plataforma',
-    onboarding: 'Onboarding completo',
-    charges: 'Cobros habilitados',
-    payouts: 'Pagos habilitados',
-    incomplete: 'Onboarding incompleto',
+    onboarding: 'Onboarding',
+    charges: 'Cobros',
+    payouts: 'Pagos',
+    incomplete: 'Incompleto',
     connectStripe: 'Conectar Stripe',
     refreshStripe: 'Actualizar Stripe',
     loading: 'Cargando builder...',
@@ -175,6 +178,7 @@ const copy = {
     pricePlaceholder: '12.99',
     descriptionPlaceholder: 'Comida fresca hecha al momento',
     remove: 'Eliminar',
+    previewLabel: 'Vista previa en vivo',
   },
 } as const;
 
@@ -610,49 +614,65 @@ export default function BuilderPage() {
 
       <section className="contentGrid">
         <div className="leftCol">
-          <form onSubmit={handleSaveBusiness} className="card">
-            <h2 className="cardTitle">{t.businessInfo}</h2>
+          <form onSubmit={handleSaveBusiness} className="card businessCard">
+            <div className="sectionTop">
+              <div>
+                <h2 className="cardTitle">{t.businessInfo}</h2>
+              </div>
+            </div>
 
-            <label className="label">{t.businessName}</label>
-            <input
-              className="input"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
-              placeholder={t.noBusiness}
-              required
-            />
+            <div className="fieldGrid">
+              <div className="fieldSpan2">
+                <label className="label">{t.businessName}</label>
+                <input
+                  className="input"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder={t.noBusiness}
+                  required
+                />
+              </div>
 
-            <label className="label">{t.storeSlug}</label>
-            <input
-              className="input"
-              value={slug ? `/store/${slug}` : ''}
-              placeholder={t.noSlug}
-              disabled
-            />
+              <div className="fieldSpan2">
+                <label className="label">{t.storeSlug}</label>
+                <input
+                  className="input"
+                  value={slug ? `/store/${slug}` : ''}
+                  placeholder={t.noSlug}
+                  disabled
+                />
+              </div>
 
-            <label className="label">{t.phone}</label>
-            <input
-              className="input"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={t.phonePlaceholder}
-            />
+              <div>
+                <label className="label">{t.phone}</label>
+                <input
+                  className="input"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder={t.phonePlaceholder}
+                />
+              </div>
 
-            <label className="label">{t.address}</label>
-            <input
-              className="input"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder={t.addressPlaceholder}
-            />
+              <div>
+                <label className="label">{t.hours}</label>
+                <input
+                  className="input"
+                  value={hours}
+                  onChange={(e) => setHours(e.target.value)}
+                  placeholder={t.hoursPlaceholder}
+                />
+              </div>
 
-            <label className="label">{t.hours}</label>
-            <input
-              className="input"
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              placeholder={t.hoursPlaceholder}
-            />
+              <div className="fieldSpan2">
+                <label className="label">{t.address}</label>
+                <input
+                  className="input"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder={t.addressPlaceholder}
+                />
+              </div>
+            </div>
 
             <button type="submit" className="primaryButton" disabled={savingBusiness}>
               {savingBusiness ? t.savingBusiness : t.saveBusiness}
@@ -660,11 +680,15 @@ export default function BuilderPage() {
           </form>
 
           <div className="card">
-            <h2 className="cardTitle">{t.storeImages}</h2>
-            <p className="muted imageText">{t.storeImagesText}</p>
+            <div className="sectionTop">
+              <div>
+                <h2 className="cardTitle">{t.storeImages}</h2>
+                <p className="muted imageText">{t.storeImagesText}</p>
+              </div>
+            </div>
 
             <div className="imageGrid">
-              <div>
+              <div className="uploadPanel">
                 <div className="label">{t.heroImage}</div>
 
                 <input
@@ -681,9 +705,14 @@ export default function BuilderPage() {
                   onClick={() => heroInputRef.current?.click()}
                 >
                   {heroUrl ? (
-                    <div className="imagePreviewWrap">
-                      <img src={heroUrl} alt="Hero" className="imagePreview" />
-                    </div>
+                    <>
+                      <div className="imagePreviewWrap fixedTall">
+                        <img src={heroUrl} alt="Hero" className="imagePreview" />
+                      </div>
+                      <div className="overlayBar">
+                        {heroUploading ? t.uploading : t.changeImage}
+                      </div>
+                    </>
                   ) : (
                     <>
                       <span className="uploadTitle">
@@ -695,7 +724,7 @@ export default function BuilderPage() {
                 </button>
               </div>
 
-              <div>
+              <div className="uploadPanel">
                 <div className="label">{t.logoImage}</div>
 
                 <input
@@ -712,9 +741,14 @@ export default function BuilderPage() {
                   onClick={() => logoInputRef.current?.click()}
                 >
                   {logoUrl ? (
-                    <div className="imagePreviewWrap">
-                      <img src={logoUrl} alt="Logo" className="imagePreview" />
-                    </div>
+                    <>
+                      <div className="imagePreviewWrap fixedSquare">
+                        <img src={logoUrl} alt="Logo" className="imagePreview" />
+                      </div>
+                      <div className="overlayBar">
+                        {logoUploading ? t.uploading : t.changeImage}
+                      </div>
+                    </>
                   ) : (
                     <>
                       <span className="uploadTitle">
@@ -729,75 +763,90 @@ export default function BuilderPage() {
           </div>
 
           <form onSubmit={handleAddMenuItem} className="card">
-            <div className="cardTop">
+            <div className="sectionTop sectionTopTight">
               <div>
                 <h2 className="cardTitle">{t.addItem}</h2>
                 <div className="muted">{menuCountText}</div>
               </div>
 
-              <button type="button" className="secondaryButton" onClick={handleViewStore}>
+              <button type="button" className="secondaryButton compactButton" onClick={handleViewStore}>
                 {t.viewStore}
               </button>
             </div>
 
-            <label className="label">{t.itemName}</label>
-            <input
-              className="input"
-              value={menuName}
-              onChange={(e) => setMenuName(e.target.value)}
-              placeholder={t.itemNamePlaceholder}
-              required
-            />
+            <div className="fieldGrid">
+              <div className="fieldSpan2">
+                <label className="label">{t.itemName}</label>
+                <input
+                  className="input"
+                  value={menuName}
+                  onChange={(e) => setMenuName(e.target.value)}
+                  placeholder={t.itemNamePlaceholder}
+                  required
+                />
+              </div>
 
-            <label className="label">{t.price}</label>
-            <input
-              className="input"
-              value={menuPrice}
-              onChange={(e) => setMenuPrice(e.target.value)}
-              placeholder={t.pricePlaceholder}
-              inputMode="decimal"
-              required
-            />
+              <div>
+                <label className="label">{t.price}</label>
+                <input
+                  className="input"
+                  value={menuPrice}
+                  onChange={(e) => setMenuPrice(e.target.value)}
+                  placeholder={t.pricePlaceholder}
+                  inputMode="decimal"
+                  required
+                />
+              </div>
 
-            <label className="label">{t.description}</label>
-            <textarea
-              className="textarea"
-              value={menuDescription}
-              onChange={(e) => setMenuDescription(e.target.value)}
-              placeholder={t.descriptionPlaceholder}
-              required
-            />
+              <div className="fieldSpan2">
+                <label className="label">{t.description}</label>
+                <textarea
+                  className="textarea"
+                  value={menuDescription}
+                  onChange={(e) => setMenuDescription(e.target.value)}
+                  placeholder={t.descriptionPlaceholder}
+                  required
+                />
+              </div>
 
-            <label className="label">{t.itemImage}</label>
-            <input
-              ref={menuImageInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleMenuImageSelect}
-              className="hiddenInput"
-            />
+              <div className="fieldSpan2">
+                <label className="label">{t.itemImage}</label>
+                <input
+                  ref={menuImageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleMenuImageSelect}
+                  className="hiddenInput"
+                />
 
-            <button
-              type="button"
-              className="uploadBox"
-              onClick={() => menuImageInputRef.current?.click()}
-            >
-              {menuImagePreview ? (
-                <div className="imagePreviewWrap">
-                  <img
-                    src={menuImagePreview}
-                    alt="Menu preview"
-                    className="imagePreview"
-                  />
-                </div>
-              ) : (
-                <>
-                  <span className="uploadTitle">{t.uploadMenuImage}</span>
-                  <span className="uploadText">{t.uploadHint}</span>
-                  <span className="uploadText small">{t.imageOptional}</span>
-                </>
-              )}
-            </button>
+                <button
+                  type="button"
+                  className="uploadBox"
+                  onClick={() => menuImageInputRef.current?.click()}
+                >
+                  {menuImagePreview ? (
+                    <>
+                      <div className="imagePreviewWrap fixedMedium">
+                        <img
+                          src={menuImagePreview}
+                          alt="Menu preview"
+                          className="imagePreview"
+                        />
+                      </div>
+                      <div className="overlayBar">
+                        {t.changeImage}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="uploadTitle">{t.uploadMenuImage}</span>
+                      <span className="uploadText">{t.uploadHint}</span>
+                      <span className="uploadText small">{t.imageOptional}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
 
             <button type="submit" className="primaryButton" disabled={addingItem}>
               {addingItem ? t.addingItem : t.addMenuItem}
@@ -805,7 +854,7 @@ export default function BuilderPage() {
           </form>
 
           <div className="card">
-            <div className="cardTop">
+            <div className="sectionTop">
               <div>
                 <h2 className="cardTitle">{t.currentMenu}</h2>
                 <div className="muted">{menuCountText}</div>
@@ -818,34 +867,40 @@ export default function BuilderPage() {
               ) : (
                 menuItems.map((item) => (
                   <div key={item.id} className="menuItemCard">
-                    <div className="menuItemTop">
-                      <div className="menuItemInfo">
-                        <div className="menuItemName">{item.name || 'Untitled item'}</div>
-                        <div className="menuItemPrice">{formatPrice(item.price)}</div>
-                      </div>
-
-                      <div className="menuItemActions">
+                    <div className="menuItemLayout">
+                      <div className="menuItemMedia">
                         {item.image_url ? (
                           <img
                             src={item.image_url}
                             alt={item.name || 'Menu item'}
-                            className="menuThumb"
+                            className="menuThumbLarge"
                           />
-                        ) : null}
+                        ) : (
+                          <div className="menuThumbLarge placeholderThumb" />
+                        )}
+                      </div>
 
-                        <button
-                          type="button"
-                          className="removeButton"
-                          onClick={() => handleDeleteMenuItem(item.id)}
-                        >
-                          {t.remove}
-                        </button>
+                      <div className="menuItemContent">
+                        <div className="menuItemHeader">
+                          <div>
+                            <div className="menuItemName">{item.name || 'Untitled item'}</div>
+                            <div className="menuItemPrice">{formatPrice(item.price)}</div>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="removeButton"
+                            onClick={() => handleDeleteMenuItem(item.id)}
+                          >
+                            {t.remove}
+                          </button>
+                        </div>
+
+                        {item.description ? (
+                          <div className="menuItemDescription">{item.description}</div>
+                        ) : null}
                       </div>
                     </div>
-
-                    {item.description ? (
-                      <div className="menuItemDescription">{item.description}</div>
-                    ) : null}
                   </div>
                 ))
               )}
@@ -855,23 +910,29 @@ export default function BuilderPage() {
 
         <div className="rightCol">
           <div className="card previewCard">
-            <div className="cardTop">
+            <div className="sectionTop">
               <div>
                 <h2 className="cardTitle">{t.storePreview}</h2>
                 <div className="muted">{t.previewText}</div>
               </div>
 
-              <div className="slugTag">/store/{slug || t.noSlug}</div>
+              <div className="previewPill">{t.previewLabel}</div>
             </div>
 
-            <div className="previewPhone">
-              {logoUrl ? (
-                <div className="previewLogoWrap">
-                  <img src={logoUrl} alt="Logo preview" className="previewLogo" />
-                </div>
-              ) : null}
+            <div className="slugTag">/store/{slug || t.noSlug}</div>
 
-              <div className="previewBusiness">{businessName || t.noBusiness}</div>
+            <div className="previewPhone">
+              <div className="previewTop">
+                {logoUrl ? (
+                  <div className="previewLogoWrap">
+                    <img src={logoUrl} alt="Logo preview" className="previewLogo" />
+                  </div>
+                ) : (
+                  <div className="previewLogoWrap previewLogoFallback">M</div>
+                )}
+
+                <div className="previewBusiness">{businessName || t.noBusiness}</div>
+              </div>
 
               {heroUrl ? (
                 <div className="previewHeroWrap">
@@ -893,7 +954,9 @@ export default function BuilderPage() {
                           alt={item.name || 'Menu preview'}
                           className="previewMenuImage"
                         />
-                      ) : null}
+                      ) : (
+                        <div className="previewMenuImage placeholderPreviewImage" />
+                      )}
 
                       <div className="previewMenuText">
                         <div className="previewMenuName">{item.name}</div>
@@ -906,9 +969,13 @@ export default function BuilderPage() {
             </div>
           </div>
 
-          <div className="card">
-            <h2 className="cardTitle">{t.stripeTitle}</h2>
-            <p className="muted">{t.stripeText}</p>
+          <div className="card stripeCard">
+            <div className="sectionTop">
+              <div>
+                <h2 className="cardTitle">{t.stripeTitle}</h2>
+                <p className="muted">{t.stripeText}</p>
+              </div>
+            </div>
 
             <div className="stripeGrid">
               <div className="stripeStat">
@@ -917,7 +984,7 @@ export default function BuilderPage() {
               </div>
               <div className="stripeStat">
                 <div className="stripeLabel">{t.onboarding}</div>
-                <div className="stripeValue">{t.incomplete}</div>
+                <div className="stripeValue strongValue">{t.incomplete}</div>
               </div>
               <div className="stripeStat">
                 <div className="stripeLabel">{t.charges}</div>
@@ -1076,7 +1143,7 @@ export default function BuilderPage() {
           max-width: 1440px;
           margin: 18px auto 0;
           display: grid;
-          grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+          grid-template-columns: minmax(0, 1.15fr) minmax(390px, 0.85fr);
           gap: 20px;
           align-items: start;
         }
@@ -1085,6 +1152,7 @@ export default function BuilderPage() {
         .rightCol {
           display: grid;
           gap: 20px;
+          min-width: 0;
         }
 
         .card {
@@ -1097,12 +1165,21 @@ export default function BuilderPage() {
           box-sizing: border-box;
         }
 
-        .cardTop {
+        .businessCard {
+          padding-bottom: 30px;
+        }
+
+        .sectionTop {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
           gap: 16px;
           flex-wrap: wrap;
+          margin-bottom: 10px;
+        }
+
+        .sectionTopTight {
+          margin-bottom: 6px;
         }
 
         .cardTitle {
@@ -1120,6 +1197,16 @@ export default function BuilderPage() {
           font-size: 18px;
           line-height: 1.5;
           font-weight: 700;
+        }
+
+        .fieldGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 18px;
+        }
+
+        .fieldSpan2 {
+          grid-column: 1 / -1;
         }
 
         .label {
@@ -1155,12 +1242,16 @@ export default function BuilderPage() {
         }
 
         .textarea {
-          min-height: 150px;
+          min-height: 170px;
           resize: vertical;
         }
 
         .hiddenInput {
           display: none;
+        }
+
+        .uploadPanel {
+          min-width: 0;
         }
 
         .uploadBox,
@@ -1180,6 +1271,8 @@ export default function BuilderPage() {
           padding: 18px;
           cursor: pointer;
           box-sizing: border-box;
+          position: relative;
+          overflow: hidden;
         }
 
         .uploadTitle {
@@ -1202,10 +1295,20 @@ export default function BuilderPage() {
 
         .imagePreviewWrap {
           width: 100%;
-          height: 100%;
-          min-height: 180px;
           border-radius: 20px;
           overflow: hidden;
+        }
+
+        .fixedTall {
+          height: 230px;
+        }
+
+        .fixedSquare {
+          height: 230px;
+        }
+
+        .fixedMedium {
+          height: 230px;
         }
 
         .imagePreview {
@@ -1214,6 +1317,24 @@ export default function BuilderPage() {
           object-fit: cover;
           display: block;
           border-radius: 20px;
+        }
+
+        .overlayBar {
+          position: absolute;
+          left: 16px;
+          right: 16px;
+          bottom: 16px;
+          min-height: 46px;
+          border-radius: 14px;
+          background: rgba(0, 0, 0, 0.82);
+          color: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          font-weight: 900;
+          letter-spacing: 0.01em;
+          backdrop-filter: blur(6px);
         }
 
         .primaryButton,
@@ -1235,6 +1356,13 @@ export default function BuilderPage() {
           background: #fff;
           color: #142132;
           border: 1px solid rgba(20, 33, 50, 0.12);
+        }
+
+        .compactButton {
+          width: auto;
+          min-width: 170px;
+          margin-top: 0;
+          min-height: 62px;
         }
 
         .mutedButton {
@@ -1260,68 +1388,81 @@ export default function BuilderPage() {
         }
 
         .menuItemCard {
-          border-radius: 20px;
-          background: #f9fbff;
+          border-radius: 22px;
+          background: #fbfcfe;
           border: 1px solid rgba(20, 33, 50, 0.08);
-          padding: 16px;
+          padding: 18px;
         }
 
-        .menuItemTop {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
+        .menuItemLayout {
+          display: grid;
+          grid-template-columns: 120px minmax(0, 1fr);
+          gap: 16px;
+          align-items: start;
         }
 
-        .menuItemInfo {
+        .menuItemMedia {
           min-width: 0;
         }
 
-        .menuItemActions {
+        .menuThumbLarge {
+          width: 120px;
+          height: 120px;
+          object-fit: cover;
+          border-radius: 18px;
+          display: block;
+          background: #eef2f7;
+        }
+
+        .placeholderThumb {
+          border: 1px dashed rgba(20, 33, 50, 0.12);
+        }
+
+        .menuItemContent {
+          min-width: 0;
+        }
+
+        .menuItemHeader {
           display: flex;
           align-items: flex-start;
-          gap: 12px;
-          flex-shrink: 0;
+          justify-content: space-between;
+          gap: 16px;
         }
 
         .menuItemName {
           color: #142132;
-          font-size: 22px;
+          font-size: 30px;
           font-weight: 900;
-          line-height: 1.1;
+          line-height: 1.02;
+          letter-spacing: -0.03em;
+          word-break: break-word;
         }
 
         .menuItemPrice {
-          margin-top: 8px;
+          margin-top: 10px;
           color: #5a6473;
           font-size: 18px;
           font-weight: 900;
         }
 
         .menuItemDescription {
-          margin-top: 12px;
+          margin-top: 14px;
           color: #5a6473;
-          font-size: 15px;
+          font-size: 18px;
           line-height: 1.55;
           font-weight: 700;
-        }
-
-        .menuThumb {
-          width: 84px;
-          height: 84px;
-          object-fit: cover;
-          border-radius: 16px;
-          flex-shrink: 0;
+          word-break: break-word;
         }
 
         .removeButton {
           border: none;
           background: transparent;
           color: #dc2626;
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 900;
           cursor: pointer;
           padding: 0;
+          flex-shrink: 0;
         }
 
         .previewCard {
@@ -1329,20 +1470,44 @@ export default function BuilderPage() {
           top: 18px;
         }
 
+        .previewPill {
+          min-height: 40px;
+          padding: 0 14px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 900;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: #5a6473;
+          background: #f3f6fa;
+          border: 1px solid rgba(20, 33, 50, 0.08);
+        }
+
         .slugTag {
           color: #6c7685;
           font-size: 16px;
           font-weight: 800;
           word-break: break-word;
+          margin-top: 6px;
         }
 
         .previewPhone {
           margin-top: 18px;
           border-radius: 30px;
           border: 1px solid rgba(20, 33, 50, 0.08);
-          background: #fbfdff;
+          background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
           padding: 20px;
           overflow: hidden;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+
+        .previewTop {
+          display: flex;
+          align-items: center;
+          gap: 14px;
         }
 
         .previewLogoWrap {
@@ -1350,7 +1515,18 @@ export default function BuilderPage() {
           height: 72px;
           border-radius: 18px;
           overflow: hidden;
-          margin-bottom: 14px;
+          flex-shrink: 0;
+          background: #eef2f7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .previewLogoFallback {
+          background: #000;
+          color: #fff;
+          font-size: 28px;
+          font-weight: 900;
         }
 
         .previewLogo {
@@ -1376,6 +1552,7 @@ export default function BuilderPage() {
           border-radius: 24px;
           overflow: hidden;
           background: #eef4ff;
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
         }
 
         .previewHeroImage {
@@ -1403,9 +1580,9 @@ export default function BuilderPage() {
         }
 
         .previewMenuSection {
-          margin-top: 18px;
+          margin-top: 20px;
           display: grid;
-          gap: 12px;
+          gap: 14px;
         }
 
         .previewEmpty {
@@ -1419,21 +1596,28 @@ export default function BuilderPage() {
         }
 
         .previewMenuItem {
-          display: flex;
+          display: grid;
+          grid-template-columns: 72px minmax(0, 1fr);
           align-items: center;
-          gap: 12px;
-          border-radius: 18px;
+          gap: 14px;
+          border-radius: 20px;
           background: #fff;
           border: 1px solid rgba(20, 33, 50, 0.08);
-          padding: 12px;
+          padding: 14px;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
         }
 
         .previewMenuImage {
-          width: 68px;
-          height: 68px;
-          border-radius: 14px;
+          width: 72px;
+          height: 72px;
+          border-radius: 16px;
           object-fit: cover;
           flex-shrink: 0;
+          background: #eef2f7;
+        }
+
+        .placeholderPreviewImage {
+          border: 1px dashed rgba(20, 33, 50, 0.12);
         }
 
         .previewMenuText {
@@ -1441,16 +1625,17 @@ export default function BuilderPage() {
         }
 
         .previewMenuName {
-          font-size: 18px;
+          font-size: 20px;
           color: #142132;
           font-weight: 900;
-          line-height: 1.15;
+          line-height: 1.12;
+          word-break: break-word;
         }
 
         .previewMenuPrice {
           margin-top: 6px;
           color: #5a6473;
-          font-size: 15px;
+          font-size: 16px;
           font-weight: 900;
         }
 
@@ -1459,10 +1644,15 @@ export default function BuilderPage() {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 18px;
+          align-items: start;
         }
 
         .imageText {
           max-width: 580px;
+        }
+
+        .stripeCard {
+          align-self: start;
         }
 
         .stripeGrid {
@@ -1477,6 +1667,10 @@ export default function BuilderPage() {
           background: #f8f9fc;
           border: 1px solid rgba(20, 33, 50, 0.08);
           padding: 18px;
+          min-height: 118px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         .stripeLabel {
@@ -1495,6 +1689,10 @@ export default function BuilderPage() {
           word-break: break-word;
         }
 
+        .strongValue {
+          color: #0f172a;
+        }
+
         .stripeButtons {
           display: flex;
           gap: 12px;
@@ -1505,6 +1703,16 @@ export default function BuilderPage() {
         .stripeButtons :global(button) {
           flex: 1 1 220px;
           margin-top: 0;
+        }
+
+        @media (max-width: 1180px) {
+          .contentGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .previewCard {
+            position: static;
+          }
         }
 
         @media (max-width: 980px) {
@@ -1529,14 +1737,6 @@ export default function BuilderPage() {
             width: 100%;
           }
 
-          .contentGrid {
-            grid-template-columns: 1fr;
-          }
-
-          .previewCard {
-            position: static;
-          }
-
           .card {
             padding: 20px;
             border-radius: 24px;
@@ -1552,8 +1752,13 @@ export default function BuilderPage() {
           }
 
           .imageGrid,
-          .stripeGrid {
+          .stripeGrid,
+          .fieldGrid {
             grid-template-columns: 1fr;
+          }
+
+          .fieldSpan2 {
+            grid-column: auto;
           }
 
           .uploadBox,
@@ -1561,10 +1766,60 @@ export default function BuilderPage() {
             min-height: 180px;
           }
 
+          .fixedTall,
+          .fixedSquare,
+          .fixedMedium,
           .previewHeroWrap,
           .previewHeroPlaceholder {
-            min-height: 180px;
             height: 180px;
+            min-height: 180px;
+          }
+
+          .menuItemLayout {
+            grid-template-columns: 1fr;
+          }
+
+          .menuThumbLarge {
+            width: 100%;
+            height: 190px;
+          }
+
+          .compactButton {
+            width: 100%;
+            margin-top: 0;
+          }
+        }
+
+        @media (max-width: 560px) {
+          .heroRight {
+            width: 100%;
+          }
+
+          .langWrap {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .langButton {
+            width: 100%;
+          }
+
+          .menuItemHeader {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .removeButton {
+            margin-top: 2px;
+          }
+
+          .stripeButtons {
+            flex-direction: column;
+          }
+
+          .previewTop {
+            align-items: flex-start;
           }
         }
       `}</style>
