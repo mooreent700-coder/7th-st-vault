@@ -1,53 +1,136 @@
-const handleStripeConnect = async () => {
-  try {
-    if (!restaurantId) {
-      alert(t.stripeMissingRestaurant);
-      return;
+'use client';
+
+import { useState } from 'react';
+
+export default function BuilderPage() {
+  const [loading, setLoading] = useState(false);
+
+  const handleStripeConnect = async () => {
+    try {
+      setLoading(true);
+
+      const create = await fetch('/api/connect/create-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      const createData = await create.json();
+
+      if (!create.ok) {
+        throw new Error(createData?.error || 'Failed to create Stripe account');
+      }
+
+      const accountId = String(createData.accountId || '').trim();
+
+      const link = await fetch('/api/connect/create-onboarding-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      });
+
+      const linkData = await link.json();
+
+      if (!link.ok) {
+        throw new Error(linkData?.error || 'Failed to create onboarding link');
+      }
+
+      const url = String(linkData.url || '').trim();
+
+      if (!url) throw new Error('Invalid onboarding link');
+
+      window.location.href = url;
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setStripeLoading(true);
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>MenuFlow Builder</h1>
 
-    const createResponse = await fetch('/api/connect/create-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ restaurantId, email: userEmail, businessName }),
-    });
+      {/* BUSINESS INFO */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Business Info</h2>
 
-    const createData = await createResponse.json();
+        <input
+          placeholder="Store Name"
+          style={inputStyle}
+        />
 
-    if (!createResponse.ok) {
-      throw new Error(createData?.error || t.stripeCreateFailed);
-    }
+        {/* 🔥 PHONE FIX (number pad) */}
+        <input
+          type="tel"
+          inputMode="numeric"
+          placeholder="Phone Number"
+          style={inputStyle}
+        />
 
-    const accountId = String(createData?.accountId ?? '').trim();
-    if (!accountId) {
-      throw new Error(t.stripeCreateFailed);
-    }
+        <input
+          placeholder="Address"
+          style={inputStyle}
+        />
+      </div>
 
-    const onboardingResponse = await fetch('/api/connect/create-onboarding-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId }),
-    });
+      {/* HOURS FIX */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Business Hours</h2>
 
-    const onboardingData = await onboardingResponse.json();
+        <input type="time" style={inputStyle} />
+        <input type="time" style={inputStyle} />
+      </div>
 
-    if (!onboardingResponse.ok) {
-      throw new Error(onboardingData?.error || t.stripeLinkFailed);
-    }
+      {/* MENU */}
+      <div style={{ marginTop: 20 }}>
+        <h2>Menu</h2>
 
-    const redirectUrl = String(onboardingData?.url ?? '').trim();
+        <input placeholder="Item Name" style={inputStyle} />
 
-    if (!redirectUrl) {
-      throw new Error(t.stripeLinkFailed);
-    }
+        {/* 🔥 PRICE FIX (number pad) */}
+        <input
+          type="number"
+          inputMode="decimal"
+          placeholder="Price"
+          style={inputStyle}
+        />
 
-    new URL(redirectUrl);
+        <textarea placeholder="Description" style={inputStyle} />
+      </div>
 
-    window.location.assign(redirectUrl);
-  } catch (error: any) {
-    alert(error?.message || t.builderFailed);
-  } finally {
-    setStripeLoading(false);
-  }
+      {/* STRIPE */}
+      <div style={{ marginTop: 30 }}>
+        <h2>Payments</h2>
+
+        <button
+          onClick={handleStripeConnect}
+          style={buttonStyle}
+          disabled={loading}
+        >
+          {loading ? 'Connecting...' : 'Connect Stripe'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: 12,
+  marginTop: 10,
+  borderRadius: 10,
+  border: '1px solid #ccc',
+};
+
+const buttonStyle: React.CSSProperties = {
+  marginTop: 20,
+  padding: 15,
+  width: '100%',
+  borderRadius: 12,
+  background: 'black',
+  color: 'white',
+  fontWeight: 'bold',
+  border: 'none',
 };
