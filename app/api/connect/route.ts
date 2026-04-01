@@ -3,36 +3,61 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_ROLE_KEY as string
-);
+if (!stripeSecretKey) {
+  throw new Error('Missing STRIPE_SECRET_KEY');
+}
+
+if (!supabaseUrl) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+}
+
+if (!supabaseServiceRoleKey) {
+  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+}
+
+if (!siteUrl) {
+  throw new Error('Missing NEXT_PUBLIC_SITE_URL');
+}
+
+const stripe = new Stripe(stripeSecretKey);
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function POST(req: Request) {
   try {
-    const { restaurantId } = await req.json();
+    const body = await req.json();
+    const restaurantId =
+      typeof body?.restaurantId === 'string' ? body.restaurantId.trim() : '';
 
     if (!restaurantId) {
-      return NextResponse.json({ error: 'Missing restaurantId' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing restaurantId' },
+        { status: 400 }
+      );
     }
 
-    // Get restaurant
-    const { data: restaurant } = await supabase
+    const { data: restaurant, error: restaurantError } = await supabase
       .from('restaurants')
-      .select('*')
+      .select('id, name, slug, stripe_account_id')
       .eq('id', restaurantId)
       .single();
 
-    if (!restaurant) {
-      return NextResponse.json({ error: 'Restaurant not found' }, { status: 404 });
+    if (restaurantError || !restaurant) {
+      return NextResponse.json(
+        { error: 'Restaurant not found' },
+        { status: 404 }
+      );
     }
 
-    let accountId = restaurant.stripe_account_id;
+    let accountId: string | null = restaurant.stripe_account_id ?? null;
 
-    // Create Stripe account if missing
     if (!accountId) {
       const account = await stripe.accounts.create({
         type: 'express',
@@ -41,28 +66,54 @@ export async function POST(req: Request) {
           card_payments: { requested: true },
           transfers: { requested: true },
         },
+        business_type: 'individual',
+        metadata: {
+          restaurant_id: restaurant.id,
+          restaurant_slug: restaurant.slug ?? '',
+          restaurant_name: restaurant.name ?? '',
+        },
       });
 
       accountId = account.id;
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('restaurants')
-        .update({ stripe_account_id: accountId })
-        .eq('id', restaurantId);
+        .update({
+          stripe_account_id: accountId,
+        })
+        .eq('id', restaurant.id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 }
+        );
+      }
     }
 
-    // Create onboarding link
+    const dashboardPath = '/dashboard/owner';
+    const refreshUrl = `${siteUrl}${dashboardPath}`;
+    const returnUrl = `${siteUrl}${dashboardPath}`;
+
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
-      return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
       type: 'account_onboarding',
     });
 
-    return NextResponse.json({ url: accountLink.url });
+    return NextResponse.json({
+      url: accountLink.url,
+      accountId,
+    });
+  } catch (error: any) {
+    console.error('STRIPE CONNECT ERROR:', error);
 
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: error?.message || 'Something went wrong',
+      },
+      { status: 500 }
+    );
   }
 }
