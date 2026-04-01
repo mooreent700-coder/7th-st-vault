@@ -57,52 +57,50 @@ const COPY = {
   en: {
     loading: 'Loading store...',
     notFound: 'Store not found.',
-    add: 'Add',
-    remove: 'Remove',
-    viewCart: 'View Cart',
-    yourOrder: 'Your Order',
-    emptyCart: 'Your cart is empty.',
-    subtotal: 'Subtotal',
-    close: 'Close',
-    orderNow: 'Order now',
     menu: 'Menu',
+    orderNow: 'Order now',
+    add: 'Add',
+    qty: 'Qty',
+    subtotal: 'Subtotal',
+    yourOrder: 'Your Order',
+    close: 'Close',
+    emptyCart: 'Your cart is empty.',
+    payNow: 'Pay Now',
+    openingCheckout: 'Opening checkout...',
     address: 'Address',
     phone: 'Phone',
     hours: 'Hours',
-    qty: 'Qty',
-    item: 'item',
-    items: 'items',
-    total: 'Total',
     noDescription: 'Fresh made with care.',
-    storeClosed: 'Closed',
     noHours: 'Hours not available',
-    payNow: 'Pay Now',
-    openingCheckout: 'Opening checkout...',
+    closed: 'Closed',
+    items: 'items',
+    item: 'item',
+    direct: 'Order direct. No fees.',
+    details: 'Store details',
   },
   es: {
     loading: 'Cargando tienda...',
     notFound: 'No se encontró la tienda.',
-    add: 'Agregar',
-    remove: 'Eliminar',
-    viewCart: 'Ver carrito',
-    yourOrder: 'Tu pedido',
-    emptyCart: 'Tu carrito está vacío.',
-    subtotal: 'Subtotal',
-    close: 'Cerrar',
-    orderNow: 'Ordena ahora',
     menu: 'Menú',
+    orderNow: 'Ordena ahora',
+    add: 'Agregar',
+    qty: 'Cant.',
+    subtotal: 'Subtotal',
+    yourOrder: 'Tu pedido',
+    close: 'Cerrar',
+    emptyCart: 'Tu carrito está vacío.',
+    payNow: 'Pagar ahora',
+    openingCheckout: 'Abriendo pago...',
     address: 'Dirección',
     phone: 'Teléfono',
     hours: 'Horario',
-    qty: 'Cant.',
-    item: 'producto',
-    items: 'productos',
-    total: 'Total',
     noDescription: 'Hecho fresco con cuidado.',
-    storeClosed: 'Cerrado',
     noHours: 'Horario no disponible',
-    payNow: 'Pagar ahora',
-    openingCheckout: 'Abriendo pago...',
+    closed: 'Cerrado',
+    items: 'productos',
+    item: 'producto',
+    direct: 'Ordena directo. Sin tarifas.',
+    details: 'Detalles de la tienda',
   },
 } as const;
 
@@ -141,6 +139,7 @@ function parseHours(value: string | null): HoursState | null {
 
   try {
     const parsed = JSON.parse(value);
+
     return {
       mon: {
         enabled: Boolean(parsed?.mon?.enabled),
@@ -186,24 +185,85 @@ function parseHours(value: string | null): HoursState | null {
 function toDisplayTime(value: string) {
   const parts = value.split(':');
   if (parts.length < 2) return value;
+
   const hour = Number(parts[0]);
   const minute = Number(parts[1]);
+
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
 
   const suffix = hour >= 12 ? 'PM' : 'AM';
   const normalized = hour % 12 || 12;
+
   return `${normalized}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
-function formatHours(hours: HoursState | null, lang: Lang, noHours: string, closed: string) {
-  if (!hours) return noHours;
+function buildHoursGroups(hours: HoursState | null, lang: Lang) {
+  if (!hours) return [];
 
-  const rows = DAY_ORDER.filter((day) => hours[day].enabled).map((day) => {
-    const row = hours[day];
-    return `${DAY_LABELS[lang][day]} ${toDisplayTime(row.open)} - ${toDisplayTime(row.close)}`;
-  });
+  const enabledDays = DAY_ORDER.filter((day) => hours[day].enabled);
 
-  return rows.length ? rows.join(' • ') : closed;
+  if (!enabledDays.length) return [];
+
+  const groups: Array<{ label: string; range: string }> = [];
+  let start = enabledDays[0];
+  let prev = enabledDays[0];
+
+  for (let i = 1; i <= enabledDays.length; i += 1) {
+    const current = enabledDays[i];
+    const prevIndex = DAY_ORDER.indexOf(prev);
+    const currentIndex = current ? DAY_ORDER.indexOf(current) : -1;
+    const prevRow = hours[prev];
+    const sameBlock =
+      current &&
+      currentIndex === prevIndex + 1 &&
+      hours[current].open === prevRow.open &&
+      hours[current].close === prevRow.close;
+
+    if (sameBlock) {
+      prev = current!;
+      continue;
+    }
+
+    const label =
+      start === prev
+        ? DAY_LABELS[lang][start]
+        : `${DAY_LABELS[lang][start]}–${DAY_LABELS[lang][prev]}`;
+
+    groups.push({
+      label,
+      range: `${toDisplayTime(prevRow.open)} - ${toDisplayTime(prevRow.close)}`,
+    });
+
+    if (current) {
+      start = current;
+      prev = current;
+    }
+  }
+
+  return groups;
+}
+
+function formatHoursInline(hours: HoursState | null, lang: Lang, noHours: string, closed: string) {
+  const groups = buildHoursGroups(hours, lang);
+  if (!groups.length) return hours ? closed : noHours;
+  return groups.map((group) => `${group.label}: ${group.range}`).join(' • ');
+}
+
+function buildInitials(name: string | null) {
+  const value = (name || '').trim();
+  if (!value) return 'M';
+  return value.charAt(0).toUpperCase();
+}
+
+function normalizeCartItem(item: CartItem): MenuItemRow {
+  return {
+    id: item.id,
+    restaurant_id: '',
+    name: item.name,
+    price: item.price,
+    description: item.description,
+    image_url: item.image_url,
+  };
 }
 
 export default function StorefrontPage() {
@@ -275,9 +335,19 @@ export default function StorefrontPage() {
     };
   }, [slug]);
 
-  const hoursText = useMemo(
-    () => formatHours(parseHours(restaurant?.hours || null), lang, t.noHours, t.storeClosed),
-    [restaurant?.hours, lang, t.noHours, t.storeClosed]
+  const parsedHours = useMemo(
+    () => parseHours(restaurant?.hours || null),
+    [restaurant?.hours]
+  );
+
+  const hourGroups = useMemo(
+    () => buildHoursGroups(parsedHours, lang),
+    [parsedHours, lang]
+  );
+
+  const hoursInline = useMemo(
+    () => formatHoursInline(parsedHours, lang, t.noHours, t.closed),
+    [parsedHours, lang, t.noHours, t.closed]
   );
 
   const itemCount = useMemo(
@@ -298,6 +368,7 @@ export default function StorefrontPage() {
 
     setCart((prev) => {
       const existing = prev.find((entry) => entry.id === item.id);
+
       if (existing) {
         return prev.map((entry) =>
           entry.id === item.id
@@ -380,7 +451,7 @@ export default function StorefrontPage() {
             min-height: 100vh;
             display: grid;
             place-items: center;
-            background: #f6f8fc;
+            background: #f4f7fb;
           }
           .loadingText {
             color: #142132;
@@ -403,7 +474,7 @@ export default function StorefrontPage() {
             min-height: 100vh;
             display: grid;
             place-items: center;
-            background: #f6f8fc;
+            background: #f4f7fb;
             padding: 20px;
           }
           .notFoundCard {
@@ -428,44 +499,35 @@ export default function StorefrontPage() {
     <main className="page">
       <section className="heroSection">
         {restaurant.hero_url ? (
-          <img src={restaurant.hero_url} alt={restaurant.name || 'Store hero'} className="heroImage" />
+          <img
+            src={restaurant.hero_url}
+            alt={restaurant.name || 'Store hero'}
+            className="heroImage"
+          />
         ) : (
           <div className="heroFallback" />
         )}
-      </section>
 
-      <section className="contentWrap">
-        <header className="headerCard">
-          <div className="brandRow">
-            {restaurant.logo_url ? (
-              <img src={restaurant.logo_url} alt={restaurant.name || 'Store logo'} className="logo" />
-            ) : (
-              <div className="logoFallback">
-                {restaurant.name?.trim()?.charAt(0).toUpperCase() || 'M'}
-              </div>
-            )}
+        <div className="heroOverlay" />
 
-            <div className="brandInfo">
-              <h1 className="storeName">{restaurant.name || ''}</h1>
-              <div className="metaStack">
-                {restaurant.address ? (
-                  <div className="metaRow">
-                    <span className="metaLabel">{t.address}</span>
-                    <span className="metaValue">{restaurant.address}</span>
-                  </div>
-                ) : null}
-
-                {restaurant.phone ? (
-                  <div className="metaRow">
-                    <span className="metaLabel">{t.phone}</span>
-                    <span className="metaValue">{restaurant.phone}</span>
-                  </div>
-                ) : null}
-
-                <div className="metaRow">
-                  <span className="metaLabel">{t.hours}</span>
-                  <span className="metaValue">{hoursText}</span>
+        <div className="heroContent">
+          <div className="heroTopRow">
+            <div className="heroBrandBlock">
+              {restaurant.logo_url ? (
+                <img
+                  src={restaurant.logo_url}
+                  alt={restaurant.name || 'Store logo'}
+                  className="heroLogo"
+                />
+              ) : (
+                <div className="heroLogoFallback">
+                  {buildInitials(restaurant.name)}
                 </div>
+              )}
+
+              <div className="heroTextBlock">
+                <h1 className="heroTitle">{restaurant.name || ''}</h1>
+                <p className="heroTagline">{t.direct}</p>
               </div>
             </div>
 
@@ -486,7 +548,48 @@ export default function StorefrontPage() {
               </button>
             </div>
           </div>
-        </header>
+        </div>
+      </section>
+
+      <section className="contentWrap">
+        <section className="infoCard">
+          <div className="infoHeader">
+            <h2 className="infoTitle">{t.details}</h2>
+          </div>
+
+          <div className="infoGrid">
+            {restaurant.address ? (
+              <div className="infoItem">
+                <div className="infoLabel">{t.address}</div>
+                <div className="infoValue">{restaurant.address}</div>
+              </div>
+            ) : null}
+
+            {restaurant.phone ? (
+              <div className="infoItem">
+                <div className="infoLabel">{t.phone}</div>
+                <div className="infoValue">{restaurant.phone}</div>
+              </div>
+            ) : null}
+
+            <div className="infoItem infoItemFull">
+              <div className="infoLabel">{t.hours}</div>
+
+              {hourGroups.length ? (
+                <div className="hoursGroupList">
+                  {hourGroups.map((group) => (
+                    <div key={`${group.label}-${group.range}`} className="hoursRow">
+                      <span className="hoursDay">{group.label}</span>
+                      <span className="hoursRange">{group.range}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="infoValue">{hoursInline}</div>
+              )}
+            </div>
+          </div>
+        </section>
 
         <section className="menuSection">
           <div className="sectionHead">
@@ -521,7 +624,11 @@ export default function StorefrontPage() {
                       <div className="menuPrice">{money(safeNumber(item.price))}</div>
                     </div>
 
-                    <button type="button" className="addButton" onClick={() => addToCart(item)}>
+                    <button
+                      type="button"
+                      className="addButton"
+                      onClick={() => addToCart(item)}
+                    >
                       {t.add}
                     </button>
                   </div>
@@ -533,8 +640,14 @@ export default function StorefrontPage() {
       </section>
 
       {itemCount > 0 ? (
-        <button type="button" className="stickyCart" onClick={() => setCartOpen(true)}>
-          <span>{t.viewCart} ({itemCount} {cartLabel})</span>
+        <button
+          type="button"
+          className="stickyCart"
+          onClick={() => setCartOpen(true)}
+        >
+          <span>
+            {t.yourOrder} ({itemCount} {cartLabel})
+          </span>
           <span>{money(subtotal)}</span>
         </button>
       ) : null}
@@ -544,7 +657,11 @@ export default function StorefrontPage() {
           <div className="cartSheet" onClick={(e) => e.stopPropagation()}>
             <div className="cartHeader">
               <h3>{t.yourOrder}</h3>
-              <button type="button" className="closeButton" onClick={() => setCartOpen(false)}>
+              <button
+                type="button"
+                className="closeButton"
+                onClick={() => setCartOpen(false)}
+              >
                 {t.close}
               </button>
             </div>
@@ -564,7 +681,9 @@ export default function StorefrontPage() {
                     <div className="cartItemInfo">
                       <div className="cartItemTop">
                         <div className="cartItemName">{item.name}</div>
-                        <div className="cartItemPrice">{money(item.price * item.quantity)}</div>
+                        <div className="cartItemPrice">
+                          {money(item.price * item.quantity)}
+                        </div>
                       </div>
 
                       <div className="cartItemMeta">
@@ -572,10 +691,18 @@ export default function StorefrontPage() {
                       </div>
 
                       <div className="cartActions">
-                        <button type="button" className="qtyButton" onClick={() => addToCart(item as unknown as MenuItemRow)}>
+                        <button
+                          type="button"
+                          className="qtyButton"
+                          onClick={() => addToCart(normalizeCartItem(item))}
+                        >
                           +
                         </button>
-                        <button type="button" className="qtyButton dangerQty" onClick={() => removeFromCart(item.id)}>
+                        <button
+                          type="button"
+                          className="qtyButton dangerQty"
+                          onClick={() => removeFromCart(item.id)}
+                        >
                           -
                         </button>
                       </div>
@@ -607,118 +734,248 @@ export default function StorefrontPage() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%);
+          background:
+            radial-gradient(circle at top, rgba(226, 232, 240, 0.35), transparent 35%),
+            linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
           color: #142132;
-          padding-bottom: 110px;
+          padding-bottom: 112px;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
+
         .heroSection {
+          position: relative;
           width: 100%;
-          height: 45vh;
-          min-height: 280px;
-          max-height: 520px;
+          min-height: 430px;
+          height: 58vh;
+          max-height: 720px;
           overflow: hidden;
+          background: #0f172a;
         }
+
         .heroImage,
         .heroFallback {
+          position: absolute;
+          inset: 0;
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
-          background: #eef2f8;
+          background:
+            linear-gradient(135deg, #111827 0%, #0f172a 100%);
         }
-        .contentWrap {
-          max-width: 1100px;
+
+        .heroOverlay {
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.28) 45%, rgba(2, 6, 23, 0.72) 100%);
+        }
+
+        .heroContent {
+          position: relative;
+          z-index: 2;
+          max-width: 1180px;
           margin: 0 auto;
-          padding: 18px 16px 0;
+          height: 100%;
+          display: flex;
+          align-items: end;
+          padding: 24px 18px 28px;
         }
-        .headerCard {
-          margin-top: 16px;
-          background: rgba(255, 255, 255, 0.94);
-          border: 1px solid rgba(20, 33, 50, 0.08);
-          border-radius: 28px;
-          padding: 20px;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+
+        .heroTopRow {
+          width: 100%;
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 18px;
+          flex-wrap: wrap;
         }
-        .brandRow {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
-          gap: 16px;
-          align-items: start;
+
+        .heroBrandBlock {
+          display: flex;
+          align-items: end;
+          gap: 18px;
+          min-width: 0;
         }
-        .logo,
-        .logoFallback {
-          width: 86px;
-          height: 86px;
-          border-radius: 22px;
+
+        .heroLogo,
+        .heroLogoFallback {
+          width: 92px;
+          height: 92px;
+          border-radius: 26px;
           object-fit: cover;
           flex-shrink: 0;
-          background: #000;
-          color: #fff;
+          background: rgba(255, 255, 255, 0.98);
+          color: #0f172a;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 34px;
+          font-size: 36px;
           font-weight: 900;
+          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
         }
-        .storeName {
+
+        .heroTextBlock {
+          min-width: 0;
+        }
+
+        .heroTitle {
           margin: 0;
-          color: #142132;
-          font-size: clamp(32px, 5vw, 54px);
-          line-height: 0.96;
-          letter-spacing: -0.05em;
+          color: #ffffff;
+          font-size: clamp(44px, 8vw, 90px);
+          line-height: 0.92;
+          letter-spacing: -0.06em;
           font-weight: 900;
+          text-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
           word-break: break-word;
         }
-        .metaStack {
-          margin-top: 12px;
-          display: grid;
-          gap: 8px;
-        }
-        .metaRow {
-          display: grid;
-          gap: 4px;
-        }
-        .metaLabel {
-          color: #738093;
-          font-size: 14px;
+
+        .heroTagline {
+          margin: 12px 0 0;
+          color: rgba(255, 255, 255, 0.92);
+          font-size: clamp(18px, 2vw, 24px);
+          line-height: 1.2;
           font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.02em;
+          text-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
         }
-        .metaValue {
-          color: #1e293b;
-          font-size: 16px;
-          line-height: 1.45;
-          font-weight: 700;
-        }
+
         .langToggle {
           display: inline-flex;
-          align-self: start;
           gap: 6px;
-          padding: 5px;
-          border-radius: 18px;
-          border: 1px solid rgba(20, 33, 50, 0.1);
-          background: #fff;
+          padding: 6px;
+          border-radius: 22px;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          background: rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(12px);
+          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
         }
+
         .langButton {
           border: none;
-          min-width: 64px;
-          min-height: 46px;
-          border-radius: 14px;
+          min-width: 68px;
+          min-height: 48px;
+          border-radius: 16px;
           background: transparent;
-          color: #6b7686;
+          color: rgba(255, 255, 255, 0.78);
           font-size: 16px;
           font-weight: 900;
           cursor: pointer;
         }
+
         .langActive {
-          background: #0f172a;
-          color: #fff;
+          background: #ffffff;
+          color: #0f172a;
         }
+
+        .contentWrap {
+          max-width: 1180px;
+          margin: 0 auto;
+          padding: 22px 16px 0;
+        }
+
+        .infoCard {
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          border-radius: 32px;
+          padding: 24px;
+          box-shadow: 0 22px 50px rgba(15, 23, 42, 0.06);
+          backdrop-filter: blur(10px);
+          margin-top: -46px;
+          position: relative;
+          z-index: 3;
+        }
+
+        .infoHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 18px;
+        }
+
+        .infoTitle {
+          margin: 0;
+          color: #142132;
+          font-size: 14px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .infoGrid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .infoItem {
+          min-width: 0;
+          border-radius: 24px;
+          background: #f8fbff;
+          border: 1px solid rgba(20, 33, 50, 0.07);
+          padding: 18px;
+        }
+
+        .infoItemFull {
+          grid-column: span 1;
+        }
+
+        .infoLabel {
+          color: #758195;
+          font-size: 13px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .infoValue {
+          margin-top: 8px;
+          color: #142132;
+          font-size: 22px;
+          line-height: 1.32;
+          font-weight: 900;
+          word-break: break-word;
+        }
+
+        .hoursGroupList {
+          margin-top: 8px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .hoursRow {
+          display: flex;
+          align-items: start;
+          justify-content: space-between;
+          gap: 14px;
+          border-top: 1px solid rgba(20, 33, 50, 0.06);
+          padding-top: 10px;
+        }
+
+        .hoursRow:first-child {
+          border-top: none;
+          padding-top: 0;
+        }
+
+        .hoursDay {
+          color: #142132;
+          font-size: 16px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .hoursRange {
+          color: #475569;
+          font-size: 15px;
+          line-height: 1.4;
+          font-weight: 800;
+          text-align: right;
+        }
+
         .menuSection {
-          margin-top: 18px;
+          margin-top: 22px;
         }
+
         .sectionHead {
           display: flex;
           justify-content: space-between;
@@ -726,37 +983,43 @@ export default function StorefrontPage() {
           gap: 16px;
           margin-bottom: 14px;
         }
+
         .sectionTitle {
           margin: 0;
           color: #142132;
-          font-size: clamp(28px, 4vw, 42px);
+          font-size: clamp(34px, 5vw, 54px);
           line-height: 1;
-          letter-spacing: -0.04em;
+          letter-spacing: -0.05em;
           font-weight: 900;
         }
+
         .sectionSubtitle {
           color: #738093;
-          font-size: 16px;
-          font-weight: 800;
+          font-size: 18px;
+          font-weight: 900;
         }
+
         .menuGrid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 16px;
+          gap: 18px;
         }
+
         .menuCard {
           overflow: hidden;
-          border-radius: 28px;
-          background: rgba(255, 255, 255, 0.94);
+          border-radius: 30px;
+          background: rgba(255, 255, 255, 0.96);
           border: 1px solid rgba(20, 33, 50, 0.08);
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+          box-shadow: 0 20px 44px rgba(15, 23, 42, 0.06);
         }
+
         .menuImageWrap {
           width: 100%;
-          aspect-ratio: 16 / 11;
+          aspect-ratio: 16 / 10;
           overflow: hidden;
           background: #eef2f8;
         }
+
         .menuImage,
         .menuImageFallback {
           width: 100%;
@@ -764,59 +1027,71 @@ export default function StorefrontPage() {
           object-fit: cover;
           display: block;
         }
+
         .menuBody {
           padding: 18px;
         }
+
         .menuTop {
           display: grid;
           grid-template-columns: 1fr auto;
           gap: 14px;
           align-items: start;
         }
+
+        .menuText {
+          min-width: 0;
+        }
+
         .menuName {
           margin: 0;
           color: #142132;
-          font-size: 24px;
-          line-height: 1.05;
+          font-size: 28px;
+          line-height: 1.02;
           font-weight: 900;
-          letter-spacing: -0.03em;
+          letter-spacing: -0.04em;
+          word-break: break-word;
         }
+
         .menuDescription {
           margin: 10px 0 0;
-          color: #556173;
+          color: #566274;
           font-size: 16px;
           line-height: 1.55;
           font-weight: 700;
         }
+
         .menuPrice {
           color: #142132;
-          font-size: 22px;
+          font-size: 24px;
           line-height: 1;
           font-weight: 900;
           white-space: nowrap;
         }
+
         .addButton {
-          margin-top: 16px;
+          margin-top: 18px;
           width: 100%;
           min-height: 58px;
           border: none;
           border-radius: 18px;
-          background: #000;
+          background: #0f172a;
           color: #fff;
           font-size: 18px;
           font-weight: 900;
           cursor: pointer;
         }
+
         .stickyCart {
           position: fixed;
           left: 12px;
           right: 12px;
           bottom: 12px;
-          z-index: 40;
+          z-index: 50;
           min-height: 66px;
           border: none;
           border-radius: 22px;
-          background: #000;
+          background: #0f172a;
           color: #fff;
           display: flex;
           align-items: center;
@@ -824,19 +1099,21 @@ export default function StorefrontPage() {
           padding: 0 20px;
           font-size: 18px;
           font-weight: 900;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
           cursor: pointer;
         }
+
         .cartOverlay {
           position: fixed;
           inset: 0;
-          z-index: 60;
-          background: rgba(15, 23, 42, 0.5);
+          z-index: 70;
+          background: rgba(15, 23, 42, 0.52);
           display: flex;
           align-items: end;
           justify-content: center;
           padding: 12px;
         }
+
         .cartSheet {
           width: 100%;
           max-width: 760px;
@@ -844,10 +1121,11 @@ export default function StorefrontPage() {
           display: flex;
           flex-direction: column;
           background: #fff;
-          border-radius: 28px;
+          border-radius: 30px;
           overflow: hidden;
-          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+          box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
         }
+
         .cartHeader {
           display: flex;
           align-items: center;
@@ -856,6 +1134,7 @@ export default function StorefrontPage() {
           padding: 20px 20px 12px;
           border-bottom: 1px solid rgba(20, 33, 50, 0.08);
         }
+
         .cartHeader h3 {
           margin: 0;
           color: #142132;
@@ -864,6 +1143,7 @@ export default function StorefrontPage() {
           font-weight: 900;
           letter-spacing: -0.04em;
         }
+
         .closeButton {
           border: none;
           background: transparent;
@@ -872,18 +1152,21 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
+
         .cartBody {
           padding: 12px 20px;
           overflow: auto;
           display: grid;
           gap: 12px;
         }
+
         .emptyCart {
           color: #64748b;
           font-size: 18px;
           font-weight: 800;
           padding: 20px 0;
         }
+
         .cartItem {
           display: grid;
           grid-template-columns: 84px 1fr;
@@ -892,6 +1175,7 @@ export default function StorefrontPage() {
           border-radius: 20px;
           padding: 10px;
         }
+
         .cartThumb,
         .cartThumbFallback {
           width: 84px;
@@ -901,32 +1185,38 @@ export default function StorefrontPage() {
           display: block;
           background: #eef2f8;
         }
+
         .cartItemInfo {
           min-width: 0;
         }
+
         .cartItemTop {
           display: flex;
           justify-content: space-between;
           gap: 10px;
           align-items: start;
         }
+
         .cartItemName,
         .cartItemPrice {
           color: #142132;
           font-size: 18px;
           font-weight: 900;
         }
+
         .cartItemMeta {
           margin-top: 8px;
           color: #64748b;
           font-size: 15px;
           font-weight: 800;
         }
+
         .cartActions {
           margin-top: 12px;
           display: flex;
           gap: 8px;
         }
+
         .qtyButton {
           width: 44px;
           height: 44px;
@@ -938,14 +1228,17 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
+
         .dangerQty {
           background: #e11d48;
         }
+
         .cartFooter {
           padding: 16px 20px 20px;
           border-top: 1px solid rgba(20, 33, 50, 0.08);
           background: #fff;
         }
+
         .subtotalRow {
           display: flex;
           align-items: center;
@@ -955,6 +1248,7 @@ export default function StorefrontPage() {
           font-weight: 800;
           margin-bottom: 14px;
         }
+
         .checkoutButton {
           width: 100%;
           min-height: 60px;
@@ -966,58 +1260,137 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
+
         .checkoutButton:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
-        @media (max-width: 900px) {
+
+        @media (max-width: 980px) {
+          .infoGrid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .infoItemFull {
+            grid-column: span 2;
+          }
+
           .menuGrid {
             grid-template-columns: 1fr;
           }
         }
+
         @media (max-width: 640px) {
           .heroSection {
-            height: 34vh;
-            min-height: 240px;
+            min-height: 380px;
+            height: 54vh;
           }
+
+          .heroContent {
+            padding: 18px 12px 18px;
+          }
+
+          .heroTopRow {
+            align-items: end;
+          }
+
+          .heroBrandBlock {
+            gap: 14px;
+            align-items: end;
+          }
+
+          .heroLogo,
+          .heroLogoFallback {
+            width: 76px;
+            height: 76px;
+            border-radius: 22px;
+            font-size: 30px;
+          }
+
+          .heroTitle {
+            font-size: clamp(34px, 12vw, 56px);
+          }
+
+          .heroTagline {
+            margin-top: 10px;
+            font-size: 16px;
+          }
+
+          .langToggle {
+            padding: 5px;
+            border-radius: 18px;
+          }
+
+          .langButton {
+            min-width: 58px;
+            min-height: 44px;
+            border-radius: 14px;
+          }
+
           .contentWrap {
             padding: 14px 12px 0;
           }
-          .headerCard {
+
+          .infoCard {
             padding: 18px;
-            border-radius: 24px;
+            border-radius: 26px;
+            margin-top: -34px;
           }
-          .brandRow {
+
+          .infoGrid {
             grid-template-columns: 1fr;
           }
-          .langToggle {
-            width: fit-content;
+
+          .infoItemFull {
+            grid-column: span 1;
           }
-          .logo,
-          .logoFallback {
-            width: 74px;
-            height: 74px;
-            border-radius: 18px;
+
+          .infoValue {
+            font-size: 18px;
           }
-          .storeName {
-            font-size: clamp(30px, 10vw, 44px);
+
+          .hoursRow {
+            flex-direction: column;
+            gap: 4px;
           }
+
+          .hoursRange {
+            text-align: left;
+          }
+
+          .sectionTitle {
+            font-size: clamp(30px, 9vw, 44px);
+          }
+
+          .sectionSubtitle {
+            font-size: 16px;
+          }
+
           .menuBody {
             padding: 16px;
           }
+
           .menuTop {
             grid-template-columns: 1fr;
           }
+
+          .menuName {
+            font-size: 24px;
+          }
+
           .menuPrice {
             font-size: 20px;
           }
+
           .stickyCart {
             font-size: 16px;
             min-height: 62px;
           }
+
           .cartSheet {
             border-radius: 24px;
           }
+
           .cartHeader h3 {
             font-size: 24px;
           }
