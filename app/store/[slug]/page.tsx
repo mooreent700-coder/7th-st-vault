@@ -15,7 +15,6 @@ type RestaurantRow = {
   hours: string | null;
   hero_url: string | null;
   logo_url: string | null;
-  stripe_account_id?: string | null;
 };
 
 type MenuItemRow = {
@@ -64,8 +63,6 @@ const COPY = {
     yourOrder: 'Your Order',
     emptyCart: 'Your cart is empty.',
     subtotal: 'Subtotal',
-    checkout: 'Pay Now',
-    checkoutLoading: 'Opening checkout...',
     close: 'Close',
     orderNow: 'Order now',
     menu: 'Menu',
@@ -75,11 +72,12 @@ const COPY = {
     qty: 'Qty',
     item: 'item',
     items: 'items',
+    total: 'Total',
     noDescription: 'Fresh made with care.',
     storeClosed: 'Closed',
     noHours: 'Hours not available',
-    checkoutUnavailable: 'Checkout is not available for this store yet.',
-    checkoutFailed: 'Could not open checkout.',
+    payNow: 'Pay Now',
+    openingCheckout: 'Opening checkout...',
   },
   es: {
     loading: 'Cargando tienda...',
@@ -90,8 +88,6 @@ const COPY = {
     yourOrder: 'Tu pedido',
     emptyCart: 'Tu carrito está vacío.',
     subtotal: 'Subtotal',
-    checkout: 'Pagar ahora',
-    checkoutLoading: 'Abriendo checkout...',
     close: 'Cerrar',
     orderNow: 'Ordena ahora',
     menu: 'Menú',
@@ -101,11 +97,12 @@ const COPY = {
     qty: 'Cant.',
     item: 'producto',
     items: 'productos',
+    total: 'Total',
     noDescription: 'Hecho fresco con cuidado.',
     storeClosed: 'Cerrado',
     noHours: 'Horario no disponible',
-    checkoutUnavailable: 'El checkout todavía no está disponible para esta tienda.',
-    checkoutFailed: 'No se pudo abrir el checkout.',
+    payNow: 'Pagar ahora',
+    openingCheckout: 'Abriendo pago...',
   },
 } as const;
 
@@ -144,7 +141,6 @@ function parseHours(value: string | null): HoursState | null {
 
   try {
     const parsed = JSON.parse(value);
-
     return {
       mon: {
         enabled: Boolean(parsed?.mon?.enabled),
@@ -190,51 +186,24 @@ function parseHours(value: string | null): HoursState | null {
 function toDisplayTime(value: string) {
   const parts = value.split(':');
   if (parts.length < 2) return value;
-
   const hour = Number(parts[0]);
   const minute = Number(parts[1]);
-
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
 
   const suffix = hour >= 12 ? 'PM' : 'AM';
   const normalized = hour % 12 || 12;
-
   return `${normalized}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
-function buildHourGroups(hours: HoursState | null, lang: Lang, noHours: string, closedText: string) {
-  if (!hours) return [noHours];
+function formatHours(hours: HoursState | null, lang: Lang, noHours: string, closed: string) {
+  if (!hours) return noHours;
 
-  const enabledDays = DAY_ORDER.filter((day) => hours[day].enabled);
-  if (!enabledDays.length) return [closedText];
-
-  const groups: Array<{ days: Array<keyof HoursState>; open: string; close: string }> = [];
-
-  for (const day of enabledDays) {
+  const rows = DAY_ORDER.filter((day) => hours[day].enabled).map((day) => {
     const row = hours[day];
-    const last = groups[groups.length - 1];
-
-    if (last && last.open === row.open && last.close === row.close) {
-      last.days.push(day);
-    } else {
-      groups.push({
-        days: [day],
-        open: row.open,
-        close: row.close,
-      });
-    }
-  }
-
-  return groups.map((group) => {
-    const first = group.days[0];
-    const last = group.days[group.days.length - 1];
-    const dayText =
-      group.days.length === 1
-        ? DAY_LABELS[lang][first]
-        : `${DAY_LABELS[lang][first]}–${DAY_LABELS[lang][last]}`;
-
-    return `${dayText}: ${toDisplayTime(group.open)}–${toDisplayTime(group.close)}`;
+    return `${DAY_LABELS[lang][day]} ${toDisplayTime(row.open)} - ${toDisplayTime(row.close)}`;
   });
+
+  return rows.length ? rows.join(' • ') : closed;
 }
 
 export default function StorefrontPage() {
@@ -262,7 +231,7 @@ export default function StorefrontPage() {
 
         const restaurantRes = await supabase
           .from('restaurants')
-          .select('id, name, slug, phone, address, hours, hero_url, logo_url, stripe_account_id')
+          .select('id, name, slug, phone, address, hours, hero_url, logo_url')
           .eq('slug', slug)
           .maybeSingle();
 
@@ -306,18 +275,20 @@ export default function StorefrontPage() {
     };
   }, [slug]);
 
-  const hourLines = useMemo(
-    () => buildHourGroups(parseHours(restaurant?.hours || null), lang, t.noHours, t.storeClosed),
+  const hoursText = useMemo(
+    () => formatHours(parseHours(restaurant?.hours || null), lang, t.noHours, t.storeClosed),
     [restaurant?.hours, lang, t.noHours, t.storeClosed]
   );
 
-  const itemCount = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.quantity, 0);
-  }, [cart]);
+  const itemCount = useMemo(
+    () => cart.reduce((sum, item) => sum + item.quantity, 0),
+    [cart]
+  );
 
-  const subtotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  }, [cart]);
+  const subtotal = useMemo(
+    () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cart]
+  );
 
   const cartLabel = itemCount === 1 ? t.item : t.items;
 
@@ -327,10 +298,11 @@ export default function StorefrontPage() {
 
     setCart((prev) => {
       const existing = prev.find((entry) => entry.id === item.id);
-
       if (existing) {
         return prev.map((entry) =>
-          entry.id === item.id ? { ...entry, quantity: entry.quantity + 1 } : entry
+          entry.id === item.id
+            ? { ...entry, quantity: entry.quantity + 1 }
+            : entry
         );
       }
 
@@ -351,43 +323,49 @@ export default function StorefrontPage() {
   function removeFromCart(id: string) {
     setCart((prev) =>
       prev
-        .map((item) => (item.id === id ? { ...item, quantity: item.quantity - 1 } : item))
+        .map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+        )
         .filter((item) => item.quantity > 0)
     );
   }
 
-  async function openStripeCheckout() {
-    if (!restaurant || !cart.length) return;
-
+  async function openCheckout() {
     try {
+      if (!slug) return;
+      if (!cart.length) return;
+
       setCheckoutLoading(true);
 
-      const response = await fetch('/api/checkout/create', {
+      const response = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          restaurantId: restaurant.id,
-          slug: restaurant.slug,
-          items: cart.map((item) => ({
+          slug,
+          cart: cart.map((item) => ({
             id: item.id,
             name: item.name,
             quantity: item.quantity,
             price: item.price,
           })),
-          lang,
         }),
       });
 
       const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data?.url) {
-        throw new Error(data?.error || t.checkoutUnavailable);
+      if (!response.ok) {
+        throw new Error(data?.error || 'Checkout failed');
+      }
+
+      if (!data?.url) {
+        throw new Error('Checkout link was not created.');
       }
 
       window.location.href = data.url;
     } catch (error: any) {
-      alert(error?.message || t.checkoutFailed);
-    } finally {
+      alert(error?.message || 'Checkout failed');
       setCheckoutLoading(false);
     }
   }
@@ -454,70 +432,58 @@ export default function StorefrontPage() {
         ) : (
           <div className="heroFallback" />
         )}
+      </section>
 
-        <div className="heroOverlay" />
-
-        <div className="heroContent">
-          <div className="heroBrand">
+      <section className="contentWrap">
+        <header className="headerCard">
+          <div className="brandRow">
             {restaurant.logo_url ? (
-              <img src={restaurant.logo_url} alt={restaurant.name || 'Store logo'} className="heroLogo" />
+              <img src={restaurant.logo_url} alt={restaurant.name || 'Store logo'} className="logo" />
             ) : (
-              <div className="heroLogoFallback">
+              <div className="logoFallback">
                 {restaurant.name?.trim()?.charAt(0).toUpperCase() || 'M'}
               </div>
             )}
 
-            <div className="heroTextWrap">
-              <h1 className="heroName">{restaurant.name || ''}</h1>
-              <p className="heroTagline">
-                {lang === 'en' ? 'Order direct. No fees.' : 'Ordena directo. Sin tarifas.'}
-              </p>
-            </div>
-          </div>
+            <div className="brandInfo">
+              <h1 className="storeName">{restaurant.name || ''}</h1>
+              <div className="metaStack">
+                {restaurant.address ? (
+                  <div className="metaRow">
+                    <span className="metaLabel">{t.address}</span>
+                    <span className="metaValue">{restaurant.address}</span>
+                  </div>
+                ) : null}
 
-          <div className="langToggle">
-            <button
-              type="button"
-              className={lang === 'en' ? 'langButton langActive' : 'langButton'}
-              onClick={() => setLang('en')}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              className={lang === 'es' ? 'langButton langActive' : 'langButton'}
-              onClick={() => setLang('es')}
-            >
-              ES
-            </button>
-          </div>
-        </div>
-      </section>
+                {restaurant.phone ? (
+                  <div className="metaRow">
+                    <span className="metaLabel">{t.phone}</span>
+                    <span className="metaValue">{restaurant.phone}</span>
+                  </div>
+                ) : null}
 
-      <section className="contentWrap">
-        <header className="infoCard">
-          <div className="infoRow">
-            <div className="infoLabel">{t.address}</div>
-            <div className="infoValue">{restaurant.address || '—'}</div>
-          </div>
-
-          <div className="infoDivider" />
-
-          <div className="infoRow">
-            <div className="infoLabel">{t.phone}</div>
-            <div className="infoValue">{restaurant.phone || '—'}</div>
-          </div>
-
-          <div className="infoDivider" />
-
-          <div className="infoRow">
-            <div className="infoLabel">{t.hours}</div>
-            <div className="hoursStack">
-              {hourLines.map((line) => (
-                <div key={line} className="infoValue">
-                  {line}
+                <div className="metaRow">
+                  <span className="metaLabel">{t.hours}</span>
+                  <span className="metaValue">{hoursText}</span>
                 </div>
-              ))}
+              </div>
+            </div>
+
+            <div className="langToggle">
+              <button
+                type="button"
+                className={lang === 'en' ? 'langButton langActive' : 'langButton'}
+                onClick={() => setLang('en')}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                className={lang === 'es' ? 'langButton langActive' : 'langButton'}
+                onClick={() => setLang('es')}
+              >
+                ES
+              </button>
             </div>
           </div>
         </header>
@@ -568,9 +534,7 @@ export default function StorefrontPage() {
 
       {itemCount > 0 ? (
         <button type="button" className="stickyCart" onClick={() => setCartOpen(true)}>
-          <span>
-            {t.viewCart} ({itemCount} {cartLabel})
-          </span>
+          <span>{t.viewCart} ({itemCount} {cartLabel})</span>
           <span>{money(subtotal)}</span>
         </button>
       ) : null}
@@ -608,27 +572,10 @@ export default function StorefrontPage() {
                       </div>
 
                       <div className="cartActions">
-                        <button
-                          type="button"
-                          className="qtyButton"
-                          onClick={() =>
-                            addToCart({
-                              id: item.id,
-                              restaurant_id: restaurant.id,
-                              name: item.name,
-                              price: item.price,
-                              description: item.description,
-                              image_url: item.image_url,
-                            })
-                          }
-                        >
+                        <button type="button" className="qtyButton" onClick={() => addToCart(item as unknown as MenuItemRow)}>
                           +
                         </button>
-                        <button
-                          type="button"
-                          className="qtyButton dangerQty"
-                          onClick={() => removeFromCart(item.id)}
-                        >
+                        <button type="button" className="qtyButton dangerQty" onClick={() => removeFromCart(item.id)}>
                           -
                         </button>
                       </div>
@@ -648,9 +595,9 @@ export default function StorefrontPage() {
                 type="button"
                 className="checkoutButton"
                 disabled={!cart.length || checkoutLoading}
-                onClick={() => void openStripeCheckout()}
+                onClick={openCheckout}
               >
-                {checkoutLoading ? t.checkoutLoading : t.checkout}
+                {checkoutLoading ? t.openingCheckout : t.payNow}
               </button>
             </div>
           </div>
@@ -665,16 +612,13 @@ export default function StorefrontPage() {
           padding-bottom: 110px;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-
         .heroSection {
-          position: relative;
           width: 100%;
-          height: 44vh;
-          min-height: 300px;
-          max-height: 540px;
+          height: 45vh;
+          min-height: 280px;
+          max-height: 520px;
           overflow: hidden;
         }
-
         .heroImage,
         .heroFallback {
           width: 100%;
@@ -683,39 +627,30 @@ export default function StorefrontPage() {
           display: block;
           background: #eef2f8;
         }
-
-        .heroOverlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.58) 100%);
-        }
-
-        .heroContent {
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          display: flex;
-          align-items: end;
-          justify-content: space-between;
-          gap: 16px;
+        .contentWrap {
           max-width: 1100px;
           margin: 0 auto;
-          padding: 20px 16px 18px;
+          padding: 18px 16px 0;
         }
-
-        .heroBrand {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          min-width: 0;
+        .headerCard {
+          margin-top: 16px;
+          background: rgba(255, 255, 255, 0.94);
+          border: 1px solid rgba(20, 33, 50, 0.08);
+          border-radius: 28px;
+          padding: 20px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
         }
-
-        .heroLogo,
-        .heroLogoFallback {
-          width: 76px;
-          height: 76px;
-          border-radius: 20px;
+        .brandRow {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          gap: 16px;
+          align-items: start;
+        }
+        .logo,
+        .logoFallback {
+          width: 86px;
+          height: 86px;
+          border-radius: 22px;
           object-fit: cover;
           flex-shrink: 0;
           background: #000;
@@ -723,112 +658,67 @@ export default function StorefrontPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 28px;
+          font-size: 34px;
           font-weight: 900;
-          box-shadow: 0 16px 30px rgba(0, 0, 0, 0.25);
         }
-
-        .heroTextWrap {
-          min-width: 0;
-        }
-
-        .heroName {
+        .storeName {
           margin: 0;
-          color: #fff;
-          font-size: clamp(34px, 6vw, 64px);
-          line-height: 0.95;
+          color: #142132;
+          font-size: clamp(32px, 5vw, 54px);
+          line-height: 0.96;
           letter-spacing: -0.05em;
           font-weight: 900;
           word-break: break-word;
-          text-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
         }
-
-        .heroTagline {
-          margin: 10px 0 0;
-          color: rgba(255, 255, 255, 0.94);
-          font-size: clamp(16px, 2vw, 22px);
-          line-height: 1.2;
-          font-weight: 700;
-          text-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-        }
-
-        .langToggle {
-          display: inline-flex;
-          gap: 6px;
-          padding: 5px;
-          border-radius: 18px;
-          background: rgba(255, 255, 255, 0.14);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.18);
-        }
-
-        .langButton {
-          border: none;
-          min-width: 62px;
-          min-height: 42px;
-          border-radius: 14px;
-          background: transparent;
-          color: rgba(255, 255, 255, 0.78);
-          font-size: 15px;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
-        .langActive {
-          background: #fff;
-          color: #111827;
-        }
-
-        .contentWrap {
-          max-width: 1100px;
-          margin: 0 auto;
-          padding: 18px 16px 0;
-        }
-
-        .infoCard {
-          background: rgba(255, 255, 255, 0.96);
-          border: 1px solid rgba(20, 33, 50, 0.08);
-          border-radius: 28px;
-          padding: 18px 20px;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
-        }
-
-        .infoRow {
+        .metaStack {
+          margin-top: 12px;
           display: grid;
           gap: 8px;
         }
-
-        .infoLabel {
-          color: #7a8595;
-          font-size: 14px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.04em;
-        }
-
-        .infoValue {
-          color: #142132;
-          font-size: 18px;
-          line-height: 1.45;
-          font-weight: 800;
-          word-break: break-word;
-        }
-
-        .hoursStack {
+        .metaRow {
           display: grid;
           gap: 4px;
         }
-
-        .infoDivider {
-          height: 1px;
-          background: rgba(20, 33, 50, 0.08);
-          margin: 16px 0;
+        .metaLabel {
+          color: #738093;
+          font-size: 14px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
         }
-
+        .metaValue {
+          color: #1e293b;
+          font-size: 16px;
+          line-height: 1.45;
+          font-weight: 700;
+        }
+        .langToggle {
+          display: inline-flex;
+          align-self: start;
+          gap: 6px;
+          padding: 5px;
+          border-radius: 18px;
+          border: 1px solid rgba(20, 33, 50, 0.1);
+          background: #fff;
+        }
+        .langButton {
+          border: none;
+          min-width: 64px;
+          min-height: 46px;
+          border-radius: 14px;
+          background: transparent;
+          color: #6b7686;
+          font-size: 16px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+        .langActive {
+          background: #0f172a;
+          color: #fff;
+        }
         .menuSection {
           margin-top: 18px;
         }
-
         .sectionHead {
           display: flex;
           justify-content: space-between;
@@ -836,7 +726,6 @@ export default function StorefrontPage() {
           gap: 16px;
           margin-bottom: 14px;
         }
-
         .sectionTitle {
           margin: 0;
           color: #142132;
@@ -845,34 +734,29 @@ export default function StorefrontPage() {
           letter-spacing: -0.04em;
           font-weight: 900;
         }
-
         .sectionSubtitle {
           color: #738093;
           font-size: 16px;
           font-weight: 800;
         }
-
         .menuGrid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 16px;
         }
-
         .menuCard {
           overflow: hidden;
           border-radius: 28px;
-          background: rgba(255, 255, 255, 0.96);
+          background: rgba(255, 255, 255, 0.94);
           border: 1px solid rgba(20, 33, 50, 0.08);
           box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
         }
-
         .menuImageWrap {
           width: 100%;
           aspect-ratio: 16 / 11;
           overflow: hidden;
           background: #eef2f8;
         }
-
         .menuImage,
         .menuImageFallback {
           width: 100%;
@@ -880,18 +764,15 @@ export default function StorefrontPage() {
           object-fit: cover;
           display: block;
         }
-
         .menuBody {
           padding: 18px;
         }
-
         .menuTop {
           display: grid;
           grid-template-columns: 1fr auto;
           gap: 14px;
           align-items: start;
         }
-
         .menuName {
           margin: 0;
           color: #142132;
@@ -900,7 +781,6 @@ export default function StorefrontPage() {
           font-weight: 900;
           letter-spacing: -0.03em;
         }
-
         .menuDescription {
           margin: 10px 0 0;
           color: #556173;
@@ -908,7 +788,6 @@ export default function StorefrontPage() {
           line-height: 1.55;
           font-weight: 700;
         }
-
         .menuPrice {
           color: #142132;
           font-size: 22px;
@@ -916,7 +795,6 @@ export default function StorefrontPage() {
           font-weight: 900;
           white-space: nowrap;
         }
-
         .addButton {
           margin-top: 16px;
           width: 100%;
@@ -929,7 +807,6 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
-
         .stickyCart {
           position: fixed;
           left: 12px;
@@ -950,7 +827,6 @@ export default function StorefrontPage() {
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
           cursor: pointer;
         }
-
         .cartOverlay {
           position: fixed;
           inset: 0;
@@ -961,7 +837,6 @@ export default function StorefrontPage() {
           justify-content: center;
           padding: 12px;
         }
-
         .cartSheet {
           width: 100%;
           max-width: 760px;
@@ -973,7 +848,6 @@ export default function StorefrontPage() {
           overflow: hidden;
           box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
         }
-
         .cartHeader {
           display: flex;
           align-items: center;
@@ -982,7 +856,6 @@ export default function StorefrontPage() {
           padding: 20px 20px 12px;
           border-bottom: 1px solid rgba(20, 33, 50, 0.08);
         }
-
         .cartHeader h3 {
           margin: 0;
           color: #142132;
@@ -991,7 +864,6 @@ export default function StorefrontPage() {
           font-weight: 900;
           letter-spacing: -0.04em;
         }
-
         .closeButton {
           border: none;
           background: transparent;
@@ -1000,21 +872,18 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
-
         .cartBody {
           padding: 12px 20px;
           overflow: auto;
           display: grid;
           gap: 12px;
         }
-
         .emptyCart {
           color: #64748b;
           font-size: 18px;
           font-weight: 800;
           padding: 20px 0;
         }
-
         .cartItem {
           display: grid;
           grid-template-columns: 84px 1fr;
@@ -1023,7 +892,6 @@ export default function StorefrontPage() {
           border-radius: 20px;
           padding: 10px;
         }
-
         .cartThumb,
         .cartThumbFallback {
           width: 84px;
@@ -1033,38 +901,32 @@ export default function StorefrontPage() {
           display: block;
           background: #eef2f8;
         }
-
         .cartItemInfo {
           min-width: 0;
         }
-
         .cartItemTop {
           display: flex;
           justify-content: space-between;
           gap: 10px;
           align-items: start;
         }
-
         .cartItemName,
         .cartItemPrice {
           color: #142132;
           font-size: 18px;
           font-weight: 900;
         }
-
         .cartItemMeta {
           margin-top: 8px;
           color: #64748b;
           font-size: 15px;
           font-weight: 800;
         }
-
         .cartActions {
           margin-top: 12px;
           display: flex;
           gap: 8px;
         }
-
         .qtyButton {
           width: 44px;
           height: 44px;
@@ -1076,17 +938,14 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
-
         .dangerQty {
           background: #e11d48;
         }
-
         .cartFooter {
           padding: 16px 20px 20px;
           border-top: 1px solid rgba(20, 33, 50, 0.08);
           background: #fff;
         }
-
         .subtotalRow {
           display: flex;
           align-items: center;
@@ -1096,7 +955,6 @@ export default function StorefrontPage() {
           font-weight: 800;
           margin-bottom: 14px;
         }
-
         .checkoutButton {
           width: 100%;
           min-height: 60px;
@@ -1108,91 +966,58 @@ export default function StorefrontPage() {
           font-weight: 900;
           cursor: pointer;
         }
-
         .checkoutButton:disabled {
-          opacity: 0.55;
+          opacity: 0.5;
           cursor: not-allowed;
         }
-
         @media (max-width: 900px) {
           .menuGrid {
             grid-template-columns: 1fr;
           }
         }
-
         @media (max-width: 640px) {
           .heroSection {
-            height: 38vh;
-            min-height: 280px;
+            height: 34vh;
+            min-height: 240px;
           }
-
-          .heroContent {
-            padding: 18px 12px 16px;
-            align-items: end;
-            gap: 12px;
-          }
-
-          .heroBrand {
-            align-items: end;
-          }
-
-          .heroLogo,
-          .heroLogoFallback {
-            width: 68px;
-            height: 68px;
-            border-radius: 18px;
-          }
-
-          .heroName {
-            font-size: clamp(28px, 12vw, 44px);
-          }
-
-          .heroTagline {
-            font-size: 15px;
-          }
-
           .contentWrap {
-            padding: 16px 12px 0;
+            padding: 14px 12px 0;
           }
-
-          .infoCard {
+          .headerCard {
             padding: 18px;
             border-radius: 24px;
           }
-
+          .brandRow {
+            grid-template-columns: 1fr;
+          }
           .langToggle {
-            position: absolute;
-            right: 12px;
-            top: 12px;
+            width: fit-content;
           }
-
-          .langButton {
-            min-width: 54px;
-            min-height: 38px;
-            font-size: 14px;
+          .logo,
+          .logoFallback {
+            width: 74px;
+            height: 74px;
+            border-radius: 18px;
           }
-
+          .storeName {
+            font-size: clamp(30px, 10vw, 44px);
+          }
           .menuBody {
             padding: 16px;
           }
-
           .menuTop {
             grid-template-columns: 1fr;
           }
-
           .menuPrice {
             font-size: 20px;
           }
-
           .stickyCart {
             font-size: 16px;
             min-height: 62px;
           }
-
           .cartSheet {
             border-radius: 24px;
           }
-
           .cartHeader h3 {
             font-size: 24px;
           }
