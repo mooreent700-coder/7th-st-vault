@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Lang = 'en' | 'es';
+type ThemeMode = 'light' | 'dark';
 
 type RestaurantRow = {
   id: string;
@@ -12,9 +13,9 @@ type RestaurantRow = {
   slug: string | null;
   phone: string | null;
   address: string | null;
-  hours: string | null;
   hero_url: string | null;
   logo_url: string | null;
+  storefront_theme: ThemeMode | null;
 };
 
 type MenuItemRow = {
@@ -35,24 +36,6 @@ type CartItem = {
   quantity: number;
 };
 
-type HoursRow = {
-  enabled: boolean;
-  open: string;
-  close: string;
-};
-
-type HoursState = {
-  mon: HoursRow;
-  tue: HoursRow;
-  wed: HoursRow;
-  thu: HoursRow;
-  fri: HoursRow;
-  sat: HoursRow;
-  sun: HoursRow;
-};
-
-const DAY_ORDER: Array<keyof HoursState> = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
 const COPY = {
   en: {
     loading: 'Loading store...',
@@ -69,13 +52,9 @@ const COPY = {
     openingCheckout: 'Opening checkout...',
     address: 'Address',
     phone: 'Phone',
-    hours: 'Hours',
-    noDescription: 'Fresh made with care.',
-    noHours: 'Hours not available',
-    closed: 'Closed',
-    items: 'items',
-    item: 'item',
     direct: 'Order direct. No fees.',
+    item: 'item',
+    items: 'items',
     details: 'Store details',
   },
   es: {
@@ -93,37 +72,12 @@ const COPY = {
     openingCheckout: 'Abriendo pago...',
     address: 'Dirección',
     phone: 'Teléfono',
-    hours: 'Horario',
-    noDescription: 'Hecho fresco con cuidado.',
-    noHours: 'Horario no disponible',
-    closed: 'Cerrado',
-    items: 'productos',
-    item: 'producto',
     direct: 'Ordena directo. Sin tarifas.',
+    item: 'producto',
+    items: 'productos',
     details: 'Detalles de la tienda',
   },
 } as const;
-
-const DAY_LABELS: Record<Lang, Record<keyof HoursState, string>> = {
-  en: {
-    mon: 'Mon',
-    tue: 'Tue',
-    wed: 'Wed',
-    thu: 'Thu',
-    fri: 'Fri',
-    sat: 'Sat',
-    sun: 'Sun',
-  },
-  es: {
-    mon: 'Lun',
-    tue: 'Mar',
-    wed: 'Mié',
-    thu: 'Jue',
-    fri: 'Vie',
-    sat: 'Sáb',
-    sun: 'Dom',
-  },
-};
 
 function safeNumber(value: number | string | null | undefined) {
   const n = Number(value ?? 0);
@@ -132,127 +86,6 @@ function safeNumber(value: number | string | null | undefined) {
 
 function money(value: number) {
   return `$${value.toFixed(2)}`;
-}
-
-function parseHours(value: string | null): HoursState | null {
-  if (!value) return null;
-
-  try {
-    const parsed = JSON.parse(value);
-
-    return {
-      mon: {
-        enabled: Boolean(parsed?.mon?.enabled),
-        open: parsed?.mon?.open || '09:00',
-        close: parsed?.mon?.close || '17:00',
-      },
-      tue: {
-        enabled: Boolean(parsed?.tue?.enabled),
-        open: parsed?.tue?.open || '09:00',
-        close: parsed?.tue?.close || '17:00',
-      },
-      wed: {
-        enabled: Boolean(parsed?.wed?.enabled),
-        open: parsed?.wed?.open || '09:00',
-        close: parsed?.wed?.close || '17:00',
-      },
-      thu: {
-        enabled: Boolean(parsed?.thu?.enabled),
-        open: parsed?.thu?.open || '09:00',
-        close: parsed?.thu?.close || '17:00',
-      },
-      fri: {
-        enabled: Boolean(parsed?.fri?.enabled),
-        open: parsed?.fri?.open || '09:00',
-        close: parsed?.fri?.close || '17:00',
-      },
-      sat: {
-        enabled: Boolean(parsed?.sat?.enabled),
-        open: parsed?.sat?.open || '09:00',
-        close: parsed?.sat?.close || '17:00',
-      },
-      sun: {
-        enabled: Boolean(parsed?.sun?.enabled),
-        open: parsed?.sun?.open || '09:00',
-        close: parsed?.sun?.close || '17:00',
-      },
-    };
-  } catch {
-    return null;
-  }
-}
-
-function toDisplayTime(value: string) {
-  const parts = value.split(':');
-  if (parts.length < 2) return value;
-
-  const hour = Number(parts[0]);
-  const minute = Number(parts[1]);
-
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
-
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const normalized = hour % 12 || 12;
-
-  return `${normalized}:${String(minute).padStart(2, '0')} ${suffix}`;
-}
-
-function buildHoursGroups(hours: HoursState | null, lang: Lang) {
-  if (!hours) return [];
-
-  const enabledDays = DAY_ORDER.filter((day) => hours[day].enabled);
-
-  if (!enabledDays.length) return [];
-
-  const groups: Array<{ label: string; range: string }> = [];
-  let start = enabledDays[0];
-  let prev = enabledDays[0];
-
-  for (let i = 1; i <= enabledDays.length; i += 1) {
-    const current = enabledDays[i];
-    const prevIndex = DAY_ORDER.indexOf(prev);
-    const currentIndex = current ? DAY_ORDER.indexOf(current) : -1;
-    const prevRow = hours[prev];
-    const sameBlock =
-      current &&
-      currentIndex === prevIndex + 1 &&
-      hours[current].open === prevRow.open &&
-      hours[current].close === prevRow.close;
-
-    if (sameBlock) {
-      prev = current!;
-      continue;
-    }
-
-    const label =
-      start === prev
-        ? DAY_LABELS[lang][start]
-        : `${DAY_LABELS[lang][start]}–${DAY_LABELS[lang][prev]}`;
-
-    groups.push({
-      label,
-      range: `${toDisplayTime(prevRow.open)} - ${toDisplayTime(prevRow.close)}`,
-    });
-
-    if (current) {
-      start = current;
-      prev = current;
-    }
-  }
-
-  return groups;
-}
-
-function formatHoursInline(hours: HoursState | null, lang: Lang, noHours: string, closed: string) {
-  const groups = buildHoursGroups(hours, lang);
-  if (!groups.length) return hours ? closed : noHours;
-  return groups.map((group) => `${group.label}: ${group.range}`).join(' • ');
-}
-
-function buildInitials(name: string | null) {
-  const value = (name || '').trim();
-  if (!value) return 'M';
-  return value.charAt(0).toUpperCase();
 }
 
 function normalizeCartItem(item: CartItem): MenuItemRow {
@@ -291,7 +124,7 @@ export default function StorefrontPage() {
 
         const restaurantRes = await supabase
           .from('restaurants')
-          .select('id, name, slug, phone, address, hours, hero_url, logo_url')
+          .select('id, name, slug, phone, address, hero_url, logo_url, storefront_theme')
           .eq('slug', slug)
           .maybeSingle();
 
@@ -335,21 +168,6 @@ export default function StorefrontPage() {
     };
   }, [slug]);
 
-  const parsedHours = useMemo(
-    () => parseHours(restaurant?.hours || null),
-    [restaurant?.hours]
-  );
-
-  const hourGroups = useMemo(
-    () => buildHoursGroups(parsedHours, lang),
-    [parsedHours, lang]
-  );
-
-  const hoursInline = useMemo(
-    () => formatHoursInline(parsedHours, lang, t.noHours, t.closed),
-    [parsedHours, lang, t.noHours, t.closed]
-  );
-
   const itemCount = useMemo(
     () => cart.reduce((sum, item) => sum + item.quantity, 0),
     [cart]
@@ -361,6 +179,7 @@ export default function StorefrontPage() {
   );
 
   const cartLabel = itemCount === 1 ? t.item : t.items;
+  const isDark = (restaurant?.storefront_theme || 'light') === 'dark';
 
   function addToCart(item: MenuItemRow) {
     const name = item.name?.trim() || '';
@@ -496,7 +315,7 @@ export default function StorefrontPage() {
   }
 
   return (
-    <main className="page">
+    <main className={isDark ? 'page pageDark' : 'page pageLight'}>
       <section className="heroSection">
         {restaurant.hero_url ? (
           <img
@@ -511,93 +330,68 @@ export default function StorefrontPage() {
         <div className="heroOverlay" />
 
         <div className="heroContent">
-          <div className="heroTopRow">
-            <div className="heroBrandBlock">
-              {restaurant.logo_url ? (
-                <img
-                  src={restaurant.logo_url}
-                  alt={restaurant.name || 'Store logo'}
-                  className="heroLogo"
-                />
-              ) : (
-                <div className="heroLogoFallback">
-                  {buildInitials(restaurant.name)}
-                </div>
-              )}
-
-              <div className="heroTextBlock">
-                <h1 className="heroTitle">{restaurant.name || ''}</h1>
-                <p className="heroTagline">{t.direct}</p>
+          <div className="brandWrap">
+            {restaurant.logo_url ? (
+              <img
+                src={restaurant.logo_url}
+                alt={restaurant.name || 'Store logo'}
+                className="heroLogo"
+              />
+            ) : (
+              <div className="heroLogoFallback">
+                {(restaurant.name?.trim() || 'M').charAt(0).toUpperCase()}
               </div>
-            </div>
+            )}
 
-            <div className="langToggle">
-              <button
-                type="button"
-                className={lang === 'en' ? 'langButton langActive' : 'langButton'}
-                onClick={() => setLang('en')}
-              >
-                EN
-              </button>
-              <button
-                type="button"
-                className={lang === 'es' ? 'langButton langActive' : 'langButton'}
-                onClick={() => setLang('es')}
-              >
-                ES
-              </button>
+            <div className="heroText">
+              <h1>{restaurant.name || ''}</h1>
+              <p>{t.direct}</p>
             </div>
+          </div>
+
+          <div className="langToggle">
+            <button
+              type="button"
+              className={lang === 'en' ? 'langButton activeLang' : 'langButton'}
+              onClick={() => setLang('en')}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={lang === 'es' ? 'langButton activeLang' : 'langButton'}
+              onClick={() => setLang('es')}
+            >
+              ES
+            </button>
           </div>
         </div>
       </section>
 
       <section className="contentWrap">
-        <section className="infoCard">
-          <div className="infoHeader">
-            <h2 className="infoTitle">{t.details}</h2>
-          </div>
+        <section className="infoPanel">
+          <div className="panelTitle">{t.details}</div>
 
           <div className="infoGrid">
-            {restaurant.address ? (
-              <div className="infoItem">
-                <div className="infoLabel">{t.address}</div>
-                <div className="infoValue">{restaurant.address}</div>
-              </div>
-            ) : null}
+            <div className="infoCard">
+              <div className="infoLabel">{t.address}</div>
+              <div className="infoValue">{restaurant.address || '—'}</div>
+            </div>
 
-            {restaurant.phone ? (
-              <div className="infoItem">
-                <div className="infoLabel">{t.phone}</div>
-                <div className="infoValue">{restaurant.phone}</div>
-              </div>
-            ) : null}
-
-            <div className="infoItem infoItemFull">
-              <div className="infoLabel">{t.hours}</div>
-
-              {hourGroups.length ? (
-                <div className="hoursGroupList">
-                  {hourGroups.map((group) => (
-                    <div key={`${group.label}-${group.range}`} className="hoursRow">
-                      <span className="hoursDay">{group.label}</span>
-                      <span className="hoursRange">{group.range}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="infoValue">{hoursInline}</div>
-              )}
+            <div className="infoCard">
+              <div className="infoLabel">{t.phone}</div>
+              <div className="infoValue">{restaurant.phone || '—'}</div>
             </div>
           </div>
         </section>
 
         <section className="menuSection">
-          <div className="sectionHead">
-            <h2 className="sectionTitle">{t.menu}</h2>
-            <div className="sectionSubtitle">{t.orderNow}</div>
+          <div className="menuHeader">
+            <h2>{t.menu}</h2>
+            <div className="menuSub">{t.orderNow}</div>
           </div>
 
-          <div className="menuGrid">
+          <div className="menuList">
             {menuItems.map((item) => {
               const name = item.name?.trim() || '';
               if (!name) return null;
@@ -613,14 +407,9 @@ export default function StorefrontPage() {
                   </div>
 
                   <div className="menuBody">
-                    <div className="menuTop">
-                      <div className="menuText">
-                        <h3 className="menuName">{name}</h3>
-                        <p className="menuDescription">
-                          {item.description?.trim() || t.noDescription}
-                        </p>
-                      </div>
-
+                    <div className="menuInfo">
+                      <h3>{name}</h3>
+                      <p>{item.description?.trim() || ''}</p>
                       <div className="menuPrice">{money(safeNumber(item.price))}</div>
                     </div>
 
@@ -646,7 +435,7 @@ export default function StorefrontPage() {
           onClick={() => setCartOpen(true)}
         >
           <span>
-            {t.yourOrder} ({itemCount} {cartLabel})
+            {t.orderNow} ({itemCount} {cartLabel})
           </span>
           <span>{money(subtotal)}</span>
         </button>
@@ -734,22 +523,26 @@ export default function StorefrontPage() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background:
-            radial-gradient(circle at top, rgba(226, 232, 240, 0.35), transparent 35%),
-            linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
-          color: #142132;
-          padding-bottom: 112px;
+          padding-bottom: 110px;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .pageLight {
+          background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+          color: #0f172a;
+        }
+
+        .pageDark {
+          background: linear-gradient(180deg, #0b1220 0%, #111827 100%);
+          color: #fff;
         }
 
         .heroSection {
           position: relative;
-          width: 100%;
           min-height: 430px;
           height: 58vh;
           max-height: 720px;
           overflow: hidden;
-          background: #0f172a;
         }
 
         .heroImage,
@@ -760,83 +553,65 @@ export default function StorefrontPage() {
           height: 100%;
           object-fit: cover;
           display: block;
-          background:
-            linear-gradient(135deg, #111827 0%, #0f172a 100%);
+          background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
         }
 
         .heroOverlay {
           position: absolute;
           inset: 0;
-          background:
-            linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.28) 45%, rgba(2, 6, 23, 0.72) 100%);
+          background: linear-gradient(180deg, rgba(2, 6, 23, 0.08) 0%, rgba(2, 6, 23, 0.65) 100%);
         }
 
         .heroContent {
           position: relative;
           z-index: 2;
           max-width: 1180px;
-          margin: 0 auto;
           height: 100%;
-          display: flex;
-          align-items: end;
-          padding: 24px 18px 28px;
-        }
-
-        .heroTopRow {
-          width: 100%;
+          margin: 0 auto;
+          padding: 22px 16px 26px;
           display: flex;
           align-items: end;
           justify-content: space-between;
-          gap: 18px;
+          gap: 16px;
           flex-wrap: wrap;
         }
 
-        .heroBrandBlock {
+        .brandWrap {
           display: flex;
           align-items: end;
-          gap: 18px;
-          min-width: 0;
+          gap: 16px;
         }
 
         .heroLogo,
         .heroLogoFallback {
-          width: 92px;
-          height: 92px;
-          border-radius: 26px;
+          width: 86px;
+          height: 86px;
+          border-radius: 24px;
           object-fit: cover;
-          flex-shrink: 0;
-          background: rgba(255, 255, 255, 0.98);
+          background: rgba(255, 255, 255, 0.96);
           color: #0f172a;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 36px;
+          font-size: 34px;
           font-weight: 900;
-          box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
         }
 
-        .heroTextBlock {
-          min-width: 0;
-        }
-
-        .heroTitle {
+        .heroText h1 {
           margin: 0;
-          color: #ffffff;
-          font-size: clamp(44px, 8vw, 90px);
+          color: #fff;
+          font-size: clamp(42px, 8vw, 88px);
           line-height: 0.92;
           letter-spacing: -0.06em;
           font-weight: 900;
-          text-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
-          word-break: break-word;
         }
 
-        .heroTagline {
-          margin: 12px 0 0;
+        .heroText p {
+          margin: 10px 0 0;
           color: rgba(255, 255, 255, 0.92);
           font-size: clamp(18px, 2vw, 24px);
           line-height: 1.2;
           font-weight: 800;
-          text-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
         }
 
         .langToggle {
@@ -844,85 +619,98 @@ export default function StorefrontPage() {
           gap: 6px;
           padding: 6px;
           border-radius: 22px;
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          border: 1px solid rgba(255, 255, 255, 0.16);
           background: rgba(255, 255, 255, 0.12);
-          backdrop-filter: blur(12px);
-          box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
+          backdrop-filter: blur(10px);
         }
 
         .langButton {
+          min-width: 62px;
+          min-height: 46px;
           border: none;
-          min-width: 68px;
-          min-height: 48px;
           border-radius: 16px;
           background: transparent;
-          color: rgba(255, 255, 255, 0.78);
+          color: rgba(255, 255, 255, 0.72);
           font-size: 16px;
           font-weight: 900;
           cursor: pointer;
         }
 
-        .langActive {
-          background: #ffffff;
+        .activeLang {
+          background: #fff;
           color: #0f172a;
         }
 
         .contentWrap {
           max-width: 1180px;
           margin: 0 auto;
-          padding: 22px 16px 0;
+          padding: 18px 16px 0;
         }
 
-        .infoCard {
-          background: rgba(255, 255, 255, 0.92);
-          border: 1px solid rgba(20, 33, 50, 0.08);
-          border-radius: 32px;
-          padding: 24px;
-          box-shadow: 0 22px 50px rgba(15, 23, 42, 0.06);
-          backdrop-filter: blur(10px);
-          margin-top: -46px;
+        .infoPanel {
+          margin-top: -40px;
           position: relative;
           z-index: 3;
+          border-radius: 28px;
+          padding: 20px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
         }
 
-        .infoHeader {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 18px;
+        .pageLight .infoPanel,
+        .pageLight .menuCard,
+        .pageLight .cartSheet {
+          background: rgba(255, 255, 255, 0.96);
         }
 
-        .infoTitle {
-          margin: 0;
-          color: #142132;
+        .pageDark .infoPanel,
+        .pageDark .menuCard,
+        .pageDark .cartSheet {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .panelTitle {
           font-size: 14px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.08em;
+          margin-bottom: 14px;
+        }
+
+        .pageLight .panelTitle,
+        .pageLight .infoLabel {
+          color: #718096;
+        }
+
+        .pageDark .panelTitle,
+        .pageDark .infoLabel {
+          color: rgba(255, 255, 255, 0.65);
         }
 
         .infoGrid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
         }
 
-        .infoItem {
-          min-width: 0;
-          border-radius: 24px;
-          background: #f8fbff;
-          border: 1px solid rgba(20, 33, 50, 0.07);
+        .infoCard {
+          border-radius: 22px;
           padding: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
         }
 
-        .infoItemFull {
-          grid-column: span 1;
+        .pageLight .infoCard {
+          background: #f8fbff;
+        }
+
+        .pageDark .infoCard {
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(255, 255, 255, 0.08);
         }
 
         .infoLabel {
-          color: #758195;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 900;
           text-transform: uppercase;
           letter-spacing: 0.08em;
@@ -930,86 +718,54 @@ export default function StorefrontPage() {
 
         .infoValue {
           margin-top: 8px;
-          color: #142132;
           font-size: 22px;
-          line-height: 1.32;
+          line-height: 1.3;
           font-weight: 900;
           word-break: break-word;
         }
 
-        .hoursGroupList {
-          margin-top: 8px;
-          display: grid;
-          gap: 10px;
-        }
-
-        .hoursRow {
-          display: flex;
-          align-items: start;
-          justify-content: space-between;
-          gap: 14px;
-          border-top: 1px solid rgba(20, 33, 50, 0.06);
-          padding-top: 10px;
-        }
-
-        .hoursRow:first-child {
-          border-top: none;
-          padding-top: 0;
-        }
-
-        .hoursDay {
-          color: #142132;
-          font-size: 16px;
-          font-weight: 900;
-          white-space: nowrap;
-        }
-
-        .hoursRange {
-          color: #475569;
-          font-size: 15px;
-          line-height: 1.4;
-          font-weight: 800;
-          text-align: right;
-        }
-
         .menuSection {
-          margin-top: 22px;
+          margin-top: 20px;
         }
 
-        .sectionHead {
+        .menuHeader {
           display: flex;
           justify-content: space-between;
           align-items: end;
-          gap: 16px;
+          gap: 12px;
           margin-bottom: 14px;
         }
 
-        .sectionTitle {
+        .menuHeader h2 {
           margin: 0;
-          color: #142132;
           font-size: clamp(34px, 5vw, 54px);
           line-height: 1;
           letter-spacing: -0.05em;
           font-weight: 900;
         }
 
-        .sectionSubtitle {
-          color: #738093;
+        .menuSub {
           font-size: 18px;
           font-weight: 900;
         }
 
-        .menuGrid {
+        .pageLight .menuSub {
+          color: #738093;
+        }
+
+        .pageDark .menuSub {
+          color: rgba(255, 255, 255, 0.72);
+        }
+
+        .menuList {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 18px;
         }
 
         .menuCard {
           overflow: hidden;
           border-radius: 30px;
-          background: rgba(255, 255, 255, 0.96);
-          border: 1px solid rgba(20, 33, 50, 0.08);
+          border: 1px solid rgba(15, 23, 42, 0.08);
           box-shadow: 0 20px 44px rgba(15, 23, 42, 0.06);
         }
 
@@ -1017,7 +773,7 @@ export default function StorefrontPage() {
           width: 100%;
           aspect-ratio: 16 / 10;
           overflow: hidden;
-          background: #eef2f8;
+          background: #111827;
         }
 
         .menuImage,
@@ -1030,56 +786,64 @@ export default function StorefrontPage() {
 
         .menuBody {
           padding: 18px;
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 16px;
         }
 
-        .menuTop {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 14px;
-          align-items: start;
-        }
-
-        .menuText {
+        .menuInfo {
           min-width: 0;
         }
 
-        .menuName {
+        .menuInfo h3 {
           margin: 0;
-          color: #142132;
-          font-size: 28px;
+          font-size: 30px;
           line-height: 1.02;
           font-weight: 900;
           letter-spacing: -0.04em;
-          word-break: break-word;
         }
 
-        .menuDescription {
+        .menuInfo p {
           margin: 10px 0 0;
-          color: #566274;
           font-size: 16px;
           line-height: 1.55;
           font-weight: 700;
         }
 
+        .pageLight .menuInfo p {
+          color: #566274;
+        }
+
+        .pageDark .menuInfo p {
+          color: rgba(255, 255, 255, 0.72);
+        }
+
         .menuPrice {
-          color: #142132;
+          margin-top: 12px;
           font-size: 24px;
-          line-height: 1;
           font-weight: 900;
-          white-space: nowrap;
         }
 
         .addButton {
-          margin-top: 18px;
-          width: 100%;
-          min-height: 58px;
+          min-width: 132px;
+          min-height: 54px;
           border: none;
           border-radius: 18px;
-          background: #0f172a;
-          color: #fff;
           font-size: 18px;
           font-weight: 900;
           cursor: pointer;
+          flex-shrink: 0;
+        }
+
+        .pageLight .addButton {
+          background: #0f172a;
+          color: #fff;
+        }
+
+        .pageDark .addButton {
+          background: #fff;
+          color: #0f172a;
         }
 
         .stickyCart {
@@ -1091,16 +855,24 @@ export default function StorefrontPage() {
           min-height: 66px;
           border: none;
           border-radius: 22px;
-          background: #0f172a;
-          color: #fff;
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0 20px;
           font-size: 18px;
           font-weight: 900;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
           cursor: pointer;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+        }
+
+        .pageLight .stickyCart {
+          background: #0f172a;
+          color: #fff;
+        }
+
+        .pageDark .stickyCart {
+          background: #fff;
+          color: #0f172a;
         }
 
         .cartOverlay {
@@ -1120,9 +892,9 @@ export default function StorefrontPage() {
           max-height: 84vh;
           display: flex;
           flex-direction: column;
-          background: #fff;
           border-radius: 30px;
           overflow: hidden;
+          border: 1px solid rgba(15, 23, 42, 0.08);
           box-shadow: 0 22px 52px rgba(15, 23, 42, 0.24);
         }
 
@@ -1132,12 +904,11 @@ export default function StorefrontPage() {
           justify-content: space-between;
           gap: 12px;
           padding: 20px 20px 12px;
-          border-bottom: 1px solid rgba(20, 33, 50, 0.08);
+          border-bottom: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .cartHeader h3 {
           margin: 0;
-          color: #142132;
           font-size: 28px;
           line-height: 1;
           font-weight: 900;
@@ -1161,7 +932,6 @@ export default function StorefrontPage() {
         }
 
         .emptyCart {
-          color: #64748b;
           font-size: 18px;
           font-weight: 800;
           padding: 20px 0;
@@ -1171,7 +941,7 @@ export default function StorefrontPage() {
           display: grid;
           grid-template-columns: 84px 1fr;
           gap: 12px;
-          border: 1px solid rgba(20, 33, 50, 0.08);
+          border: 1px solid rgba(15, 23, 42, 0.08);
           border-radius: 20px;
           padding: 10px;
         }
@@ -1199,7 +969,6 @@ export default function StorefrontPage() {
 
         .cartItemName,
         .cartItemPrice {
-          color: #142132;
           font-size: 18px;
           font-weight: 900;
         }
@@ -1222,28 +991,35 @@ export default function StorefrontPage() {
           height: 44px;
           border: none;
           border-radius: 14px;
-          background: #0f172a;
-          color: #fff;
           font-size: 22px;
           font-weight: 900;
           cursor: pointer;
         }
 
+        .pageLight .qtyButton {
+          background: #0f172a;
+          color: #fff;
+        }
+
+        .pageDark .qtyButton {
+          background: #fff;
+          color: #0f172a;
+        }
+
         .dangerQty {
-          background: #e11d48;
+          background: #e11d48 !important;
+          color: #fff !important;
         }
 
         .cartFooter {
           padding: 16px 20px 20px;
-          border-top: 1px solid rgba(20, 33, 50, 0.08);
-          background: #fff;
+          border-top: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .subtotalRow {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          color: #142132;
           font-size: 18px;
           font-weight: 800;
           margin-bottom: 14px;
@@ -1254,11 +1030,19 @@ export default function StorefrontPage() {
           min-height: 60px;
           border: none;
           border-radius: 18px;
-          background: #000;
-          color: #fff;
           font-size: 20px;
           font-weight: 900;
           cursor: pointer;
+        }
+
+        .pageLight .checkoutButton {
+          background: #000;
+          color: #fff;
+        }
+
+        .pageDark .checkoutButton {
+          background: #fff;
+          color: #0f172a;
         }
 
         .checkoutButton:disabled {
@@ -1266,17 +1050,14 @@ export default function StorefrontPage() {
           cursor: not-allowed;
         }
 
-        @media (max-width: 980px) {
-          .infoGrid {
-            grid-template-columns: 1fr 1fr;
+        @media (max-width: 900px) {
+          .menuBody {
+            flex-direction: column;
+            align-items: stretch;
           }
 
-          .infoItemFull {
-            grid-column: span 2;
-          }
-
-          .menuGrid {
-            grid-template-columns: 1fr;
+          .addButton {
+            width: 100%;
           }
         }
 
@@ -1290,15 +1071,6 @@ export default function StorefrontPage() {
             padding: 18px 12px 18px;
           }
 
-          .heroTopRow {
-            align-items: end;
-          }
-
-          .heroBrandBlock {
-            gap: 14px;
-            align-items: end;
-          }
-
           .heroLogo,
           .heroLogoFallback {
             width: 76px;
@@ -1307,79 +1079,42 @@ export default function StorefrontPage() {
             font-size: 30px;
           }
 
-          .heroTitle {
+          .heroText h1 {
             font-size: clamp(34px, 12vw, 56px);
           }
 
-          .heroTagline {
-            margin-top: 10px;
+          .heroText p {
             font-size: 16px;
-          }
-
-          .langToggle {
-            padding: 5px;
-            border-radius: 18px;
-          }
-
-          .langButton {
-            min-width: 58px;
-            min-height: 44px;
-            border-radius: 14px;
           }
 
           .contentWrap {
             padding: 14px 12px 0;
           }
 
-          .infoCard {
-            padding: 18px;
-            border-radius: 26px;
+          .infoPanel {
             margin-top: -34px;
+            padding: 18px;
+            border-radius: 24px;
           }
 
           .infoGrid {
             grid-template-columns: 1fr;
           }
 
-          .infoItemFull {
-            grid-column: span 1;
-          }
-
           .infoValue {
             font-size: 18px;
           }
 
-          .hoursRow {
-            flex-direction: column;
-            gap: 4px;
-          }
-
-          .hoursRange {
-            text-align: left;
-          }
-
-          .sectionTitle {
+          .menuHeader h2 {
             font-size: clamp(30px, 9vw, 44px);
           }
 
-          .sectionSubtitle {
+          .menuSub {
             font-size: 16px;
           }
 
-          .menuBody {
-            padding: 16px;
-          }
-
-          .menuTop {
-            grid-template-columns: 1fr;
-          }
-
-          .menuName {
+          .menuInfo h3 {
             font-size: 24px;
-          }
-
-          .menuPrice {
-            font-size: 20px;
           }
 
           .stickyCart {
