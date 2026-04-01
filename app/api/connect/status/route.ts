@@ -1,34 +1,64 @@
-import { NextResponse } from "next/server";
-import Stripe from "stripe";
-import { supabase } from "@/lib/supabase";
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-if (!stripeSecretKey) {
-  throw new Error("Missing STRIPE_SECRET_KEY");
-}
-
-const stripe = new Stripe(stripeSecretKey);
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const restaurantId = searchParams.get("restaurantId");
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!restaurantId) {
-      return NextResponse.json({ error: "Missing restaurantId" }, { status: 400 });
+    if (!stripeSecretKey) {
+      return NextResponse.json(
+        { error: 'Missing STRIPE_SECRET_KEY' },
+        { status: 500 }
+      );
     }
 
-    const { data: restaurant, error } = await supabase
-      .from("restaurants")
-      .select("*")
-      .eq("id", restaurantId)
+    if (!supabaseUrl) {
+      return NextResponse.json(
+        { error: 'Missing NEXT_PUBLIC_SUPABASE_URL' },
+        { status: 500 }
+      );
+    }
+
+    if (!supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { error: 'Missing SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const { searchParams } = new URL(req.url);
+    const restaurantId = searchParams.get('restaurantId');
+
+    if (!restaurantId) {
+      return NextResponse.json(
+        { error: 'Missing restaurantId' },
+        { status: 400 }
+      );
+    }
+
+    const { data: restaurant, error: restaurantError } = await supabase
+      .from('restaurants')
+      .select('id, stripe_account_id')
+      .eq('id', restaurantId)
       .single();
 
-    if (error || !restaurant?.stripe_account_id) {
+    if (restaurantError || !restaurant) {
+      return NextResponse.json(
+        { error: 'Restaurant not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!restaurant.stripe_account_id) {
       return NextResponse.json({
         connected: false,
         onboardingComplete: false,
@@ -38,22 +68,22 @@ export async function GET(req: Request) {
       });
     }
 
-    const account = await stripe.accounts.retrieve(
-      restaurant.stripe_account_id
-    );
+    const account = await stripe.accounts.retrieve(restaurant.stripe_account_id);
 
     return NextResponse.json({
       connected: true,
-      onboardingComplete: account.details_submitted,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
+      onboardingComplete: Boolean(account.details_submitted),
+      chargesEnabled: Boolean(account.charges_enabled),
+      payoutsEnabled: Boolean(account.payouts_enabled),
       stripeAccountId: account.id,
     });
   } catch (error: any) {
-    console.error("CONNECT STATUS ERROR:", error);
+    console.error('STRIPE STATUS ERROR:', error);
 
     return NextResponse.json(
-      { error: "Failed to get Stripe connection status" },
+      {
+        error: error?.message || 'Could not get Stripe status',
+      },
       { status: 500 }
     );
   }

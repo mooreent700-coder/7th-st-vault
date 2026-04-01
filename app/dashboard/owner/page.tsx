@@ -12,6 +12,15 @@ type RestaurantRow = {
   stripe_account_id: string | null;
 };
 
+type StripeStatusResponse = {
+  connected: boolean;
+  onboardingComplete: boolean;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  stripeAccountId: string | null;
+  error?: string;
+};
+
 export default function OwnerDashboardPage() {
   const router = useRouter();
 
@@ -20,6 +29,7 @@ export default function OwnerDashboardPage() {
   const [error, setError] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [restaurant, setRestaurant] = useState<RestaurantRow | null>(null);
+  const [stripeReady, setStripeReady] = useState(false);
 
   const autoStartedRef = useRef(false);
 
@@ -30,6 +40,7 @@ export default function OwnerDashboardPage() {
       try {
         setLoading(true);
         setError('');
+        setStripeReady(false);
 
         const {
           data: { user },
@@ -42,7 +53,6 @@ export default function OwnerDashboardPage() {
         }
 
         if (!active) return;
-
         setOwnerEmail(user.email || '');
 
         const { data: restaurantRow, error: restaurantError } = await supabase
@@ -73,10 +83,40 @@ export default function OwnerDashboardPage() {
 
         setRestaurant(typedRestaurant);
 
-        if (typedRestaurant.stripe_account_id) {
+        if (!typedRestaurant.stripe_account_id) {
+          setLoading(false);
+          return;
+        }
+
+        const statusResponse = await fetch(
+          `/api/connect/status?restaurantId=${encodeURIComponent(typedRestaurant.id)}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          }
+        );
+
+        const statusData: StripeStatusResponse = await statusResponse.json();
+
+        if (!active) return;
+
+        if (!statusResponse.ok) {
+          throw new Error(statusData?.error || 'Could not check Stripe status.');
+        }
+
+        const fullyReady =
+          Boolean(statusData.connected) &&
+          Boolean(statusData.onboardingComplete) &&
+          Boolean(statusData.chargesEnabled) &&
+          Boolean(statusData.payoutsEnabled);
+
+        if (fullyReady) {
+          setStripeReady(true);
           router.replace('/dashboard/owner/builder');
           return;
         }
+
+        setStripeReady(false);
       } catch (err: any) {
         if (!active) return;
         setError(err?.message || 'Could not load owner dashboard.');
@@ -97,12 +137,13 @@ export default function OwnerDashboardPage() {
   useEffect(() => {
     if (loading) return;
     if (!restaurant) return;
-    if (restaurant.stripe_account_id) return;
+    if (stripeReady) return;
+    if (checkingStripe) return;
     if (autoStartedRef.current) return;
 
     autoStartedRef.current = true;
     void handleConnectStripe(restaurant.id);
-  }, [loading, restaurant]);
+  }, [loading, restaurant, stripeReady, checkingStripe]);
 
   async function handleConnectStripe(restaurantId: string) {
     try {
@@ -134,55 +175,45 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  async function refreshRestaurant() {
+  async function refreshStripeStatus() {
     try {
+      if (!restaurant) return;
+
+      setCheckingStripe(true);
       setError('');
-      setLoading(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const response = await fetch(
+        `/api/connect/status?restaurantId=${encodeURIComponent(restaurant.id)}`,
+        {
+          method: 'GET',
+          cache: 'no-store',
+        }
+      );
 
-      if (!user) {
-        router.replace('/login');
-        return;
+      const data: StripeStatusResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not refresh Stripe status.');
       }
 
-      const { data: restaurantRow, error: restaurantError } = await supabase
-        .from('restaurants')
-        .select('id, name, slug, stripe_account_id')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const fullyReady =
+        Boolean(data.connected) &&
+        Boolean(data.onboardingComplete) &&
+        Boolean(data.chargesEnabled) &&
+        Boolean(data.payoutsEnabled);
 
-      if (restaurantError) {
-        throw restaurantError;
-      }
-
-      if (!restaurantRow) {
-        throw new Error('Restaurant not found.');
-      }
-
-      const typedRestaurant: RestaurantRow = {
-        id: restaurantRow.id,
-        name: restaurantRow.name,
-        slug: restaurantRow.slug,
-        stripe_account_id: restaurantRow.stripe_account_id,
-      };
-
-      setRestaurant(typedRestaurant);
-
-      if (typedRestaurant.stripe_account_id) {
+      if (fullyReady) {
+        setStripeReady(true);
         router.replace('/dashboard/owner/builder');
         return;
       }
 
-      setError('Stripe is still not connected for this store yet.');
+      setStripeReady(false);
+      setError('Stripe onboarding is not complete yet. Finish Stripe setup first.');
     } catch (err: any) {
       setError(err?.message || 'Could not refresh Stripe status.');
     } finally {
-      setLoading(false);
+      setCheckingStripe(false);
     }
   }
 
@@ -346,7 +377,7 @@ export default function OwnerDashboardPage() {
           <button
             type="button"
             className="secondaryButton"
-            onClick={() => void refreshRestaurant()}
+            onClick={() => void refreshStripeStatus()}
             disabled={checkingStripe}
           >
             I already connected it
@@ -354,7 +385,7 @@ export default function OwnerDashboardPage() {
         </div>
 
         <div className="footerNote">
-          After Stripe onboarding is complete, you will be sent back and your store can accept payments.
+          You will stay on this page until Stripe onboarding is fully complete and payouts are enabled.
         </div>
       </section>
 
@@ -438,6 +469,7 @@ export default function OwnerDashboardPage() {
           font-size: 16px;
           font-weight: 800;
           line-height: 1.45;
+          word-break: break-word;
         }
         .buttonRow {
           margin-top: 24px;
