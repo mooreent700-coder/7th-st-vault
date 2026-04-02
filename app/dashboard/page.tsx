@@ -153,20 +153,17 @@ export default function OwnerDashboardPage() {
   if (loading) return <div>Loading...</div>;
 
   return (
-    <main>
-      <h1>Owner Dashboard</h1>
+  <main>
+    <h1>Owner Dashboard</h1>
 
-      {!stripeReady && (
-        <button onClick={() => handleConnectStripe(restaurant!.id)}>
-          Connect Stripe
-        </button>
-      )}
+    {!stripeReady && (
+      <button onClick={() => handleConnectStripe()}>
+        Connect Stripe
+      </button>
+    )}
 
-      {stripeReady && (
-        <Link href="/dashboard/owner/builder">
-          Go to Builder
-        </Link>
-      )}
-    </main>
-  );
-}
+    <Link href="/dashboard/owner/builder">
+      Go to Builder
+    </Link>
+  </main>
+);
