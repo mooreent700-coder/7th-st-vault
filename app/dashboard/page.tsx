@@ -166,4 +166,5 @@ export default function OwnerDashboardPage() {
       Go to Builder
     </Link>
   </main>
-);
+  );
+}
