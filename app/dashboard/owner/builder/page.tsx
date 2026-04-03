@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 type ThemeMode = 'light' | 'dark';
 type OrderLanguage = 'EN' | 'ES';
 type StorefrontLanguage = 'en' | 'es';
+type Availability = 'available' | 'sold_out';
 
 type RestaurantRow = {
   id: string;
@@ -30,14 +31,14 @@ type RestaurantRow = {
 
 type CategoryRow = {
   id: string;
-  restaurant_id?: string;
+  restaurant_id?: string | null;
   name?: string | null;
   sort_order?: number | null;
 };
 
 type ItemRow = {
   id: string;
-  restaurant_id?: string;
+  restaurant_id?: string | null;
   category_id?: string | null;
   name?: string | null;
   description?: string | null;
@@ -68,22 +69,10 @@ type OptionChoiceRow = {
   sort_order?: number | null;
 };
 
-type BuilderCategory = {
+type BuilderOption = {
   id: string;
   name: string;
-  sort_order: number;
-  items: BuilderItem[];
-};
-
-type BuilderItem = {
-  id: string;
-  category_id: string;
-  name: string;
-  base_price: string;
-  description: string;
-  image_url: string;
-  availability: 'available' | 'sold_out';
-  option_groups: BuilderOptionGroup[];
+  price: string;
 };
 
 type BuilderOptionGroup = {
@@ -95,10 +84,22 @@ type BuilderOptionGroup = {
   options: BuilderOption[];
 };
 
-type BuilderOption = {
+type BuilderItem = {
+  id: string;
+  category_id: string;
+  name: string;
+  base_price: string;
+  description: string;
+  image_url: string;
+  availability: Availability;
+  option_groups: BuilderOptionGroup[];
+};
+
+type BuilderCategory = {
   id: string;
   name: string;
-  price: string;
+  sort_order: number;
+  items: BuilderItem[];
 };
 
 function uid(prefix: string) {
@@ -172,6 +173,16 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
   }
 
   return [{ name: 'Option 1', price: '0' }];
+}
+
+function normalizeAvailability(item: ItemRow): Availability {
+  if (item.availability === 'sold_out' || item.is_available === false) return 'sold_out';
+  return 'available';
+}
+
+function normalizeSelectionMode(group: OptionGroupRow): 'single' | 'multiple' {
+  if (group.selection_mode === 'multiple' || group.is_multiple) return 'multiple';
+  return 'single';
 }
 
 export default function OwnerBuilderPage() {
@@ -291,7 +302,7 @@ export default function OwnerBuilderPage() {
         } else {
           const starterCategoryId = uid('cat');
           const starterItemId = uid('item');
-          const starter = [
+          const starter: BuilderCategory[] = [
             {
               id: starterCategoryId,
               name: 'Featured',
@@ -304,7 +315,7 @@ export default function OwnerBuilderPage() {
                   base_price: '12',
                   description: 'Tap to edit this item.',
                   image_url: '',
-                  availability: 'available' as const,
+                  availability: 'available',
                   option_groups: [],
                 },
               ],
@@ -338,7 +349,8 @@ export default function OwnerBuilderPage() {
         .eq('restaurant_id', currentRestaurantId)
         .order('sort_order', { ascending: true });
 
-      const itemIds = ((itemData || []) as ItemRow[]).map((item) => item.id);
+      const itemRows = (itemData || []) as ItemRow[];
+      const itemIds = itemRows.map((item) => item.id);
 
       let groupData: OptionGroupRow[] = [];
       let choiceData: OptionChoiceRow[] = [];
@@ -367,48 +379,50 @@ export default function OwnerBuilderPage() {
 
       if (!activeState) return;
 
-      const mappedCategories = ((categoryData || []) as CategoryRow[]).map((category, categoryIndex) => {
-        const categoryItems = ((itemData || []) as ItemRow[])
-          .filter((item) => item.category_id === category.id)
-          .map((item) => {
-            const groups = groupData
-              .filter((group) => group.item_id === item.id)
-              .map((group) => ({
-                id: group.id,
-                name: group.name || 'Options',
-                presetType: 'custom' as const,
-                required: !!group.is_required,
-                selection:
-                  group.selection_mode === 'multiple' || group.is_multiple ? 'multiple' : 'single',
-                options: choiceData
-                  .filter((choice) => choice.option_group_id === group.id)
-                  .map((choice) => ({
-                    id: choice.id,
-                    name: choice.name || 'Option',
-                    price: String(choice.price_delta ?? choice.price ?? 0),
-                  })),
-              }));
+      const mappedCategories: BuilderCategory[] = ((categoryData || []) as CategoryRow[]).map(
+        (category, categoryIndex): BuilderCategory => {
+          const categoryItems: BuilderItem[] = itemRows
+            .filter((item) => item.category_id === category.id)
+            .map((item): BuilderItem => {
+              const groups: BuilderOptionGroup[] = groupData
+                .filter((group) => group.item_id === item.id)
+                .map((group): BuilderOptionGroup => ({
+                  id: group.id,
+                  name: group.name || 'Options',
+                  presetType: 'custom',
+                  required: !!group.is_required,
+                  selection: normalizeSelectionMode(group),
+                  options: choiceData
+                    .filter((choice) => choice.option_group_id === group.id)
+                    .map(
+                      (choice): BuilderOption => ({
+                        id: choice.id,
+                        name: choice.name || 'Option',
+                        price: String(choice.price_delta ?? choice.price ?? 0),
+                      })
+                    ),
+                }));
 
-            return {
-              id: item.id,
-              category_id: category.id,
-              name: item.name || '',
-              base_price: String(item.base_price ?? item.price ?? 0),
-              description: item.description || '',
-              image_url: item.image_url || '',
-              availability:
-                item.availability === 'sold_out' || item.is_available === false ? 'sold_out' : 'available',
-              option_groups: groups,
-            };
-          });
+              return {
+                id: item.id,
+                category_id: category.id,
+                name: item.name || '',
+                base_price: String(item.base_price ?? item.price ?? 0),
+                description: item.description || '',
+                image_url: item.image_url || '',
+                availability: normalizeAvailability(item),
+                option_groups: groups,
+              };
+            });
 
-        return {
-          id: category.id,
-          name: category.name || `Category ${categoryIndex + 1}`,
-          sort_order: category.sort_order ?? categoryIndex,
-          items: categoryItems,
-        };
-      });
+          return {
+            id: category.id,
+            name: category.name || `Category ${categoryIndex + 1}`,
+            sort_order: category.sort_order ?? categoryIndex,
+            items: categoryItems,
+          };
+        }
+      );
 
       if (mappedCategories.length) {
         setCategories(mappedCategories);
@@ -421,7 +435,7 @@ export default function OwnerBuilderPage() {
       } else {
         const starterCategoryId = uid('cat');
         const starterItemId = uid('item');
-        const starter = [
+        const starter: BuilderCategory[] = [
           {
             id: starterCategoryId,
             name: 'Featured',
@@ -434,7 +448,7 @@ export default function OwnerBuilderPage() {
                 base_price: '12',
                 description: 'Tap to edit this item.',
                 image_url: '',
-                availability: 'available' as const,
+                availability: 'available',
                 option_groups: [],
               },
             ],
@@ -856,10 +870,9 @@ export default function OwnerBuilderPage() {
         sort_order: categoryIndex,
       }));
 
-      const categoryIds = allCategories.map((category) => category.id);
+      await supabase.from('menu_categories').delete().eq('restaurant_id', currentRestaurantId);
 
-      if (categoryIds.length) {
-        await supabase.from('menu_categories').delete().eq('restaurant_id', currentRestaurantId);
+      if (allCategories.length) {
         const { error: categoryInsertError } = await supabase
           .from('menu_categories')
           .insert(allCategories);
