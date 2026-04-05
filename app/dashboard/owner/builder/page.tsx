@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type ThemeMode = 'light' | 'dark';
-type OrderLanguage = 'EN' | 'ES';
 type StorefrontLanguage = 'en' | 'es';
+type BuilderLanguage = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
 
 type RestaurantRow = {
@@ -102,6 +102,297 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
+type CopyBlock = {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  openStore: string;
+  saveBuilder: string;
+  saving: string;
+  storeSetup: string;
+  storeName: string;
+  slug: string;
+  liveUrl: string;
+  phone: string;
+  address: string;
+  uploadHeroImage: string;
+  uploadLogo: string;
+  heroPreview: string;
+  logoPreview: string;
+  builderLanguage: string;
+  storefrontTheme: string;
+  storefrontLanguage: string;
+  english: string;
+  spanish: string;
+  light: string;
+  dark: string;
+  pickupDeliveryControls: string;
+  pickupOn: string;
+  pickupOff: string;
+  deliveryOn: string;
+  deliveryOff: string;
+  deliveryFee: string;
+  deliveryRadius: string;
+  deliveryMinimum: string;
+  categoryBuilder: string;
+  addCategory: string;
+  categoryName: string;
+  delete: string;
+  untitledCategory: string;
+  itemsIn: string;
+  addItem: string;
+  available: string;
+  soldOut: string;
+  itemBuilder: string;
+  deleteItem: string;
+  uploadItemImage: string;
+  itemPreview: string;
+  itemName: string;
+  basePrice: string;
+  description: string;
+  describeItem: string;
+  availability: string;
+  optionGroups: string;
+  protein: string;
+  size: string;
+  drink: string;
+  extras: string;
+  removals: string;
+  custom: string;
+  noOptionGroups: string;
+  groupName: string;
+  required: string;
+  optional: string;
+  singleChoice: string;
+  multipleChoice: string;
+  choiceName: string;
+  addChoice: string;
+  newItem: string;
+  sampleItem: string;
+  sampleDescription: string;
+  customOptions: string;
+  livePreview: string;
+  imageOnlyMainGrid: string;
+  storefrontPreview: string;
+  category: string;
+  itemNameFallback: string;
+  itemDetailsPlaceholder: string;
+  builderSaved: string;
+  loadingBuilder: string;
+  couldNotLoad: string;
+  couldNotSave: string;
+  couldNotUploadHero: string;
+  couldNotUploadLogo: string;
+  couldNotUploadItem: string;
+  newChoice: string;
+  options: string;
+  heroInfoBlock: string;
+  placeholderError: string;
+};
+
+const COPY: Record<BuilderLanguage, CopyBlock> = {
+  en: {
+    eyebrow: 'MENUFLOW BUILDER',
+    title: 'Build Your Store',
+    subtitle: 'Upload branding, set delivery rules, build categories and items, then save.',
+    openStore: 'Open Store',
+    saveBuilder: 'Save Builder',
+    saving: 'Saving...',
+    storeSetup: 'Store Setup',
+    storeName: 'Store Name',
+    slug: 'Slug',
+    liveUrl: 'Live URL',
+    phone: 'Phone',
+    address: 'Address',
+    uploadHeroImage: 'Upload Hero Image',
+    uploadLogo: 'Upload Logo',
+    heroPreview: 'Hero Preview',
+    logoPreview: 'Logo Preview',
+    builderLanguage: 'Builder Language',
+    storefrontTheme: 'Storefront Theme',
+    storefrontLanguage: 'Storefront Language',
+    english: 'English',
+    spanish: 'Spanish',
+    light: 'Light',
+    dark: 'Dark',
+    pickupDeliveryControls: 'Pickup / Delivery Controls',
+    pickupOn: 'Pickup On',
+    pickupOff: 'Pickup Off',
+    deliveryOn: 'Delivery On',
+    deliveryOff: 'Delivery Off',
+    deliveryFee: 'Delivery Fee',
+    deliveryRadius: 'Delivery Radius',
+    deliveryMinimum: 'Delivery Minimum',
+    categoryBuilder: 'Category Builder',
+    addCategory: 'Add Category',
+    categoryName: 'Category Name',
+    delete: 'Delete',
+    untitledCategory: 'Untitled Category',
+    itemsIn: 'Items in',
+    addItem: 'Add Item',
+    available: 'Available',
+    soldOut: 'Sold Out',
+    itemBuilder: 'Item Builder',
+    deleteItem: 'Delete Item',
+    uploadItemImage: 'Upload Item Image',
+    itemPreview: 'Item Preview',
+    itemName: 'Item Name',
+    basePrice: 'Base Price',
+    description: 'Description',
+    describeItem: 'Describe the item...',
+    availability: 'Availability',
+    optionGroups: 'Option Groups',
+    protein: 'Protein',
+    size: 'Size',
+    drink: 'Drink',
+    extras: 'Extras',
+    removals: 'Removals',
+    custom: 'Custom',
+    noOptionGroups: 'No option groups yet.',
+    groupName: 'Group Name',
+    required: 'Required',
+    optional: 'Optional',
+    singleChoice: 'Single Choice',
+    multipleChoice: 'Multiple Choice',
+    choiceName: 'Choice Name',
+    addChoice: 'Add Choice',
+    newItem: 'New Item',
+    sampleItem: 'Sample Item',
+    sampleDescription: 'Tap to edit this item.',
+    customOptions: 'Custom Options',
+    livePreview: 'Live Preview',
+    imageOnlyMainGrid: 'IMAGE-ONLY MAIN GRID',
+    storefrontPreview: 'Storefront Preview',
+    category: 'Category',
+    itemNameFallback: 'Item Name',
+    itemDetailsPlaceholder: 'Item details will show here in the popup preview.',
+    builderSaved: 'Builder saved.',
+    loadingBuilder: 'Loading builder...',
+    couldNotLoad: 'Could not load builder.',
+    couldNotSave: 'Could not save builder.',
+    couldNotUploadHero: 'Could not upload hero image.',
+    couldNotUploadLogo: 'Could not upload logo image.',
+    couldNotUploadItem: 'Could not upload item image.',
+    newChoice: 'New Choice',
+    options: 'Options',
+    heroInfoBlock: 'Store Info',
+    placeholderError: 'Could not load placeholder images.',
+  },
+  es: {
+    eyebrow: 'CONSTRUCTOR MENUFLOW',
+    title: 'Construye Tu Tienda',
+    subtitle: 'Sube tu branding, configura entrega, crea categorías y productos, y guarda.',
+    openStore: 'Abrir Tienda',
+    saveBuilder: 'Guardar Constructor',
+    saving: 'Guardando...',
+    storeSetup: 'Configuración de Tienda',
+    storeName: 'Nombre del Negocio',
+    slug: 'Slug',
+    liveUrl: 'URL en vivo',
+    phone: 'Teléfono',
+    address: 'Dirección',
+    uploadHeroImage: 'Subir Imagen Hero',
+    uploadLogo: 'Subir Logo',
+    heroPreview: 'Vista previa hero',
+    logoPreview: 'Vista previa logo',
+    builderLanguage: 'Idioma del Constructor',
+    storefrontTheme: 'Tema de la Tienda',
+    storefrontLanguage: 'Idioma de la Tienda',
+    english: 'Inglés',
+    spanish: 'Español',
+    light: 'Claro',
+    dark: 'Oscuro',
+    pickupDeliveryControls: 'Controles de Recogida / Entrega',
+    pickupOn: 'Recogida Activada',
+    pickupOff: 'Recogida Desactivada',
+    deliveryOn: 'Entrega Activada',
+    deliveryOff: 'Entrega Desactivada',
+    deliveryFee: 'Costo de Entrega',
+    deliveryRadius: 'Radio de Entrega',
+    deliveryMinimum: 'Mínimo de Entrega',
+    categoryBuilder: 'Constructor de Categorías',
+    addCategory: 'Agregar Categoría',
+    categoryName: 'Nombre de Categoría',
+    delete: 'Eliminar',
+    untitledCategory: 'Categoría sin nombre',
+    itemsIn: 'Productos en',
+    addItem: 'Agregar Producto',
+    available: 'Disponible',
+    soldOut: 'Agotado',
+    itemBuilder: 'Constructor de Producto',
+    deleteItem: 'Eliminar Producto',
+    uploadItemImage: 'Subir Imagen del Producto',
+    itemPreview: 'Vista previa del producto',
+    itemName: 'Nombre del Producto',
+    basePrice: 'Precio Base',
+    description: 'Descripción',
+    describeItem: 'Describe el producto...',
+    availability: 'Disponibilidad',
+    optionGroups: 'Grupos de Opciones',
+    protein: 'Proteína',
+    size: 'Tamaño',
+    drink: 'Bebida',
+    extras: 'Extras',
+    removals: 'Quitar',
+    custom: 'Personalizado',
+    noOptionGroups: 'Todavía no hay grupos de opciones.',
+    groupName: 'Nombre del Grupo',
+    required: 'Requerido',
+    optional: 'Opcional',
+    singleChoice: 'Una Opción',
+    multipleChoice: 'Múltiples Opciones',
+    choiceName: 'Nombre de Opción',
+    addChoice: 'Agregar Opción',
+    newItem: 'Nuevo Producto',
+    sampleItem: 'Producto de Ejemplo',
+    sampleDescription: 'Toca para editar este producto.',
+    customOptions: 'Opciones Personalizadas',
+    livePreview: 'Vista en Vivo',
+    imageOnlyMainGrid: 'CUADRÍCULA SOLO IMÁGENES',
+    storefrontPreview: 'Vista previa de la tienda',
+    category: 'Categoría',
+    itemNameFallback: 'Nombre del producto',
+    itemDetailsPlaceholder: 'Los detalles del producto aparecerán aquí en la vista previa.',
+    builderSaved: 'Constructor guardado.',
+    loadingBuilder: 'Cargando constructor...',
+    couldNotLoad: 'No se pudo cargar el constructor.',
+    couldNotSave: 'No se pudo guardar el constructor.',
+    couldNotUploadHero: 'No se pudo subir la imagen hero.',
+    couldNotUploadLogo: 'No se pudo subir el logo.',
+    couldNotUploadItem: 'No se pudo subir la imagen del producto.',
+    newChoice: 'Nueva Opción',
+    options: 'Opciones',
+    heroInfoBlock: 'Información de Tienda',
+    placeholderError: 'No se pudieron cargar imágenes de relleno.',
+  },
+};
+
+const PLACEHOLDER_BUCKET = 'menu-images';
+
+const CATEGORY_FOLDER_MAP: Record<string, string> = {
+  bbq: 'bbq',
+  breakfast: 'breakfast',
+  combo: 'combos',
+  combos: 'combos',
+  dessert: 'desserts',
+  desserts: 'desserts',
+  drink: 'drinks',
+  drinks: 'drinks',
+  hero: 'hero',
+  logo: 'logo',
+  mexican: 'mexican',
+  pasta: 'pasta',
+  sandwich: 'sandwiches',
+  sandwiches: 'sandwiches',
+  seafood: 'seafood',
+  side: 'sides',
+  sides: 'sides',
+  single: 'singles',
+  singles: 'singles',
+  wing: 'wings',
+  wings: 'wings',
+};
+
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -185,6 +476,27 @@ function normalizeSelectionMode(group: OptionGroupRow): 'single' | 'multiple' {
   return 'single';
 }
 
+function normalizeCategoryNameToFolder(name: string | null | undefined) {
+  const normalized = (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return CATEGORY_FOLDER_MAP[normalized] || CATEGORY_FOLDER_MAP[normalized.replace(/s$/, '')] || null;
+}
+
+function pickDeterministicImage(urls: string[], seed: string) {
+  if (!urls.length) return '';
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return urls[hash % urls.length];
+}
+
 export default function OwnerBuilderPage() {
   const router = useRouter();
 
@@ -200,6 +512,8 @@ export default function OwnerBuilderPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [builderLanguage, setBuilderLanguage] = useState<BuilderLanguage>('en');
+
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [phone, setPhone] = useState('');
@@ -207,7 +521,6 @@ export default function OwnerBuilderPage() {
   const [heroImage, setHeroImage] = useState('');
   const [logoImage, setLogoImage] = useState('');
   const [theme, setTheme] = useState<ThemeMode>('light');
-  const [orderLanguage, setOrderLanguage] = useState<OrderLanguage>('EN');
   const [storefrontLanguage, setStorefrontLanguage] = useState<StorefrontLanguage>('en');
 
   const [pickupEnabled, setPickupEnabled] = useState(true);
@@ -220,6 +533,78 @@ export default function OwnerBuilderPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [previewItemId, setPreviewItemId] = useState<string>('');
+  const [placeholderMap, setPlaceholderMap] = useState<Record<string, string[]>>({});
+
+  const copy = COPY[builderLanguage];
+
+  useEffect(() => {
+    const stored =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem('menuflow_builder_language')
+        : null;
+
+    if (stored === 'en' || stored === 'es') {
+      setBuilderLanguage(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('menuflow_builder_language', builderLanguage);
+    }
+  }, [builderLanguage]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPlaceholderMap() {
+      try {
+        const folders = Array.from(new Set(Object.values(CATEGORY_FOLDER_MAP)));
+        const results = await Promise.all(
+          folders.map(async (folder) => {
+            const { data, error: listError } = await supabase.storage
+              .from(PLACEHOLDER_BUCKET)
+              .list(folder, {
+                limit: 100,
+                sortBy: { column: 'name', order: 'asc' },
+              });
+
+            if (listError) {
+              return [folder, []] as const;
+            }
+
+            const urls =
+              (data || [])
+                .filter((file) => file.name && !file.name.startsWith('.'))
+                .map((file) => {
+                  const { data: publicUrlData } = supabase.storage
+                    .from(PLACEHOLDER_BUCKET)
+                    .getPublicUrl(`${folder}/${file.name}`);
+                  return publicUrlData.publicUrl;
+                }) || [];
+
+            return [folder, urls] as const;
+          })
+        );
+
+        if (!active) return;
+
+        const nextMap: Record<string, string[]> = {};
+        for (const [folder, urls] of results) {
+          nextMap[folder] = urls;
+        }
+        setPlaceholderMap(nextMap);
+      } catch {
+        if (!active) return;
+      }
+    }
+
+    void loadPlaceholderMap();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -245,26 +630,24 @@ export default function OwnerBuilderPage() {
 
         const { data: restaurant, error: restaurantError } = await supabase
           .from('restaurants')
-          .select(
-            `
-              id,
-              owner_id,
-              name,
-              slug,
-              phone,
-              address,
-              hero_image,
-              logo_image,
-              storefront_theme,
-              order_language,
-              storefront_language,
-              pickup_enabled,
-              delivery_enabled,
-              delivery_fee,
-              delivery_radius,
-              delivery_minimum
-            `
-          )
+          .select(`
+            id,
+            owner_id,
+            name,
+            slug,
+            phone,
+            address,
+            hero_image,
+            logo_image,
+            storefront_theme,
+            order_language,
+            storefront_language,
+            pickup_enabled,
+            delivery_enabled,
+            delivery_fee,
+            delivery_radius,
+            delivery_minimum
+          `)
           .eq('owner_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -286,10 +669,12 @@ export default function OwnerBuilderPage() {
           setHeroImage(row.hero_image || '');
           setLogoImage(row.logo_image || '');
           setTheme((row.storefront_theme as ThemeMode) || 'light');
-          setOrderLanguage(
-            (row.order_language || 'EN').toString().toUpperCase() === 'ES' ? 'ES' : 'EN'
-          );
           setStorefrontLanguage((row.storefront_language || 'en') === 'es' ? 'es' : 'en');
+
+          const inferredBuilderLanguage =
+            (row.order_language || 'EN').toString().toUpperCase() === 'ES' ? 'es' : 'en';
+          setBuilderLanguage(inferredBuilderLanguage);
+
           setPickupEnabled(row.pickup_enabled ?? true);
           setDeliveryEnabled(row.delivery_enabled ?? false);
           setDeliveryFee(String(row.delivery_fee ?? 0));
@@ -311,9 +696,9 @@ export default function OwnerBuilderPage() {
                 {
                   id: starterItemId,
                   category_id: starterCategoryId,
-                  name: 'Sample Item',
+                  name: COPY.en.sampleItem,
                   base_price: '12',
-                  description: 'Tap to edit this item.',
+                  description: COPY.en.sampleDescription,
                   image_url: '',
                   availability: 'available',
                   option_groups: [],
@@ -328,7 +713,7 @@ export default function OwnerBuilderPage() {
         }
       } catch (err: any) {
         if (!active) return;
-        setError(err?.message || 'Could not load builder.');
+        setError(err?.message || COPY[builderLanguage].couldNotLoad);
       } finally {
         if (active) setLoading(false);
       }
@@ -388,7 +773,7 @@ export default function OwnerBuilderPage() {
                 .filter((group) => group.item_id === item.id)
                 .map((group): BuilderOptionGroup => ({
                   id: group.id,
-                  name: group.name || 'Options',
+                  name: group.name || COPY[builderLanguage].options,
                   presetType: 'custom',
                   required: !!group.is_required,
                   selection: normalizeSelectionMode(group),
@@ -397,7 +782,7 @@ export default function OwnerBuilderPage() {
                     .map(
                       (choice): BuilderOption => ({
                         id: choice.id,
-                        name: choice.name || 'Option',
+                        name: choice.name || COPY[builderLanguage].newChoice,
                         price: String(choice.price_delta ?? choice.price ?? 0),
                       })
                     ),
@@ -417,7 +802,7 @@ export default function OwnerBuilderPage() {
 
           return {
             id: category.id,
-            name: category.name || `Category ${categoryIndex + 1}`,
+            name: category.name || `${COPY[builderLanguage].category} ${categoryIndex + 1}`,
             sort_order: category.sort_order ?? categoryIndex,
             items: categoryItems,
           };
@@ -444,9 +829,9 @@ export default function OwnerBuilderPage() {
               {
                 id: starterItemId,
                 category_id: starterCategoryId,
-                name: 'Sample Item',
+                name: COPY[builderLanguage].sampleItem,
                 base_price: '12',
-                description: 'Tap to edit this item.',
+                description: COPY[builderLanguage].sampleDescription,
                 image_url: '',
                 availability: 'available',
                 option_groups: [],
@@ -466,11 +851,29 @@ export default function OwnerBuilderPage() {
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [router, builderLanguage]);
 
   const normalizedSlug = useMemo(() => slugify(slug), [slug]);
 
   const previewLink = normalizedSlug ? `/store/${normalizedSlug}` : '/store/demo';
+
+  function getCategoryNameById(categoryId: string) {
+    return categories.find((category) => category.id === categoryId)?.name || '';
+  }
+
+  function getPlaceholderForItem(item: BuilderItem) {
+    const categoryName = getCategoryNameById(item.category_id);
+    const folder = normalizeCategoryNameToFolder(categoryName);
+    if (!folder) return '';
+    const urls = placeholderMap[folder] || [];
+    return pickDeterministicImage(urls, item.id || item.name || folder);
+  }
+
+  function getResolvedItemImage(item: BuilderItem | null) {
+    if (!item) return '';
+    if (item.image_url?.trim()) return item.image_url;
+    return getPlaceholderForItem(item);
+  }
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) || categories[0] || null,
@@ -514,7 +917,7 @@ export default function OwnerBuilderPage() {
       const url = await uploadToBucket(file, 'heroes');
       setHeroImage(url);
     } catch (err: any) {
-      setError(err?.message || 'Could not upload hero image.');
+      setError(err?.message || copy.couldNotUploadHero);
     } finally {
       setUploadingHero(false);
     }
@@ -529,7 +932,7 @@ export default function OwnerBuilderPage() {
       const url = await uploadToBucket(file, 'logos');
       setLogoImage(url);
     } catch (err: any) {
-      setError(err?.message || 'Could not upload logo image.');
+      setError(err?.message || copy.couldNotUploadLogo);
     } finally {
       setUploadingLogo(false);
     }
@@ -552,7 +955,7 @@ export default function OwnerBuilderPage() {
         }))
       );
     } catch (err: any) {
-      setError(err?.message || 'Could not upload item image.');
+      setError(err?.message || copy.couldNotUploadItem);
     } finally {
       setUploadingItemId(null);
     }
@@ -564,13 +967,13 @@ export default function OwnerBuilderPage() {
 
     const newCategory: BuilderCategory = {
       id: newCategoryId,
-      name: `Category ${categories.length + 1}`,
+      name: `${copy.category} ${categories.length + 1}`,
       sort_order: categories.length,
       items: [
         {
           id: newItemId,
           category_id: newCategoryId,
-          name: 'New Item',
+          name: copy.newItem,
           base_price: '0',
           description: '',
           image_url: '',
@@ -616,7 +1019,7 @@ export default function OwnerBuilderPage() {
                 {
                   id: itemId,
                   category_id: categoryId,
-                  name: 'New Item',
+                  name: copy.newItem,
                   base_price: '0',
                   description: '',
                   image_url: '',
@@ -670,12 +1073,18 @@ export default function OwnerBuilderPage() {
     const groupId = uid('group');
     const optionSeed = getPresetOptions(presetType);
 
+    const presetMap: Record<BuilderOptionGroup['presetType'], string> = {
+      protein: copy.protein,
+      size: copy.size,
+      drink: copy.drink,
+      extras: copy.extras,
+      removals: copy.removals,
+      custom: copy.customOptions,
+    };
+
     const group: BuilderOptionGroup = {
       id: groupId,
-      name:
-        presetType === 'custom'
-          ? 'Custom Options'
-          : presetType.charAt(0).toUpperCase() + presetType.slice(1),
+      name: presetMap[presetType],
       presetType,
       required: false,
       selection: presetType === 'extras' || presetType === 'removals' ? 'multiple' : 'single',
@@ -750,7 +1159,7 @@ export default function OwnerBuilderPage() {
                   group.id === groupId
                     ? {
                         ...group,
-                        options: [...group.options, { id: optionId, name: 'New Choice', price: '0' }],
+                        options: [...group.options, { id: optionId, name: copy.newChoice, price: '0' }],
                       }
                     : group
                 ),
@@ -831,8 +1240,8 @@ export default function OwnerBuilderPage() {
         hero_image: heroImage.trim() || null,
         logo_image: logoImage.trim() || null,
         storefront_theme: theme,
-        order_language: orderLanguage,
         storefront_language: storefrontLanguage,
+        order_language: builderLanguage === 'es' ? 'ES' : 'EN',
         pickup_enabled: pickupEnabled,
         delivery_enabled: deliveryEnabled,
         delivery_fee: Number(deliveryFee || 0),
@@ -866,7 +1275,7 @@ export default function OwnerBuilderPage() {
       const allCategories = categories.map((category, categoryIndex) => ({
         id: category.id,
         restaurant_id: currentRestaurantId,
-        name: category.name.trim() || `Category ${categoryIndex + 1}`,
+        name: category.name.trim() || `${copy.category} ${categoryIndex + 1}`,
         sort_order: categoryIndex,
       }));
 
@@ -880,19 +1289,22 @@ export default function OwnerBuilderPage() {
       }
 
       const allItems = categories.flatMap((category, categoryIndex) =>
-        category.items.map((item, itemIndex) => ({
-          id: item.id,
-          restaurant_id: currentRestaurantId,
-          category_id: category.id,
-          name: item.name.trim() || 'Untitled Item',
-          base_price: Number(item.base_price || 0),
-          price: Number(item.base_price || 0),
-          description: item.description.trim() || null,
-          image_url: item.image_url || null,
-          availability: item.availability,
-          is_available: item.availability === 'available',
-          sort_order: itemIndex + categoryIndex * 100,
-        }))
+        category.items.map((item, itemIndex) => {
+          const fallbackImage = getResolvedItemImage(item);
+          return {
+            id: item.id,
+            restaurant_id: currentRestaurantId,
+            category_id: category.id,
+            name: item.name.trim() || copy.itemNameFallback,
+            base_price: Number(item.base_price || 0),
+            price: Number(item.base_price || 0),
+            description: item.description.trim() || null,
+            image_url: fallbackImage || null,
+            availability: item.availability,
+            is_available: item.availability === 'available',
+            sort_order: itemIndex + categoryIndex * 100,
+          };
+        })
       );
 
       await supabase.from('menu_items').delete().eq('restaurant_id', currentRestaurantId);
@@ -907,7 +1319,7 @@ export default function OwnerBuilderPage() {
           item.option_groups.map((group, groupIndex) => ({
             id: group.id,
             item_id: item.id,
-            name: group.name.trim() || 'Options',
+            name: group.name.trim() || copy.options,
             is_required: group.required,
             is_multiple: group.selection === 'multiple',
             selection_mode: group.selection,
@@ -941,7 +1353,7 @@ export default function OwnerBuilderPage() {
             group.options.map((option, optionIndex) => ({
               id: option.id,
               option_group_id: group.id,
-              name: option.name.trim() || 'Choice',
+              name: option.name.trim() || copy.newChoice,
               price: Number(option.price || 0),
               price_delta: Number(option.price || 0),
               sort_order: optionIndex,
@@ -957,9 +1369,9 @@ export default function OwnerBuilderPage() {
         if (choiceInsertError) throw choiceInsertError;
       }
 
-      setSuccess('Builder saved.');
+      setSuccess(copy.builderSaved);
     } catch (err: any) {
-      setError(err?.message || 'Could not save builder.');
+      setError(err?.message || copy.couldNotSave);
     } finally {
       setSaving(false);
     }
@@ -969,27 +1381,28 @@ export default function OwnerBuilderPage() {
     return (
       <main className="page">
         <section className="shell">
-          <div className="eyebrow">MenuFlow Builder</div>
-          <h1>Loading builder...</h1>
+          <div className="eyebrow">{copy.eyebrow}</div>
+          <h1>{copy.loadingBuilder}</h1>
 
           <style jsx>{`
             .page {
               min-height: 100vh;
-              background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+              background: #f3f3f0;
               padding: 24px;
-              font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                'Segoe UI', sans-serif;
             }
             .shell {
-              max-width: 1320px;
+              max-width: 1420px;
               margin: 0 auto;
-              background: #fff;
-              border: 1px solid rgba(15, 23, 42, 0.08);
-              border-radius: 32px;
+              background: #f9f9f6;
+              border: 1px solid rgba(14, 23, 43, 0.08);
+              border-radius: 36px;
               padding: 28px;
               box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
             }
             .eyebrow {
-              color: #718096;
+              color: #7d8596;
               font-size: 13px;
               font-weight: 900;
               text-transform: uppercase;
@@ -998,9 +1411,9 @@ export default function OwnerBuilderPage() {
             }
             h1 {
               margin: 0;
-              color: #0f172a;
+              color: #0e1730;
               font-size: clamp(34px, 6vw, 60px);
-              line-height: 0.94;
+              line-height: 0.96;
               letter-spacing: -0.05em;
               font-weight: 900;
             }
@@ -1014,18 +1427,36 @@ export default function OwnerBuilderPage() {
     <main className="page">
       <section className="shell">
         <div className="topRow">
-          <div>
-            <div className="eyebrow">MenuFlow Builder</div>
-            <h1>Build Your Store</h1>
-            <p>Upload branding, set delivery rules, build categories and items, then save.</p>
+          <div className="heroCopyCard">
+            <div className="eyebrow">{copy.eyebrow}</div>
+            <h1>{copy.title}</h1>
+            <p>{copy.subtitle}</p>
           </div>
 
           <div className="topActions">
+            <div className="languageSwitch">
+              <button
+                type="button"
+                className={builderLanguage === 'en' ? 'langButton langButtonActive' : 'langButton'}
+                onClick={() => setBuilderLanguage('en')}
+              >
+                EN
+              </button>
+              <button
+                type="button"
+                className={builderLanguage === 'es' ? 'langButton langButtonActive' : 'langButton'}
+                onClick={() => setBuilderLanguage('es')}
+              >
+                ES
+              </button>
+            </div>
+
             <Link href={previewLink} className="ghostButton" target="_blank">
-              Open Store
+              {copy.openStore}
             </Link>
+
             <button type="button" className="primaryButton" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Builder'}
+              {saving ? copy.saving : copy.saveBuilder}
             </button>
           </div>
         </div>
@@ -1036,11 +1467,11 @@ export default function OwnerBuilderPage() {
         <div className="grid">
           <section className="leftColumn">
             <section className="panel">
-              <div className="panelTitle">Store Setup</div>
+              <div className="panelTitle">{copy.storeSetup}</div>
 
               <div className="fieldGrid">
                 <label className="field">
-                  <span className="label">Store name</span>
+                  <span className="label">{copy.storeName}</span>
                   <input
                     className="input"
                     value={name}
@@ -1050,18 +1481,20 @@ export default function OwnerBuilderPage() {
                 </label>
 
                 <label className="field">
-                  <span className="label">Slug</span>
+                  <span className="label">{copy.slug}</span>
                   <input
                     className="input"
                     value={slug}
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="your-store"
                   />
-                  <span className="helpText">Live URL: /store/{normalizedSlug || 'your-store'}</span>
+                  <span className="helpText">
+                    {copy.liveUrl}: /store/{normalizedSlug || 'your-store'}
+                  </span>
                 </label>
 
                 <label className="field">
-                  <span className="label">Phone</span>
+                  <span className="label">{copy.phone}</span>
                   <input
                     className="input"
                     value={phone}
@@ -1071,7 +1504,7 @@ export default function OwnerBuilderPage() {
                 </label>
 
                 <label className="field">
-                  <span className="label">Address</span>
+                  <span className="label">{copy.address}</span>
                   <input
                     className="input"
                     value={address}
@@ -1080,12 +1513,16 @@ export default function OwnerBuilderPage() {
                   />
                 </label>
               </div>
+            </section>
+
+            <section className="panel">
+              <div className="panelTitle">{copy.uploadHeroImage.replace('Upload ', '').replace('Subir ', '')}</div>
 
               <div className="uploadGrid">
                 <div className="uploadCard">
-                  <div className="uploadTitle">Upload Hero Image</div>
+                  <div className="uploadTitle">{copy.uploadHeroImage}</div>
                   <label className="uploadButton">
-                    {uploadingHero ? 'Uploading...' : 'Upload Hero Image'}
+                    {uploadingHero ? copy.saving : copy.uploadHeroImage}
                     <input
                       type="file"
                       accept="image/*"
@@ -1095,13 +1532,17 @@ export default function OwnerBuilderPage() {
                       }}
                     />
                   </label>
-                  {heroImage ? <img src={heroImage} alt="Hero" className="thumbImage" /> : <div className="thumbPlaceholder">Hero Preview</div>}
+                  {heroImage ? (
+                    <img src={heroImage} alt="Hero" className="thumbImage" />
+                  ) : (
+                    <div className="thumbPlaceholder">{copy.heroPreview}</div>
+                  )}
                 </div>
 
                 <div className="uploadCard">
-                  <div className="uploadTitle">Upload Logo</div>
+                  <div className="uploadTitle">{copy.uploadLogo}</div>
                   <label className="uploadButton">
-                    {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                    {uploadingLogo ? copy.saving : copy.uploadLogo}
                     <input
                       type="file"
                       accept="image/*"
@@ -1111,64 +1552,72 @@ export default function OwnerBuilderPage() {
                       }}
                     />
                   </label>
-                  {logoImage ? <img src={logoImage} alt="Logo" className="thumbImage logoThumb" /> : <div className="thumbPlaceholder">Logo Preview</div>}
+                  {logoImage ? (
+                    <img src={logoImage} alt="Logo" className="thumbImage logoThumb" />
+                  ) : (
+                    <div className="thumbPlaceholder">{copy.logoPreview}</div>
+                  )}
                 </div>
               </div>
+            </section>
 
-              <div className="toggleRowWrap">
-                <div className="toggleBlock">
-                  <div className="label">Storefront theme</div>
-                  <div className="themeRow">
+            <section className="panel">
+              <div className="panelTitle">{copy.builderLanguage}</div>
+
+              <div className="controlStack">
+                <div className="controlBlock">
+                  <div className="label">{copy.builderLanguage}</div>
+                  <div className="toggleRow">
                     <button
                       type="button"
-                      className={theme === 'light' ? 'themeButton activeTheme' : 'themeButton'}
+                      className={builderLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
+                      onClick={() => setBuilderLanguage('en')}
+                    >
+                      {copy.english}
+                    </button>
+                    <button
+                      type="button"
+                      className={builderLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
+                      onClick={() => setBuilderLanguage('es')}
+                    >
+                      {copy.spanish}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="controlBlock">
+                  <div className="label">{copy.storefrontTheme}</div>
+                  <div className="toggleRow">
+                    <button
+                      type="button"
+                      className={theme === 'light' ? 'toggleButton toggleActive' : 'toggleButton'}
                       onClick={() => setTheme('light')}
                     >
-                      Light
+                      {copy.light}
                     </button>
                     <button
                       type="button"
-                      className={theme === 'dark' ? 'themeButton activeTheme' : 'themeButton'}
+                      className={theme === 'dark' ? 'toggleButton toggleActive' : 'toggleButton'}
                       onClick={() => setTheme('dark')}
                     >
-                      Dark
+                      {copy.dark}
                     </button>
                   </div>
                 </div>
 
-                <div className="toggleBlock">
-                  <div className="label">Order language</div>
-                  <div className="themeRow">
+                <div className="controlBlock">
+                  <div className="label">{copy.storefrontLanguage}</div>
+                  <div className="toggleRow">
                     <button
                       type="button"
-                      className={orderLanguage === 'EN' ? 'themeButton activeTheme' : 'themeButton'}
-                      onClick={() => setOrderLanguage('EN')}
-                    >
-                      English
-                    </button>
-                    <button
-                      type="button"
-                      className={orderLanguage === 'ES' ? 'themeButton activeTheme' : 'themeButton'}
-                      onClick={() => setOrderLanguage('ES')}
-                    >
-                      Spanish
-                    </button>
-                  </div>
-                </div>
-
-                <div className="toggleBlock">
-                  <div className="label">Storefront language</div>
-                  <div className="themeRow">
-                    <button
-                      type="button"
-                      className={storefrontLanguage === 'en' ? 'themeButton activeTheme' : 'themeButton'}
+                      className={storefrontLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
                       onClick={() => setStorefrontLanguage('en')}
                     >
                       EN
                     </button>
                     <button
                       type="button"
-                      className={storefrontLanguage === 'es' ? 'themeButton activeTheme' : 'themeButton'}
+                      className={storefrontLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
                       onClick={() => setStorefrontLanguage('es')}
                     >
                       ES
@@ -1179,29 +1628,29 @@ export default function OwnerBuilderPage() {
             </section>
 
             <section className="panel">
-              <div className="panelTitle">Pickup / Delivery Controls</div>
+              <div className="panelTitle">{copy.pickupDeliveryControls}</div>
 
               <div className="deliveryToggleRow">
                 <button
                   type="button"
-                  className={pickupEnabled ? 'pillToggle activePill' : 'pillToggle'}
+                  className={pickupEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
                   onClick={() => setPickupEnabled((current) => !current)}
                 >
-                  Pickup {pickupEnabled ? 'On' : 'Off'}
+                  {pickupEnabled ? copy.pickupOn : copy.pickupOff}
                 </button>
 
                 <button
                   type="button"
-                  className={deliveryEnabled ? 'pillToggle activePill' : 'pillToggle'}
+                  className={deliveryEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
                   onClick={() => setDeliveryEnabled((current) => !current)}
                 >
-                  Delivery {deliveryEnabled ? 'On' : 'Off'}
+                  {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
                 </button>
               </div>
 
               <div className="fieldGrid threeCols">
                 <label className="field">
-                  <span className="label">Delivery fee</span>
+                  <span className="label">{copy.deliveryFee}</span>
                   <input
                     className="input"
                     value={deliveryFee}
@@ -1211,7 +1660,7 @@ export default function OwnerBuilderPage() {
                 </label>
 
                 <label className="field">
-                  <span className="label">Delivery radius</span>
+                  <span className="label">{copy.deliveryRadius}</span>
                   <input
                     className="input"
                     value={deliveryRadius}
@@ -1221,7 +1670,7 @@ export default function OwnerBuilderPage() {
                 </label>
 
                 <label className="field">
-                  <span className="label">Delivery minimum</span>
+                  <span className="label">{copy.deliveryMinimum}</span>
                   <input
                     className="input"
                     value={deliveryMinimum}
@@ -1234,9 +1683,9 @@ export default function OwnerBuilderPage() {
 
             <section className="panel">
               <div className="panelHeader">
-                <div className="panelTitle noMargin">Category Builder</div>
-                <button type="button" className="smallAction" onClick={addCategory}>
-                  Add Category
+                <div className="panelTitle noMargin">{copy.categoryBuilder}</div>
+                <button type="button" className="primaryButton small" onClick={addCategory}>
+                  {copy.addCategory}
                 </button>
               </div>
 
@@ -1244,7 +1693,11 @@ export default function OwnerBuilderPage() {
                 {categories.map((category) => (
                   <div
                     key={category.id}
-                    className={category.id === selectedCategoryId ? 'categoryCard categoryCardActive' : 'categoryCard'}
+                    className={
+                      category.id === selectedCategoryId
+                        ? 'categoryCard categoryCardActive'
+                        : 'categoryCard'
+                    }
                   >
                     <button
                       type="button"
@@ -1258,7 +1711,7 @@ export default function OwnerBuilderPage() {
                         }
                       }}
                     >
-                      <span>{category.name || 'Untitled Category'}</span>
+                      <span>{category.name || copy.untitledCategory}</span>
                       <span className="categoryCount">{category.items.length}</span>
                     </button>
 
@@ -1267,11 +1720,15 @@ export default function OwnerBuilderPage() {
                         className="input compactInput"
                         value={category.name}
                         onChange={(e) => updateCategory(category.id, e.target.value)}
-                        placeholder="Category name"
+                        placeholder={copy.categoryName}
                       />
 
-                      <button type="button" className="dangerButton" onClick={() => deleteCategory(category.id)}>
-                        Delete
+                      <button
+                        type="button"
+                        className="dangerButton"
+                        onClick={() => deleteCategory(category.id)}
+                      >
+                        {copy.delete}
                       </button>
                     </div>
                   </div>
@@ -1282,36 +1739,58 @@ export default function OwnerBuilderPage() {
             {selectedCategory ? (
               <section className="panel">
                 <div className="panelHeader">
-                  <div className="panelTitle noMargin">Items in {selectedCategory.name || 'Category'}</div>
+                  <div className="panelTitle noMargin">
+                    {copy.itemsIn} {selectedCategory.name || copy.category}
+                  </div>
                   <button
                     type="button"
-                    className="smallAction"
+                    className="primaryButton small"
                     onClick={() => addItem(selectedCategory.id)}
                   >
-                    Add Item
+                    {copy.addItem}
                   </button>
                 </div>
 
-                <div className="itemList">
-                  {selectedCategory.items.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className={item.id === selectedItemId ? 'itemListCard itemListCardActive' : 'itemListCard'}
-                      onClick={() => {
-                        setSelectedItemId(item.id);
-                        setPreviewItemId(item.id);
-                      }}
-                    >
-                      <div>
-                        <div className="itemListName">{item.name || 'Untitled Item'}</div>
-                        <div className="itemListMeta">{money(item.base_price)}</div>
-                      </div>
-                      <div className={item.availability === 'available' ? 'availability availabilityOn' : 'availability availabilityOff'}>
-                        {item.availability === 'available' ? 'Available' : 'Sold Out'}
-                      </div>
-                    </button>
-                  ))}
+                <div className="itemCardGrid">
+                  {selectedCategory.items.map((item) => {
+                    const resolvedImage = getResolvedItemImage(item);
+
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={item.id === selectedItemId ? 'itemVisualCard itemVisualCardActive' : 'itemVisualCard'}
+                        onClick={() => {
+                          setSelectedItemId(item.id);
+                          setPreviewItemId(item.id);
+                        }}
+                      >
+                        <div className="itemVisualImageWrap">
+                          {resolvedImage ? (
+                            <img src={resolvedImage} alt={item.name} className="itemVisualImage" />
+                          ) : (
+                            <div className="itemVisualFallback" />
+                          )}
+                        </div>
+
+                        <div className="itemVisualBody">
+                          <div className="itemVisualTop">
+                            <div className="itemVisualName">{item.name || copy.itemNameFallback}</div>
+                            <div className="itemVisualPrice">{money(item.base_price)}</div>
+                          </div>
+                          <div
+                            className={
+                              item.availability === 'available'
+                                ? 'availability availabilityOn'
+                                : 'availability availabilityOff'
+                            }
+                          >
+                            {item.availability === 'available' ? copy.available : copy.soldOut}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             ) : null}
@@ -1319,21 +1798,21 @@ export default function OwnerBuilderPage() {
             {selectedItem ? (
               <section className="panel">
                 <div className="panelHeader">
-                  <div className="panelTitle noMargin">Item Builder</div>
+                  <div className="panelTitle noMargin">{copy.itemBuilder}</div>
                   <button
                     type="button"
                     className="dangerButton"
                     onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}
                   >
-                    Delete Item
+                    {copy.deleteItem}
                   </button>
                 </div>
 
                 <div className="fieldGrid">
                   <div className="uploadCard fullWidthCard">
-                    <div className="uploadTitle">Upload Item Image</div>
+                    <div className="uploadTitle">{copy.uploadItemImage}</div>
                     <label className="uploadButton">
-                      {uploadingItemId === selectedItem.id ? 'Uploading...' : 'Upload Item Image'}
+                      {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
                       <input
                         type="file"
                         accept="image/*"
@@ -1344,25 +1823,29 @@ export default function OwnerBuilderPage() {
                       />
                     </label>
 
-                    {selectedItem.image_url ? (
-                      <img src={selectedItem.image_url} alt={selectedItem.name} className="thumbImage itemThumb" />
+                    {getResolvedItemImage(selectedItem) ? (
+                      <img
+                        src={getResolvedItemImage(selectedItem)}
+                        alt={selectedItem.name}
+                        className="thumbImage itemThumb"
+                      />
                     ) : (
-                      <div className="thumbPlaceholder itemThumbPlaceholder">Item Preview</div>
+                      <div className="thumbPlaceholder itemThumbPlaceholder">{copy.itemPreview}</div>
                     )}
                   </div>
 
                   <label className="field">
-                    <span className="label">Item name</span>
+                    <span className="label">{copy.itemName}</span>
                     <input
                       className="input"
                       value={selectedItem.name}
                       onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
-                      placeholder="Item name"
+                      placeholder={copy.itemName}
                     />
                   </label>
 
                   <label className="field">
-                    <span className="label">Base price</span>
+                    <span className="label">{copy.basePrice}</span>
                     <input
                       className="input"
                       value={selectedItem.base_price}
@@ -1376,56 +1859,88 @@ export default function OwnerBuilderPage() {
                   </label>
 
                   <label className="field fullWidth">
-                    <span className="label">Description</span>
+                    <span className="label">{copy.description}</span>
                     <textarea
                       className="textarea"
                       value={selectedItem.description}
                       onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
-                      placeholder="Describe the item..."
+                      placeholder={copy.describeItem}
                     />
                   </label>
 
                   <div className="field fullWidth">
-                    <span className="label">Availability</span>
-                    <div className="themeRow">
+                    <span className="label">{copy.availability}</span>
+                    <div className="toggleRow">
                       <button
                         type="button"
-                        className={selectedItem.availability === 'available' ? 'themeButton activeTheme' : 'themeButton'}
+                        className={
+                          selectedItem.availability === 'available'
+                            ? 'toggleButton toggleActive'
+                            : 'toggleButton'
+                        }
                         onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
                       >
-                        Available
+                        {copy.available}
                       </button>
                       <button
                         type="button"
-                        className={selectedItem.availability === 'sold_out' ? 'themeButton activeTheme' : 'themeButton'}
+                        className={
+                          selectedItem.availability === 'sold_out'
+                            ? 'toggleButton toggleActive'
+                            : 'toggleButton'
+                        }
                         onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
                       >
-                        Sold Out
+                        {copy.soldOut}
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <div className="optionGroupHeader">
-                  <div className="panelTitle noMargin">Option Groups</div>
+                  <div className="panelTitle noMargin">{copy.optionGroups}</div>
                   <div className="optionActionWrap">
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
-                      Protein
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'protein')}
+                    >
+                      {copy.protein}
                     </button>
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
-                      Size
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'size')}
+                    >
+                      {copy.size}
                     </button>
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
-                      Drink
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'drink')}
+                    >
+                      {copy.drink}
                     </button>
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
-                      Extras
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'extras')}
+                    >
+                      {copy.extras}
                     </button>
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
-                      Removals
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'removals')}
+                    >
+                      {copy.removals}
                     </button>
-                    <button type="button" className="smallAction" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
-                      Custom
+                    <button
+                      type="button"
+                      className="ghostTiny"
+                      onClick={() => addOptionGroup(selectedItem.id, 'custom')}
+                    >
+                      {copy.custom}
                     </button>
                   </div>
                 </div>
@@ -1441,7 +1956,7 @@ export default function OwnerBuilderPage() {
                             onChange={(e) =>
                               updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })
                             }
-                            placeholder="Group name"
+                            placeholder={copy.groupName}
                           />
 
                           <button
@@ -1449,39 +1964,45 @@ export default function OwnerBuilderPage() {
                             className="dangerButton"
                             onClick={() => deleteOptionGroup(selectedItem.id, group.id)}
                           >
-                            Delete
+                            {copy.delete}
                           </button>
                         </div>
 
                         <div className="optionMetaRow">
                           <button
                             type="button"
-                            className={group.required ? 'pillToggle activePill' : 'pillToggle'}
+                            className={group.required ? 'toggleButton toggleActive' : 'toggleButton'}
                             onClick={() =>
                               updateOptionGroup(selectedItem.id, group.id, { required: !group.required })
                             }
                           >
-                            {group.required ? 'Required' : 'Optional'}
+                            {group.required ? copy.required : copy.optional}
                           </button>
 
                           <button
                             type="button"
-                            className={group.selection === 'single' ? 'pillToggle activePill' : 'pillToggle'}
+                            className={
+                              group.selection === 'single' ? 'toggleButton toggleActive' : 'toggleButton'
+                            }
                             onClick={() =>
                               updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })
                             }
                           >
-                            Single Choice
+                            {copy.singleChoice}
                           </button>
 
                           <button
                             type="button"
-                            className={group.selection === 'multiple' ? 'pillToggle activePill' : 'pillToggle'}
+                            className={
+                              group.selection === 'multiple'
+                                ? 'toggleButton toggleActive'
+                                : 'toggleButton'
+                            }
                             onClick={() =>
                               updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })
                             }
                           >
-                            Multiple Choice
+                            {copy.multipleChoice}
                           </button>
                         </div>
 
@@ -1496,7 +2017,7 @@ export default function OwnerBuilderPage() {
                                     name: e.target.value,
                                   })
                                 }
-                                placeholder="Choice name"
+                                placeholder={copy.choiceName}
                               />
 
                               <input
@@ -1515,7 +2036,7 @@ export default function OwnerBuilderPage() {
                                 className="dangerButton"
                                 onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
                               >
-                                Delete
+                                {copy.delete}
                               </button>
                             </div>
                           ))}
@@ -1523,15 +2044,15 @@ export default function OwnerBuilderPage() {
 
                         <button
                           type="button"
-                          className="smallAction"
+                          className="primaryButton small"
                           onClick={() => addOptionChoice(selectedItem.id, group.id)}
                         >
-                          Add Choice
+                          {copy.addChoice}
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div className="emptyBlock">No option groups yet.</div>
+                    <div className="emptyBlock">{copy.noOptionGroups}</div>
                   )}
                 </div>
               </section>
@@ -1541,8 +2062,8 @@ export default function OwnerBuilderPage() {
           <section className="rightColumn">
             <section className="panel stickyPanel">
               <div className="panelHeader">
-                <div className="panelTitle noMargin">Live Preview</div>
-                <div className="previewStatus">Image-only main grid</div>
+                <div className="panelTitle noMargin">{copy.livePreview}</div>
+                <div className="previewStatus">{copy.imageOnlyMainGrid}</div>
               </div>
 
               <div className={previewThemeClass}>
@@ -1567,17 +2088,37 @@ export default function OwnerBuilderPage() {
 
                       <div>
                         <div className="previewName">{name.trim() || 'Your Store'}</div>
-                        <div className="previewTag">{address.trim() || 'Storefront Preview'}</div>
+                        <div className="previewTag">{copy.storefrontPreview}</div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="previewInfoBand">
+                  <div className="previewInfoTitle">{copy.heroInfoBlock}</div>
+                  <div className="previewInfoGrid">
+                    <div className="previewInfoCell">
+                      <span>{copy.address}</span>
+                      <strong>{address.trim() || '123 Main St'}</strong>
+                    </div>
+                    <div className="previewInfoCell">
+                      <span>{copy.phone}</span>
+                      <strong>{phone.trim() || '3235553355'}</strong>
                     </div>
                   </div>
                 </div>
 
                 <div className="previewContent">
                   <div className="previewTopMeta">
-                    <div className="previewMetaPill">{pickupEnabled ? 'Pickup On' : 'Pickup Off'}</div>
-                    <div className="previewMetaPill">{deliveryEnabled ? 'Delivery On' : 'Delivery Off'}</div>
-                    <div className="previewMetaPill">{theme === 'dark' ? 'Dark Theme' : 'Light Theme'}</div>
+                    <div className="previewMetaPill">
+                      {pickupEnabled ? copy.pickupOn : copy.pickupOff}
+                    </div>
+                    <div className="previewMetaPill">
+                      {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
+                    </div>
+                    <div className="previewMetaPill">
+                      {theme === 'dark' ? copy.dark : copy.light}
+                    </div>
                   </div>
 
                   <div className="previewCategoryTabs">
@@ -1586,30 +2127,36 @@ export default function OwnerBuilderPage() {
                         type="button"
                         key={category.id}
                         className={
-                          category.id === selectedCategoryId ? 'previewCategoryTab previewCategoryTabActive' : 'previewCategoryTab'
+                          category.id === selectedCategoryId
+                            ? 'previewCategoryTab previewCategoryTabActive'
+                            : 'previewCategoryTab'
                         }
                         onClick={() => setSelectedCategoryId(category.id)}
                       >
-                        {category.name || 'Category'}
+                        {category.name || copy.category}
                       </button>
                     ))}
                   </div>
 
                   <div className="previewGrid">
-                    {(selectedCategory?.items || []).map((item) => (
-                      <button
-                        type="button"
-                        key={item.id}
-                        className="previewGridCard"
-                        onClick={() => setPreviewItemId(item.id)}
-                      >
-                        {item.image_url ? (
-                          <img src={item.image_url} alt={item.name} className="previewGridImage" />
-                        ) : (
-                          <div className="previewGridFallback" />
-                        )}
-                      </button>
-                    ))}
+                    {(selectedCategory?.items || []).map((item) => {
+                      const resolvedImage = getResolvedItemImage(item);
+
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={item.id === previewItemId ? 'previewGridCard previewGridCardActive' : 'previewGridCard'}
+                          onClick={() => setPreviewItemId(item.id)}
+                        >
+                          {resolvedImage ? (
+                            <img src={resolvedImage} alt={item.name} className="previewGridImage" />
+                          ) : (
+                            <div className="previewGridFallback" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1617,18 +2164,27 @@ export default function OwnerBuilderPage() {
               {previewItem ? (
                 <div className="previewPopup">
                   <div className="previewPopupImageWrap">
-                    {previewItem.image_url ? (
-                      <img src={previewItem.image_url} alt={previewItem.name} className="previewPopupImage" />
+                    {getResolvedItemImage(previewItem) ? (
+                      <img
+                        src={getResolvedItemImage(previewItem)}
+                        alt={previewItem.name}
+                        className="previewPopupImage"
+                      />
                     ) : (
                       <div className="previewPopupFallback" />
                     )}
                   </div>
 
                   <div className="previewPopupBody">
-                    <div className="previewPopupName">{previewItem.name || 'Item Name'}</div>
-                    <div className="previewPopupPrice">{money(previewItem.base_price)}</div>
+                    <div className="previewPopupHeaderRow">
+                      <div className="previewPopupName">
+                        {previewItem.name || copy.itemNameFallback}
+                      </div>
+                      <div className="previewPopupPrice">{money(previewItem.base_price)}</div>
+                    </div>
+
                     <div className="previewPopupDescription">
-                      {previewItem.description || 'Item details will show here in the popup preview.'}
+                      {previewItem.description || copy.itemDetailsPlaceholder}
                     </div>
 
                     {previewItem.option_groups.length ? (
@@ -1637,7 +2193,7 @@ export default function OwnerBuilderPage() {
                           <div key={group.id} className="previewOptionGroup">
                             <div className="previewOptionHeader">
                               <span>{group.name}</span>
-                              <span>{group.required ? 'Required' : 'Optional'}</span>
+                              <span>{group.required ? copy.required : copy.optional}</span>
                             </div>
 
                             <div className="previewChoiceWrap">
@@ -1663,17 +2219,18 @@ export default function OwnerBuilderPage() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+          background: #f2f2ef;
           padding: 24px;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+            'Segoe UI', sans-serif;
         }
 
         .shell {
           max-width: 1440px;
           margin: 0 auto;
-          background: rgba(255, 255, 255, 0.96);
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 32px;
+          background: #f8f8f5;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          border-radius: 36px;
           padding: 28px;
           box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
         }
@@ -1686,8 +2243,12 @@ export default function OwnerBuilderPage() {
           margin-bottom: 20px;
         }
 
+        .heroCopyCard {
+          min-width: 0;
+        }
+
         .eyebrow {
-          color: #718096;
+          color: #7d8596;
           font-size: 13px;
           font-weight: 900;
           text-transform: uppercase;
@@ -1697,36 +2258,65 @@ export default function OwnerBuilderPage() {
 
         h1 {
           margin: 0;
-          color: #0f172a;
-          font-size: clamp(34px, 6vw, 60px);
+          color: #0e1730;
+          font-size: clamp(36px, 6vw, 64px);
           line-height: 0.94;
-          letter-spacing: -0.05em;
+          letter-spacing: -0.06em;
           font-weight: 900;
         }
 
         p {
-          margin: 12px 0 0;
-          color: #566274;
+          margin: 14px 0 0;
+          color: #667081;
           font-size: 18px;
-          line-height: 1.5;
-          font-weight: 700;
+          line-height: 1.45;
+          font-weight: 800;
+          max-width: 760px;
         }
 
         .topActions {
           display: flex;
+          align-items: center;
           gap: 12px;
           flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .languageSwitch {
+          display: inline-flex;
+          gap: 8px;
+          padding: 6px;
+          border-radius: 999px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          box-shadow: inset 0 0 0 1px rgba(14, 23, 48, 0.02);
+        }
+
+        .langButton {
+          min-width: 74px;
+          min-height: 48px;
+          border-radius: 999px;
+          border: none;
+          background: transparent;
+          color: #7a8396;
+          font-size: 15px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        .langButtonActive {
+          background: #000000;
+          color: #ffffff;
         }
 
         .primaryButton,
         .ghostButton,
-        .smallAction,
-        .dangerButton,
         .uploadButton,
-        .themeButton,
-        .pillToggle {
-          min-height: 48px;
-          border-radius: 16px;
+        .toggleButton,
+        .dangerButton,
+        .ghostTiny {
+          min-height: 52px;
+          border-radius: 18px;
           font-size: 15px;
           font-weight: 900;
           display: inline-flex;
@@ -1735,59 +2325,67 @@ export default function OwnerBuilderPage() {
           text-decoration: none;
           cursor: pointer;
           border: none;
-          transition: 0.18s ease;
+          transition: 0.16s ease;
         }
 
         .primaryButton {
-          padding: 0 18px;
-          background: #0f172a;
-          color: #fff;
+          padding: 0 20px;
+          background: #000000;
+          color: #ffffff;
+        }
+
+        .primaryButton.small {
+          min-height: 46px;
+          padding: 0 16px;
+          border-radius: 16px;
         }
 
         .ghostButton {
-          padding: 0 18px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #fff;
-          color: #0f172a;
-        }
-
-        .smallAction {
-          padding: 0 16px;
-          background: #0f172a;
-          color: #fff;
-        }
-
-        .dangerButton {
-          padding: 0 14px;
-          background: rgba(220, 38, 38, 0.1);
-          color: #991b1b;
+          padding: 0 20px;
+          background: #ffffff;
+          color: #0e1730;
+          border: 1px solid rgba(14, 23, 48, 0.1);
         }
 
         .uploadButton {
-          padding: 0 16px;
-          background: #0f172a;
-          color: #fff;
+          padding: 0 18px;
+          background: #000000;
+          color: #ffffff;
           width: fit-content;
         }
 
-        .themeButton,
-        .pillToggle {
-          padding: 0 18px;
-          background: #fff;
-          color: #0f172a;
-          border: 1px solid rgba(15, 23, 42, 0.12);
+        .toggleButton {
+          padding: 0 20px;
+          background: #ffffff;
+          color: #0e1730;
+          border: 1px solid rgba(14, 23, 48, 0.1);
         }
 
-        .activeTheme,
-        .activePill {
-          background: #0f172a;
-          color: #fff;
-          border-color: #0f172a;
+        .toggleActive {
+          background: #000000;
+          color: #ffffff;
+          border-color: #000000;
+        }
+
+        .dangerButton {
+          padding: 0 16px;
+          background: #f7e3e3;
+          color: #9e2c2c;
+        }
+
+        .ghostTiny {
+          min-height: 42px;
+          padding: 0 14px;
+          border-radius: 14px;
+          background: #ffffff;
+          color: #0e1730;
+          border: 1px solid rgba(14, 23, 48, 0.1);
+          font-size: 14px;
         }
 
         .primaryButton:disabled,
         .uploadButton:disabled {
-          opacity: 0.6;
+          opacity: 0.55;
           cursor: not-allowed;
         }
 
@@ -1800,20 +2398,20 @@ export default function OwnerBuilderPage() {
         }
 
         .error {
-          color: #991b1b;
-          background: rgba(220, 38, 38, 0.08);
-          border: 1px solid rgba(220, 38, 38, 0.16);
+          color: #9a1f1f;
+          background: #f8e9e9;
+          border: 1px solid rgba(154, 31, 31, 0.12);
         }
 
         .success {
-          color: #166534;
-          background: rgba(22, 163, 74, 0.08);
-          border: 1px solid rgba(22, 163, 74, 0.16);
+          color: #165534;
+          background: #eaf5ee;
+          border: 1px solid rgba(22, 85, 52, 0.1);
         }
 
         .grid {
           display: grid;
-          grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.85fr);
+          grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
           gap: 20px;
         }
 
@@ -1825,11 +2423,11 @@ export default function OwnerBuilderPage() {
         }
 
         .panel {
-          background: #fff;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 28px;
-          padding: 20px;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.04);
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.07);
+          border-radius: 30px;
+          padding: 22px;
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.03);
         }
 
         .stickyPanel {
@@ -1838,10 +2436,11 @@ export default function OwnerBuilderPage() {
         }
 
         .panelTitle {
-          color: #0f172a;
-          font-size: 18px;
+          color: #0e1730;
+          font-size: 22px;
           font-weight: 900;
           margin-bottom: 16px;
+          letter-spacing: -0.03em;
         }
 
         .panelHeader {
@@ -1877,7 +2476,7 @@ export default function OwnerBuilderPage() {
         }
 
         .label {
-          color: #718096;
+          color: #7d8596;
           font-size: 12px;
           font-weight: 900;
           text-transform: uppercase;
@@ -1887,28 +2486,29 @@ export default function OwnerBuilderPage() {
         .input,
         .textarea {
           width: 100%;
-          border-radius: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #fff;
-          padding: 0 16px;
-          color: #0f172a;
-          font-size: 16px;
-          font-weight: 700;
+          border-radius: 20px;
+          border: 1px solid rgba(14, 23, 48, 0.1);
+          background: #fbfbf8;
+          padding: 0 18px;
+          color: #0e1730;
+          font-size: 17px;
+          font-weight: 800;
           outline: none;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
         }
 
         .input {
-          min-height: 54px;
+          min-height: 58px;
         }
 
         .textarea {
-          min-height: 120px;
-          padding: 16px;
+          min-height: 132px;
+          padding: 16px 18px;
           resize: vertical;
         }
 
         .compactInput {
-          min-height: 46px;
+          min-height: 50px;
           font-size: 15px;
         }
 
@@ -1917,42 +2517,41 @@ export default function OwnerBuilderPage() {
         }
 
         .priceInput {
-          max-width: 110px;
+          max-width: 120px;
         }
 
         .helpText {
-          color: #64748b;
+          color: #7d8596;
           font-size: 13px;
-          font-weight: 700;
+          font-weight: 800;
         }
 
         .uploadGrid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 14px;
-          margin-top: 14px;
         }
 
         .uploadCard {
-          border: 1px dashed rgba(15, 23, 42, 0.16);
-          border-radius: 22px;
-          padding: 16px;
+          border: 1px dashed rgba(14, 23, 48, 0.14);
+          border-radius: 26px;
+          padding: 18px;
           display: grid;
-          gap: 12px;
-          background: #fbfdff;
+          gap: 14px;
+          background: #fcfcfa;
         }
 
         .uploadTitle {
-          color: #0f172a;
-          font-size: 15px;
+          color: #0e1730;
+          font-size: 16px;
           font-weight: 900;
         }
 
         .thumbImage,
         .thumbPlaceholder {
           width: 100%;
-          height: 180px;
-          border-radius: 18px;
+          height: 200px;
+          border-radius: 22px;
           object-fit: cover;
         }
 
@@ -1960,43 +2559,42 @@ export default function OwnerBuilderPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-          color: #475569;
+          background: #eef1f5;
+          color: #6e788a;
           font-size: 15px;
           font-weight: 900;
         }
 
         .logoThumb {
           object-fit: contain;
-          background: #fff;
-          padding: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: #ffffff;
+          padding: 18px;
+          border: 1px solid rgba(14, 23, 48, 0.06);
         }
 
         .itemThumb {
-          height: 220px;
+          height: 240px;
         }
 
         .itemThumbPlaceholder {
-          height: 220px;
+          height: 240px;
         }
 
         .fullWidthCard {
           grid-column: 1 / -1;
         }
 
-        .toggleRowWrap {
+        .controlStack {
           display: grid;
-          gap: 14px;
-          margin-top: 14px;
+          gap: 18px;
         }
 
-        .toggleBlock {
+        .controlBlock {
           display: grid;
           gap: 10px;
         }
 
-        .themeRow,
+        .toggleRow,
         .deliveryToggleRow,
         .optionActionWrap,
         .optionMetaRow {
@@ -2006,105 +2604,145 @@ export default function OwnerBuilderPage() {
         }
 
         .categoryList,
-        .itemList,
         .optionGroupList {
           display: grid;
-          gap: 12px;
+          gap: 14px;
         }
 
         .categoryCard,
-        .itemListCard,
         .optionGroupCard {
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 22px;
-          padding: 14px;
-          background: #fff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          border-radius: 24px;
+          padding: 16px;
+          background: #ffffff;
         }
 
-        .categoryCardActive,
-        .itemListCardActive {
-          border-color: #0f172a;
-          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+        .categoryCardActive {
+          border-color: rgba(14, 23, 48, 0.22);
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
         }
 
-        .categorySelect,
-        .itemListCard {
+        .categorySelect {
           border: none;
           background: transparent;
           width: 100%;
           text-align: left;
           cursor: pointer;
-        }
-
-        .categorySelect {
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 12px;
           padding: 0;
-          color: #0f172a;
-          font-size: 17px;
+          color: #0e1730;
+          font-size: 18px;
           font-weight: 900;
         }
 
         .categoryCount {
-          min-width: 34px;
-          min-height: 34px;
+          min-width: 38px;
+          min-height: 38px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: rgba(15, 23, 42, 0.08);
+          background: #f1f1ef;
           font-size: 13px;
           font-weight: 900;
+          color: #0e1730;
         }
 
         .categoryEditRow {
           display: flex;
           gap: 10px;
           align-items: center;
-          margin-top: 12px;
+          margin-top: 14px;
         }
 
-        .itemListCard {
+        .itemCardGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+        }
+
+        .itemVisualCard {
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          background: #ffffff;
+          border-radius: 24px;
+          padding: 10px;
+          text-align: left;
+          cursor: pointer;
+          transition: 0.16s ease;
+        }
+
+        .itemVisualCardActive {
+          border-color: rgba(14, 23, 48, 0.22);
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+        }
+
+        .itemVisualImageWrap {
+          width: 100%;
+          aspect-ratio: 1 / 1;
+          border-radius: 20px;
+          overflow: hidden;
+          background: #eef1f5;
+        }
+
+        .itemVisualImage,
+        .itemVisualFallback {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          background: linear-gradient(135deg, #e9edf2 0%, #dfe5ec 100%);
+        }
+
+        .itemVisualBody {
+          padding: 12px 4px 4px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .itemVisualTop {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          gap: 12px;
+          align-items: start;
+          gap: 10px;
         }
 
-        .itemListName {
-          color: #0f172a;
+        .itemVisualName {
+          color: #0e1730;
           font-size: 16px;
           font-weight: 900;
+          line-height: 1.1;
         }
 
-        .itemListMeta {
-          margin-top: 5px;
-          color: #475569;
-          font-size: 14px;
-          font-weight: 800;
+        .itemVisualPrice {
+          color: #0e1730;
+          font-size: 15px;
+          font-weight: 900;
+          white-space: nowrap;
         }
 
         .availability {
-          min-height: 34px;
-          padding: 0 12px;
+          min-height: 36px;
+          padding: 0 14px;
           border-radius: 999px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           font-size: 13px;
           font-weight: 900;
+          width: fit-content;
         }
 
         .availabilityOn {
-          background: rgba(22, 163, 74, 0.1);
-          color: #166534;
+          background: #ebf6ee;
+          color: #2d6c3d;
         }
 
         .availabilityOff {
-          background: rgba(220, 38, 38, 0.1);
-          color: #991b1b;
+          background: #f8e9e9;
+          color: #9a1f1f;
         }
 
         .optionGroupHeader {
@@ -2130,51 +2768,52 @@ export default function OwnerBuilderPage() {
         }
 
         .emptyBlock {
-          border: 1px dashed rgba(15, 23, 42, 0.14);
-          border-radius: 18px;
-          padding: 20px;
-          color: #64748b;
+          border: 1px dashed rgba(14, 23, 48, 0.12);
+          border-radius: 20px;
+          padding: 22px;
+          color: #7d8596;
           font-size: 15px;
           font-weight: 800;
           text-align: center;
+          background: #fcfcfa;
         }
 
         .previewStatus {
-          min-height: 34px;
-          padding: 0 12px;
+          min-height: 36px;
+          padding: 0 14px;
           border-radius: 999px;
-          background: rgba(15, 23, 42, 0.08);
-          color: #0f172a;
+          background: #efefec;
+          color: #0e1730;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           font-size: 12px;
           font-weight: 900;
           text-transform: uppercase;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.08em;
         }
 
         .previewShell {
           overflow: hidden;
-          border-radius: 28px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
+          border-radius: 30px;
+          border: 1px solid rgba(14, 23, 48, 0.08);
         }
 
         .previewLight {
-          background: #f8fbff;
-          color: #0f172a;
+          background: #f8f8f5;
+          color: #0e1730;
         }
 
         .previewDark {
-          background: #0f172a;
-          color: #fff;
+          background: #0a0a0a;
+          color: #ffffff;
         }
 
         .previewHero {
           position: relative;
-          height: 280px;
+          height: 290px;
           overflow: hidden;
-          background: #0f172a;
+          background: #111111;
         }
 
         .previewHeroImage,
@@ -2184,13 +2823,13 @@ export default function OwnerBuilderPage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+          background: linear-gradient(135deg, #111111 0%, #2a2a2a 100%);
         }
 
         .previewOverlay {
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(2, 6, 23, 0.1) 0%, rgba(2, 6, 23, 0.7) 100%);
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.65) 100%);
         }
 
         .previewHeroContent {
@@ -2210,12 +2849,12 @@ export default function OwnerBuilderPage() {
 
         .previewLogo,
         .previewLogoFallback {
-          width: 72px;
-          height: 72px;
-          border-radius: 20px;
+          width: 74px;
+          height: 74px;
+          border-radius: 22px;
           object-fit: cover;
-          background: #fff;
-          color: #0f172a;
+          background: #ffffff;
+          color: #0e1730;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2224,8 +2863,8 @@ export default function OwnerBuilderPage() {
         }
 
         .previewName {
-          color: #fff;
-          font-size: 40px;
+          color: #ffffff;
+          font-size: 42px;
           line-height: 0.94;
           letter-spacing: -0.05em;
           font-weight: 900;
@@ -2233,9 +2872,61 @@ export default function OwnerBuilderPage() {
 
         .previewTag {
           margin-top: 8px;
-          color: rgba(255, 255, 255, 0.9);
+          color: rgba(255, 255, 255, 0.92);
           font-size: 16px;
           font-weight: 800;
+        }
+
+        .previewInfoBand {
+          padding: 16px 18px;
+          border-bottom: 1px solid rgba(14, 23, 48, 0.08);
+          background: inherit;
+        }
+
+        .previewInfoTitle {
+          color: #7d8596;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 10px;
+        }
+
+        .previewInfoGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .previewInfoCell {
+          display: grid;
+          gap: 6px;
+          border-radius: 18px;
+          padding: 14px;
+          background: rgba(14, 23, 48, 0.04);
+        }
+
+        .previewInfoCell span {
+          color: #7d8596;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .previewInfoCell strong {
+          color: inherit;
+          font-size: 15px;
+          font-weight: 900;
+          line-height: 1.3;
+        }
+
+        .previewDark .previewInfoCell {
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .previewDark .previewInfoCell span {
+          color: rgba(255, 255, 255, 0.65);
         }
 
         .previewContent {
@@ -2250,10 +2941,10 @@ export default function OwnerBuilderPage() {
         }
 
         .previewMetaPill {
-          min-height: 34px;
-          padding: 0 12px;
+          min-height: 36px;
+          padding: 0 14px;
           border-radius: 999px;
-          background: rgba(15, 23, 42, 0.08);
+          background: rgba(14, 23, 48, 0.08);
           color: inherit;
           display: inline-flex;
           align-items: center;
@@ -2263,7 +2954,7 @@ export default function OwnerBuilderPage() {
         }
 
         .previewDark .previewMetaPill {
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.1);
         }
 
         .previewCategoryTabs {
@@ -2276,11 +2967,11 @@ export default function OwnerBuilderPage() {
 
         .previewCategoryTab {
           flex: 0 0 auto;
-          min-height: 38px;
-          padding: 0 14px;
+          min-height: 40px;
+          padding: 0 16px;
           border-radius: 999px;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: transparent;
+          border: 1px solid rgba(14, 23, 48, 0.1);
+          background: #ffffff;
           color: inherit;
           font-size: 14px;
           font-weight: 900;
@@ -2288,32 +2979,40 @@ export default function OwnerBuilderPage() {
         }
 
         .previewDark .previewCategoryTab {
-          border-color: rgba(255, 255, 255, 0.14);
+          background: transparent;
+          border-color: rgba(255, 255, 255, 0.16);
         }
 
         .previewCategoryTabActive {
-          background: #0f172a;
-          color: #fff;
-          border-color: #0f172a;
+          background: #000000;
+          color: #ffffff;
+          border-color: #000000;
         }
 
         .previewDark .previewCategoryTabActive {
-          background: #fff;
-          color: #0f172a;
-          border-color: #fff;
+          background: #ffffff;
+          color: #0e1730;
+          border-color: #ffffff;
         }
 
         .previewGrid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 12px;
         }
 
         .previewGridCard {
-          border: none;
+          border: 1px solid transparent;
           background: transparent;
           padding: 0;
+          border-radius: 22px;
           cursor: pointer;
+          overflow: hidden;
+        }
+
+        .previewGridCardActive {
+          border-color: rgba(14, 23, 48, 0.2);
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.04);
         }
 
         .previewGridImage,
@@ -2328,10 +3027,10 @@ export default function OwnerBuilderPage() {
 
         .previewPopup {
           margin-top: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
+          border: 1px solid rgba(14, 23, 48, 0.08);
           border-radius: 28px;
           overflow: hidden;
-          background: #fff;
+          background: #ffffff;
         }
 
         .previewPopupImageWrap {
@@ -2353,8 +3052,15 @@ export default function OwnerBuilderPage() {
           padding: 18px;
         }
 
+        .previewPopupHeaderRow {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: start;
+        }
+
         .previewPopupName {
-          color: #0f172a;
+          color: #0e1730;
           font-size: 30px;
           line-height: 0.96;
           letter-spacing: -0.05em;
@@ -2362,15 +3068,15 @@ export default function OwnerBuilderPage() {
         }
 
         .previewPopupPrice {
-          margin-top: 10px;
-          color: #0f172a;
+          color: #0e1730;
           font-size: 24px;
           font-weight: 900;
+          white-space: nowrap;
         }
 
         .previewPopupDescription {
-          margin-top: 10px;
-          color: #475569;
+          margin-top: 12px;
+          color: #566274;
           font-size: 15px;
           line-height: 1.55;
           font-weight: 700;
@@ -2383,7 +3089,7 @@ export default function OwnerBuilderPage() {
         }
 
         .previewOptionGroup {
-          border: 1px solid rgba(15, 23, 42, 0.08);
+          border: 1px solid rgba(14, 23, 48, 0.08);
           border-radius: 18px;
           padding: 14px;
         }
@@ -2392,7 +3098,7 @@ export default function OwnerBuilderPage() {
           display: flex;
           justify-content: space-between;
           gap: 12px;
-          color: #0f172a;
+          color: #0e1730;
           font-size: 14px;
           font-weight: 900;
           text-transform: uppercase;
@@ -2409,7 +3115,7 @@ export default function OwnerBuilderPage() {
           display: flex;
           justify-content: space-between;
           gap: 12px;
-          color: #475569;
+          color: #566274;
           font-size: 14px;
           font-weight: 800;
         }
@@ -2424,11 +3130,15 @@ export default function OwnerBuilderPage() {
           }
         }
 
-        @media (max-width: 820px) {
+        @media (max-width: 900px) {
           .fieldGrid,
           .threeCols,
           .uploadGrid {
             grid-template-columns: 1fr;
+          }
+
+          .previewGrid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
           }
         }
 
@@ -2439,7 +3149,7 @@ export default function OwnerBuilderPage() {
 
           .shell {
             padding: 18px;
-            border-radius: 24px;
+            border-radius: 28px;
           }
 
           .topRow {
@@ -2448,11 +3158,21 @@ export default function OwnerBuilderPage() {
 
           .topActions {
             width: 100%;
+            justify-content: stretch;
           }
 
-          .primaryButton,
-          .ghostButton {
+          .languageSwitch {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .ghostButton,
+          .primaryButton {
             flex: 1 1 0;
+          }
+
+          .itemCardGrid {
+            grid-template-columns: 1fr;
           }
 
           .choiceRow,
@@ -2462,19 +3182,19 @@ export default function OwnerBuilderPage() {
           }
 
           .previewHero {
-            height: 220px;
+            height: 230px;
           }
 
           .previewName {
-            font-size: 32px;
+            font-size: 34px;
           }
 
           .previewPopupImageWrap {
             height: 200px;
           }
 
-          .previewGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+          .previewInfoGrid {
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
