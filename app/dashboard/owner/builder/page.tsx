@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabase';
 type ThemeMode = 'light' | 'dark';
 type LanguageMode = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
+type SectionKey = 'store' | 'branding' | 'theme' | 'menu' | 'item' | 'options';
+type ExpandedSection = SectionKey | null;
 
 type RestaurantRow = {
   id: string;
@@ -101,10 +103,8 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
-type ExpandedSection = 'store' | 'branding' | 'theme' | 'menu' | 'item' | 'options' | null;
-
 type CopyBlock = {
-  builder: string;
+  builderWord: string;
   title: string;
   subtitle: string;
   loading: string;
@@ -121,7 +121,6 @@ type CopyBlock = {
   itemBuilder: string;
   optionGroups: string;
   previewStore: string;
-  openStore: string;
   save: string;
   saving: string;
   liveUrl: string;
@@ -131,7 +130,6 @@ type CopyBlock = {
   builderLanguage: string;
   storefrontLanguage: string;
   orderLanguage: string;
-  storefrontTheme: string;
   english: string;
   spanish: string;
   light: string;
@@ -176,17 +174,19 @@ type CopyBlock = {
   addChoice: string;
   newChoice: string;
   noOptionGroups: string;
+  categoriesAndItems: string;
+  heroAndLogoImages: string;
   dashboard: string;
+  builder: string;
+  preview: string;
   flyers: string;
   orders: string;
   more: string;
-  categoriesAndItems: string;
-  heroAndLogoImages: string;
 };
 
 const COPY: Record<LanguageMode, CopyBlock> = {
   en: {
-    builder: 'BUILDER',
+    builderWord: 'BUILDER',
     title: 'Build Your Store',
     subtitle: 'Upload branding, build your menu, go live.',
     loading: 'Loading builder...',
@@ -203,7 +203,6 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     itemBuilder: 'Item Builder',
     optionGroups: 'Option Groups',
     previewStore: 'Preview Store',
-    openStore: 'Open Store',
     save: 'Save',
     saving: 'Saving...',
     liveUrl: 'Live URL',
@@ -213,7 +212,6 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     builderLanguage: 'Builder Language',
     storefrontLanguage: 'Storefront Language',
     orderLanguage: 'Order Language',
-    storefrontTheme: 'Storefront Theme',
     english: 'English',
     spanish: 'Spanish',
     light: 'Light',
@@ -258,15 +256,17 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     addChoice: 'Add Choice',
     newChoice: 'New Choice',
     noOptionGroups: 'No option groups yet.',
+    categoriesAndItems: 'Categories & Items',
+    heroAndLogoImages: 'Hero & Logo Images',
     dashboard: 'Dashboard',
+    builder: 'Builder',
+    preview: 'Preview',
     flyers: 'Flyers',
     orders: 'Orders',
     more: 'More',
-    categoriesAndItems: 'Categories & Items',
-    heroAndLogoImages: 'Hero & Logo Images',
   },
   es: {
-    builder: 'BUILDER',
+    builderWord: 'BUILDER',
     title: 'Construye Tu Tienda',
     subtitle: 'Sube branding, crea tu menú y publícalo.',
     loading: 'Cargando constructor...',
@@ -283,7 +283,6 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     itemBuilder: 'Producto',
     optionGroups: 'Grupos de Opciones',
     previewStore: 'Vista Tienda',
-    openStore: 'Abrir Tienda',
     save: 'Guardar',
     saving: 'Guardando...',
     liveUrl: 'URL en vivo',
@@ -293,7 +292,6 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     builderLanguage: 'Idioma del Constructor',
     storefrontLanguage: 'Idioma de la Tienda',
     orderLanguage: 'Idioma del Pedido',
-    storefrontTheme: 'Tema de la Tienda',
     english: 'Inglés',
     spanish: 'Español',
     light: 'Claro',
@@ -338,12 +336,14 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     addChoice: 'Agregar Opción',
     newChoice: 'Nueva Opción',
     noOptionGroups: 'Todavía no hay grupos de opciones.',
+    categoriesAndItems: 'Categorías y Productos',
+    heroAndLogoImages: 'Hero y Logo',
     dashboard: 'Panel',
+    builder: 'Builder',
+    preview: 'Vista',
     flyers: 'Flyers',
     orders: 'Pedidos',
     more: 'Más',
-    categoriesAndItems: 'Categorías y Productos',
-    heroAndLogoImages: 'Hero y Logo',
   },
 };
 
@@ -501,130 +501,8 @@ function getEmptyStarter(copy: CopyBlock): BuilderCategory[] {
   ];
 }
 
-function IconStore() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M4 9.5 5.4 4h13.2L20 9.5M4 9.5h16M4 9.5v7.8A1.7 1.7 0 0 0 5.7 19h12.6a1.7 1.7 0 0 0 1.7-1.7V9.5M8 19v-5.1h8V19"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconImage() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M4.2 6.2A2.2 2.2 0 0 1 6.4 4h11.2a2.2 2.2 0 0 1 2.2 2.2v11.6a2.2 2.2 0 0 1-2.2 2.2H6.4a2.2 2.2 0 0 1-2.2-2.2Zm0 9.8 4.3-4.3a1.6 1.6 0 0 1 2.2 0l2.3 2.3 2.3-2.3a1.6 1.6 0 0 1 2.2 0l2.3 2.3M9 9.2a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconPalette() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M12 3.5c-4.9 0-8.9 3.5-8.9 7.8 0 2 1 3.6 2.7 4.7 1 .6 1.4 1.4 1.2 2.2-.3 1.1.6 2 1.7 1.8.7-.1 1.4-.4 2.1-.4h1.1c4.9 0 8.9-3.5 8.9-7.8S16.9 3.5 12 3.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="7.8" cy="10" r="1.1" fill="currentColor" />
-      <circle cx="10.8" cy="7.9" r="1.1" fill="currentColor" />
-      <circle cx="14.6" cy="8" r="1.1" fill="currentColor" />
-      <circle cx="16.8" cy="11" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconGrid() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconChevron() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="m9 6 6 6-6 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconEdit() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="m4 20 4.2-1 9.1-9.1a1.9 1.9 0 0 0-2.7-2.7L5.5 16.3 4 20Zm9.8-12.8 3 3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconEye() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        d="M2.4 12s3.4-5.8 9.6-5.8 9.6 5.8 9.6 5.8-3.4 5.8-9.6 5.8S2.4 12 2.4 12Zm9.6 2.9A2.9 2.9 0 1 0 12 9a2.9 2.9 0 0 0 0 5.8Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconDots() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="5" cy="12" r="1.9" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.9" fill="currentColor" />
-      <circle cx="19" cy="12" r="1.9" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconDash() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 12h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
+function MiniIcon({ children }: { children: ReactNode }) {
+  return <span className="miniIcon">{children}</span>;
 }
 
 export default function Page() {
@@ -977,7 +855,7 @@ export default function Page() {
     return getPlaceholderForItem(item);
   }
 
-  function setOpen(section: ExpandedSection) {
+  function toggleSection(section: SectionKey) {
     setExpanded((current) => (current === section ? null : section));
   }
 
@@ -1490,77 +1368,73 @@ export default function Page() {
   const categoryPreviewImage = selectedCategory?.items?.[0] ? getResolvedItemImage(selectedCategory.items[0]) : '';
   const selectedItemImage = getResolvedItemImage(selectedItem);
 
-  function SummaryCard({
+  function SectionCard({
+    section,
     icon,
     title,
+    right,
     summary,
-    rightLabel,
-    section,
   }: {
+    section: SectionKey;
     icon: ReactNode;
     title: string;
+    right?: ReactNode;
     summary?: ReactNode;
-    rightLabel?: ReactNode;
-    section: ExpandedSection;
   }) {
     return (
-      <div className="summaryWrap">
-        <button type="button" className="summaryCard" onClick={() => setOpen(section)}>
-          <div className="summaryRow">
-            <div className="summaryLeft">
-              <span className="iconBox">{icon}</span>
-              <span className="summaryTitle">{title}</span>
-            </div>
-
-            <div className="summaryRight">
-              {rightLabel ? <span className="summaryMetaLabel">{rightLabel}</span> : null}
-              <span className="summaryChevron">
-                <IconChevron />
-              </span>
-            </div>
+      <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
+        <div className="sectionCardTop">
+          <div className="sectionCardLeft">
+            <MiniIcon>{icon}</MiniIcon>
+            <span className="sectionCardTitle">{title}</span>
           </div>
 
-          {summary ? <div className="summaryBody">{summary}</div> : null}
-        </button>
-      </div>
+          <div className="sectionCardRight">
+            {right ? <span className="sectionCardMeta">{right}</span> : null}
+            <span className="sectionCardArrow">›</span>
+          </div>
+        </div>
+
+        {summary ? <div className="sectionCardSummary">{summary}</div> : null}
+      </button>
     );
   }
 
   if (loading) {
     return (
       <main className="page">
-        <div className="appShell loadingShell">
-          <div className="topNotch" />
+        <div className="shell">
+          <div className="notch" />
           <div className="loadingCard">{copy.loading}</div>
         </div>
 
         <style jsx>{`
           .page {
             min-height: 100vh;
-            background: #eef0f4;
-            padding: 18px 12px 28px;
+            background: #eef1f5;
+            padding: 16px 12px 28px;
             display: grid;
             place-items: start center;
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           }
-          .appShell {
+
+          .shell {
             width: min(100%, 430px);
-            border-radius: 34px;
             background: #ffffff;
             border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 34px;
             box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
             padding: 14px;
           }
-          .loadingShell {
-            min-height: 200px;
-          }
-          .topNotch {
+
+          .notch {
             width: 122px;
             height: 8px;
             border-radius: 999px;
-            background: #111827;
+            background: #0f172a;
             margin: 2px auto 16px;
           }
+
           .loadingCard {
             border-radius: 18px;
             padding: 20px;
@@ -1577,23 +1451,23 @@ export default function Page() {
 
   return (
     <main className="page">
-      <div className="appShell">
-        <div className="topNotch" />
+      <div className="shell">
+        <div className="notch" />
 
         <div className="topBar">
           <div className="brand">
             <span className="brandStrong">MENUFLOW</span>
-            <span className="brandSoft"> {copy.builder}</span>
+            <span className="brandSoft"> {copy.builderWord}</span>
           </div>
 
-          <div className="topBarActions">
+          <div className="topActions">
             <button
               type="button"
               className="langButton"
               onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
             >
               {builderLanguage.toUpperCase()}
-              <span className="langCaret">⌄</span>
+              <span className="caret">⌄</span>
             </button>
 
             <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
@@ -1605,9 +1479,9 @@ export default function Page() {
         {error ? <div className="message error">{error}</div> : null}
         {success ? <div className="message success">{success}</div> : null}
 
-        <section className="heroWrap">
+        <section className="hero">
           {heroImage ? <img src={heroImage} alt="Hero" className="heroImage" /> : <div className="heroImage heroFallback" />}
-          <div className="heroShade" />
+          <div className="heroOverlay" />
 
           <div className="heroContent">
             <div className="heroIdentity">
@@ -1627,38 +1501,34 @@ export default function Page() {
           </div>
         </section>
 
-        <section className="introCard">
+        <section className="intro">
           <h1 className="title">{copy.title}</h1>
           <p className="subtitle">{copy.subtitle}</p>
 
           {previewLink ? (
-            <Link href={previewLink} target="_blank" className="previewStoreButton">
-              <span className="previewIcon">
-                <IconEye />
-              </span>
+            <Link href={previewLink} target="_blank" className="previewButton">
+              <span className="previewEye">◉</span>
               {copy.previewStore}
             </Link>
           ) : (
-            <button type="button" className="previewStoreButton" disabled>
-              <span className="previewIcon">
-                <IconEye />
-              </span>
+            <button type="button" className="previewButton" disabled>
+              <span className="previewEye">◉</span>
               {copy.previewStore}
             </button>
           )}
         </section>
 
-        <section className="stack">
-          <SummaryCard
+        <div className="stack">
+          <SectionCard
             section="store"
-            icon={<IconStore />}
+            icon="⌂"
             title={copy.storeSetup}
-            rightLabel={<IconEdit />}
+            right="✎"
             summary={
               <div className="simpleSummary">
-                <div className="simpleSummaryTitle">{name.trim() || 'Your Store'}</div>
-                <div>{phone.trim() || '323-555-1234'}</div>
-                <div>{address.trim() || '123 Main St, Los Angeles, CA'}</div>
+                <strong>{name.trim() || 'Your Store'}</strong>
+                <span>{phone.trim() || '323-555-1234'}</span>
+                <span>{address.trim() || '123 Main St, Los Angeles, CA'}</span>
               </div>
             }
           />
@@ -1666,39 +1536,39 @@ export default function Page() {
           {expanded === 'store' ? (
             <div className="panel">
               <label className="field">
-                <span className="fieldLabel">{copy.storeName}</span>
+                <span className="label">{copy.storeName}</span>
                 <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Fiesta Grill" />
               </label>
 
-              <div className="miniInfoCard">
-                <span className="fieldLabel">{copy.liveUrl}</span>
+              <div className="infoCard">
+                <span className="label">{copy.liveUrl}</span>
                 <strong>{slug ? `/store/${slug}` : '/store/your-store'}</strong>
               </div>
 
               <label className="field">
-                <span className="fieldLabel">{copy.phone}</span>
+                <span className="label">{copy.phone}</span>
                 <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="323-555-1234" />
               </label>
 
               <label className="field">
-                <span className="fieldLabel">{copy.address}</span>
+                <span className="label">{copy.address}</span>
                 <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Los Angeles, CA" />
               </label>
             </div>
           ) : null}
 
-          <SummaryCard
+          <SectionCard
             section="branding"
-            icon={<IconImage />}
+            icon="▣"
             title={copy.branding}
-            rightLabel={copy.heroAndLogoImages}
+            right={copy.heroAndLogoImages}
           />
 
           {expanded === 'branding' ? (
             <div className="panel">
               <div className="uploadCard">
-                <div className="uploadCardTitle">{copy.uploadHeroImage}</div>
-                <label className="primaryAction">
+                <div className="uploadTitle">{copy.uploadHeroImage}</div>
+                <label className="primaryButton">
                   {uploadingHero ? copy.saving : copy.uploadHeroImage}
                   <input
                     type="file"
@@ -1718,8 +1588,8 @@ export default function Page() {
               </div>
 
               <div className="uploadCard">
-                <div className="uploadCardTitle">{copy.uploadLogo}</div>
-                <label className="primaryAction">
+                <div className="uploadTitle">{copy.uploadLogo}</div>
+                <label className="primaryButton">
                   {uploadingLogo ? copy.saving : copy.uploadLogo}
                   <input
                     type="file"
@@ -1740,34 +1610,34 @@ export default function Page() {
             </div>
           ) : null}
 
-          <SummaryCard
+          <SectionCard
             section="theme"
-            icon={<IconPalette />}
+            icon="◐"
             title={copy.theme}
-            rightLabel={
-              <div className="inlineToggle" onClick={(e) => e.stopPropagation()}>
+            right={
+              <span className="inlineToggle" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
-                  className={theme === 'light' ? 'inlineToggleButton inlineToggleButtonActive' : 'inlineToggleButton'}
+                  className={theme === 'light' ? 'inlineToggleBtn inlineToggleBtnActive' : 'inlineToggleBtn'}
                   onClick={() => setTheme('light')}
                 >
                   {copy.light}
                 </button>
                 <button
                   type="button"
-                  className={theme === 'dark' ? 'inlineToggleButton inlineToggleButtonActive' : 'inlineToggleButton'}
+                  className={theme === 'dark' ? 'inlineToggleBtn inlineToggleBtnActive' : 'inlineToggleBtn'}
                   onClick={() => setTheme('dark')}
                 >
                   {copy.dark}
                 </button>
-              </div>
+              </span>
             }
           />
 
           {expanded === 'theme' ? (
             <div className="panel">
               <div className="field">
-                <span className="fieldLabel">{copy.builderLanguage}</span>
+                <span className="label">{copy.builderLanguage}</span>
                 <div className="chipRow">
                   <button
                     type="button"
@@ -1787,7 +1657,7 @@ export default function Page() {
               </div>
 
               <div className="field">
-                <span className="fieldLabel">{copy.storefrontLanguage}</span>
+                <span className="label">{copy.storefrontLanguage}</span>
                 <div className="chipRow">
                   <button
                     type="button"
@@ -1807,7 +1677,7 @@ export default function Page() {
               </div>
 
               <div className="field">
-                <span className="fieldLabel">{copy.orderLanguage}</span>
+                <span className="label">{copy.orderLanguage}</span>
                 <div className="chipRow">
                   <button
                     type="button"
@@ -1827,7 +1697,7 @@ export default function Page() {
               </div>
 
               <div className="field">
-                <span className="fieldLabel">
+                <span className="label">
                   {copy.pickupOn.replace(' On', '').replace(' Activada', '')} / {copy.deliveryOn.replace(' On', '').replace(' Activada', '')}
                 </span>
                 <div className="chipRow">
@@ -1849,35 +1719,35 @@ export default function Page() {
               </div>
 
               <label className="field">
-                <span className="fieldLabel">{copy.deliveryFee}</span>
+                <span className="label">{copy.deliveryFee}</span>
                 <input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} placeholder="0" />
               </label>
 
               <label className="field">
-                <span className="fieldLabel">{copy.deliveryRadius}</span>
+                <span className="label">{copy.deliveryRadius}</span>
                 <input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} placeholder="5" />
               </label>
 
               <label className="field">
-                <span className="fieldLabel">{copy.deliveryMinimum}</span>
+                <span className="label">{copy.deliveryMinimum}</span>
                 <input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} placeholder="0" />
               </label>
             </div>
           ) : null}
 
-          <SummaryCard
+          <SectionCard
             section="menu"
-            icon={<IconGrid />}
+            icon="▦"
             title={copy.menu}
-            rightLabel={copy.categoriesAndItems}
+            right={copy.categoriesAndItems}
             summary={
               <div className="menuSummary">
                 <div className="menuThumb">
                   {categoryPreviewImage ? <img src={categoryPreviewImage} alt="Menu preview" className="menuThumbImage" /> : <div className="menuThumbPlaceholder" />}
                 </div>
 
-                <div className="menuSummaryText">
-                  <div className="menuSummaryHeadline">
+                <div className="menuSummaryRight">
+                  <div className="menuHeadline">
                     {(selectedCategory?.name || 'Featured') + (categories.length > 1 ? ` +${categories.length - 1} more` : '')}
                   </div>
 
@@ -1886,16 +1756,14 @@ export default function Page() {
                       <button
                         type="button"
                         key={item.id}
-                        className="menuMiniListItem"
+                        className="menuMiniItem"
                         onClick={(e) => {
                           e.stopPropagation();
                           selectItem(item.id);
                         }}
                       >
                         <span>{item.name || copy.itemNameFallback}</span>
-                        <span className="menuMiniArrow">
-                          <IconChevron />
-                        </span>
+                        <span>›</span>
                       </button>
                     ))}
                   </div>
@@ -1922,7 +1790,7 @@ export default function Page() {
                     </button>
 
                     <input
-                      className="input slimInput"
+                      className="input compactInput"
                       value={category.name}
                       onChange={(e) => updateCategory(category.id, e.target.value)}
                       placeholder={copy.categoryName}
@@ -1951,11 +1819,11 @@ export default function Page() {
                           className={item.id === selectedItemId ? 'itemCard itemCardActive' : 'itemCard'}
                           onClick={() => selectItem(item.id)}
                         >
-                          <div className="itemCardImageWrap">
-                            {itemImage ? <img src={itemImage} alt={item.name} className="itemCardImage" /> : <div className="itemCardImagePlaceholder" />}
+                          <div className="itemImageWrap">
+                            {itemImage ? <img src={itemImage} alt={item.name} className="itemImage" /> : <div className="itemImagePlaceholder" />}
                           </div>
 
-                          <div className="itemCardInfo">
+                          <div className="itemInfo">
                             <strong>{item.name || copy.itemNameFallback}</strong>
                             <span>{money(item.base_price)}</span>
                           </div>
@@ -1970,14 +1838,14 @@ export default function Page() {
 
           {selectedItem ? (
             <>
-              <SummaryCard
+              <SectionCard
                 section="item"
-                icon={<IconGrid />}
+                icon="▣"
                 title={copy.itemBuilder}
                 summary={
                   <div className="simpleSummary">
-                    <div className="simpleSummaryTitle">{selectedItem.name || copy.itemNameFallback}</div>
-                    <div>{money(selectedItem.base_price)}</div>
+                    <strong>{selectedItem.name || copy.itemNameFallback}</strong>
+                    <span>{money(selectedItem.base_price)}</span>
                   </div>
                 }
               />
@@ -1989,8 +1857,8 @@ export default function Page() {
                   </button>
 
                   <div className="uploadCard">
-                    <div className="uploadCardTitle">{copy.uploadItemImage}</div>
-                    <label className="primaryAction">
+                    <div className="uploadTitle">{copy.uploadItemImage}</div>
+                    <label className="primaryButton">
                       {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
                       <input
                         type="file"
@@ -2010,12 +1878,12 @@ export default function Page() {
                   </div>
 
                   <label className="field">
-                    <span className="fieldLabel">{copy.itemName}</span>
+                    <span className="label">{copy.itemName}</span>
                     <input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} />
                   </label>
 
                   <label className="field">
-                    <span className="fieldLabel">{copy.basePrice}</span>
+                    <span className="label">{copy.basePrice}</span>
                     <input
                       className="input"
                       value={selectedItem.base_price}
@@ -2024,7 +1892,7 @@ export default function Page() {
                   </label>
 
                   <label className="field">
-                    <span className="fieldLabel">{copy.description}</span>
+                    <span className="label">{copy.description}</span>
                     <textarea
                       className="textarea"
                       value={selectedItem.description}
@@ -2033,7 +1901,7 @@ export default function Page() {
                   </label>
 
                   <div className="field">
-                    <span className="fieldLabel">{copy.availability}</span>
+                    <span className="label">{copy.availability}</span>
                     <div className="chipRow">
                       <button
                         type="button"
@@ -2054,13 +1922,13 @@ export default function Page() {
                 </div>
               ) : null}
 
-              <SummaryCard
+              <SectionCard
                 section="options"
-                icon={<IconGrid />}
+                icon="⋯"
                 title={copy.optionGroups}
                 summary={
                   <div className="simpleSummary">
-                    <div>{selectedItem.option_groups.length ? `${selectedItem.option_groups.length} groups` : copy.noOptionGroups}</div>
+                    <span>{selectedItem.option_groups.length ? `${selectedItem.option_groups.length} groups` : copy.noOptionGroups}</span>
                   </div>
                 }
               />
@@ -2068,32 +1936,32 @@ export default function Page() {
               {expanded === 'options' ? (
                 <div className="panel">
                   <div className="presetGrid">
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
                       {copy.protein}
                     </button>
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
                       {copy.size}
                     </button>
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
                       {copy.drink}
                     </button>
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
                       {copy.extras}
                     </button>
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
                       {copy.removals}
                     </button>
-                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
                       {copy.custom}
                     </button>
                   </div>
 
                   {selectedItem.option_groups.length ? (
-                    <div className="optionGroupStack">
+                    <div className="optionStack">
                       {selectedItem.option_groups.map((group) => (
-                        <div key={group.id} className="optionGroupCard">
+                        <div key={group.id} className="optionCard">
                           <input
-                            className="input slimInput"
+                            className="input compactInput"
                             value={group.name}
                             onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
                           />
@@ -2128,7 +1996,7 @@ export default function Page() {
                             {group.options.map((option) => (
                               <div key={option.id} className="choiceRow">
                                 <input
-                                  className="input slimInput choiceNameInput"
+                                  className="input compactInput choiceName"
                                   value={option.name}
                                   onChange={(e) =>
                                     updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
@@ -2136,7 +2004,7 @@ export default function Page() {
                                   placeholder={copy.choiceName}
                                 />
                                 <input
-                                  className="input slimInput choicePriceInput"
+                                  className="input compactInput choicePrice"
                                   value={option.price}
                                   onChange={(e) =>
                                     updateOptionChoice(selectedItem.id, group.id, option.id, {
@@ -2173,31 +2041,31 @@ export default function Page() {
               ) : null}
             </>
           ) : null}
-        </section>
+        </div>
 
         <nav className="bottomNav">
           <button type="button" className="navItem">
-            <span className="navIcon" />
+            <span className="navDot" />
             <span>{copy.dashboard}</span>
           </button>
           <button type="button" className="navItem">
-            <span className="navIcon" />
+            <span className="navDot" />
             <span>{copy.builder}</span>
           </button>
           <button type="button" className="navItem navItemActive">
-            <span className="navIcon" />
-            <span>{copy.previewStore.split(' ')[0]}</span>
+            <span className="navDot" />
+            <span>{copy.preview}</span>
           </button>
           <button type="button" className="navItem">
-            <span className="navIcon" />
+            <span className="navDot" />
             <span>{copy.flyers}</span>
           </button>
           <button type="button" className="navItem">
-            <span className="navIcon" />
+            <span className="navDot" />
             <span>{copy.orders}</span>
           </button>
           <button type="button" className="navItem">
-            <span className="navIcon" />
+            <span className="navDot" />
             <span>{copy.more}</span>
           </button>
         </nav>
@@ -2206,29 +2074,29 @@ export default function Page() {
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: #eef0f4;
-          padding: 18px 12px 28px;
+          background: #eef1f5;
+          padding: 16px 12px 28px;
           display: grid;
           place-items: start center;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        .appShell {
+        .shell {
           width: min(100%, 430px);
-          border-radius: 34px;
           background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 34px;
           box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
           padding: 14px 14px 92px;
           position: relative;
           overflow: hidden;
         }
 
-        .topNotch {
+        .notch {
           width: 122px;
           height: 8px;
           border-radius: 999px;
-          background: #111827;
+          background: #0f172a;
           margin: 2px auto 16px;
         }
 
@@ -2241,8 +2109,8 @@ export default function Page() {
         }
 
         .brand {
-          min-width: 0;
           white-space: nowrap;
+          min-width: 0;
           color: #111827;
           font-size: 19px;
           line-height: 1;
@@ -2259,10 +2127,10 @@ export default function Page() {
           letter-spacing: 0.02em;
         }
 
-        .topBarActions {
+        .topActions {
           display: flex;
-          gap: 8px;
           align-items: center;
+          gap: 8px;
           flex-shrink: 0;
         }
 
@@ -2272,24 +2140,24 @@ export default function Page() {
           border-radius: 10px;
           border: 1px solid rgba(15, 23, 42, 0.12);
           padding: 0 14px;
+          background: #ffffff;
+          color: #111827;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 6px;
           font-size: 15px;
           font-weight: 800;
-          background: #ffffff;
-          color: #111827;
         }
 
         .saveButton {
-          background: #111827;
+          background: #0f172a;
+          border-color: #0f172a;
           color: #ffffff;
-          border-color: #111827;
         }
 
         .saveButton:disabled {
-          opacity: 0.65;
+          opacity: 0.66;
         }
 
         .message {
@@ -2312,16 +2180,15 @@ export default function Page() {
           border: 1px solid rgba(22, 101, 52, 0.12);
         }
 
-        .heroWrap {
+        .hero {
           position: relative;
-          margin: 0 -14px;
           min-height: 188px;
           overflow: hidden;
+          margin: 0 -14px;
           background: #111827;
         }
 
-        .heroImage,
-        .heroFallback {
+        .heroImage {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -2333,10 +2200,10 @@ export default function Page() {
           background: linear-gradient(135deg, #1f2937 0%, #475569 100%);
         }
 
-        .heroShade {
+        .heroOverlay {
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.62) 100%);
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.64) 100%);
         }
 
         .heroContent {
@@ -2359,10 +2226,10 @@ export default function Page() {
           width: 58px;
           height: 58px;
           border-radius: 999px;
-          object-fit: cover;
           background: #ffffff;
-          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+          object-fit: cover;
           flex-shrink: 0;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
         }
 
         .heroLogoFallback {
@@ -2386,15 +2253,15 @@ export default function Page() {
         .heroMeta {
           margin-top: 12px;
           display: flex;
-          gap: 12px;
           flex-wrap: wrap;
+          gap: 12px;
           color: rgba(255, 255, 255, 0.96);
           font-size: 14px;
           font-weight: 700;
           text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
         }
 
-        .introCard {
+        .intro {
           padding: 18px 2px 14px;
         }
 
@@ -2415,13 +2282,13 @@ export default function Page() {
           font-weight: 600;
         }
 
-        .previewStoreButton {
+        .previewButton {
           width: 100%;
           margin-top: 16px;
           min-height: 52px;
           border-radius: 10px;
-          background: linear-gradient(180deg, #1e2430 0%, #10131a 100%);
           border: 1px solid rgba(17, 24, 39, 0.18);
+          background: linear-gradient(180deg, #1d2430 0%, #10131a 100%);
           color: #ffffff;
           display: inline-flex;
           align-items: center;
@@ -2432,16 +2299,13 @@ export default function Page() {
           font-weight: 900;
         }
 
-        .previewStoreButton:disabled {
+        .previewButton:disabled {
           opacity: 0.55;
         }
 
-        .previewIcon {
-          width: 20px;
-          height: 20px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
+        .previewEye {
+          font-size: 14px;
+          line-height: 1;
         }
 
         .stack {
@@ -2449,50 +2313,51 @@ export default function Page() {
           gap: 12px;
         }
 
-        .summaryWrap,
+        .sectionCard,
         .panel {
+          width: 100%;
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.1);
           background: #ffffff;
           box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
-          overflow: hidden;
         }
 
-        .summaryCard {
-          width: 100%;
-          border: none;
-          background: transparent;
-          text-align: left;
+        .sectionCard {
           padding: 16px;
+          text-align: left;
           display: grid;
           gap: 12px;
         }
 
-        .summaryRow {
+        .sectionCardTop {
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 10px;
         }
 
-        .summaryLeft {
+        .sectionCardLeft {
           display: flex;
           align-items: center;
           gap: 10px;
           min-width: 0;
         }
 
-        .iconBox {
-          width: 22px;
-          height: 22px;
+        .miniIcon {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          background: #f3f4f6;
           color: #111827;
-          flex-shrink: 0;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          font-size: 15px;
+          font-weight: 900;
+          flex-shrink: 0;
         }
 
-        .summaryTitle {
+        .sectionCardTitle {
           color: #111827;
           font-size: 18px;
           line-height: 1.1;
@@ -2500,37 +2365,33 @@ export default function Page() {
           letter-spacing: -0.02em;
         }
 
-        .summaryRight {
+        .sectionCardRight {
           display: flex;
           align-items: center;
           gap: 8px;
           min-width: 0;
+          flex-shrink: 0;
         }
 
-        .summaryMetaLabel {
+        .sectionCardMeta {
           color: #6b7280;
           font-size: 14px;
           font-weight: 700;
           white-space: nowrap;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          max-width: 140px;
+          max-width: 150px;
           overflow: hidden;
           text-overflow: ellipsis;
-        }
-
-        .summaryChevron {
-          width: 16px;
-          height: 16px;
-          color: #6b7280;
-          flex-shrink: 0;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
         }
 
-        .summaryBody {
+        .sectionCardArrow {
+          color: #6b7280;
+          font-size: 22px;
+          line-height: 1;
+        }
+
+        .sectionCardSummary {
           color: #374151;
         }
 
@@ -2541,78 +2402,10 @@ export default function Page() {
           font-weight: 600;
         }
 
-        .simpleSummaryTitle {
+        .simpleSummary strong {
           color: #111827;
           font-size: 17px;
           font-weight: 900;
-        }
-
-        .menuSummary {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          align-items: start;
-        }
-
-        .menuThumb {
-          aspect-ratio: 1.25 / 1;
-          border-radius: 12px;
-          overflow: hidden;
-          background: #e5e7eb;
-        }
-
-        .menuThumbImage,
-        .menuThumbPlaceholder {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .menuThumbPlaceholder {
-          background: linear-gradient(135deg, #e7ebf0 0%, #d8dee7 100%);
-        }
-
-        .menuSummaryText {
-          display: grid;
-          gap: 8px;
-        }
-
-        .menuSummaryHeadline {
-          color: #111827;
-          font-size: 16px;
-          line-height: 1.2;
-          font-weight: 900;
-        }
-
-        .menuMiniList {
-          display: grid;
-          gap: 6px;
-        }
-
-        .menuMiniListItem {
-          min-height: 42px;
-          border-radius: 10px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: #ffffff;
-          padding: 0 10px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-          color: #374151;
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .menuMiniArrow {
-          width: 16px;
-          height: 16px;
-          color: #6b7280;
-          flex-shrink: 0;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
         }
 
         .panel {
@@ -2626,7 +2419,7 @@ export default function Page() {
           gap: 8px;
         }
 
-        .fieldLabel {
+        .label {
           color: #6b7280;
           font-size: 11px;
           font-weight: 900;
@@ -2634,7 +2427,7 @@ export default function Page() {
           letter-spacing: 0.12em;
         }
 
-        .miniInfoCard {
+        .infoCard {
           border-radius: 12px;
           padding: 12px 14px;
           background: #f8fafc;
@@ -2643,7 +2436,7 @@ export default function Page() {
           gap: 4px;
         }
 
-        .miniInfoCard strong {
+        .infoCard strong {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
@@ -2667,7 +2460,7 @@ export default function Page() {
           padding: 0 14px;
         }
 
-        .slimInput {
+        .compactInput {
           min-height: 48px;
         }
 
@@ -2686,35 +2479,35 @@ export default function Page() {
           gap: 12px;
         }
 
-        .uploadCardTitle {
+        .uploadTitle {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
         }
 
-        .primaryAction,
+        .primaryButton,
         .primaryWide,
         .secondaryWide,
         .dangerWide,
         .chip,
-        .presetChip,
+        .presetButton,
         .miniDanger {
           min-height: 52px;
           border-radius: 12px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: #ffffff;
+          color: #111827;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           font-size: 16px;
           font-weight: 900;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #ffffff;
-          color: #111827;
         }
 
-        .primaryAction,
+        .primaryButton,
         .primaryWide {
-          background: #111827;
-          border-color: #111827;
+          background: #0f172a;
+          border-color: #0f172a;
           color: #ffffff;
         }
 
@@ -2773,17 +2566,17 @@ export default function Page() {
           background: #f3f4f6;
         }
 
-        .inlineToggleButton {
+        .inlineToggleBtn {
           min-height: 34px;
           padding: 0 14px;
-          font-size: 14px;
-          font-weight: 800;
           background: transparent;
           color: #374151;
+          font-size: 14px;
+          font-weight: 800;
         }
 
-        .inlineToggleButtonActive {
-          background: #111827;
+        .inlineToggleBtnActive {
+          background: #0f172a;
           color: #ffffff;
         }
 
@@ -2799,39 +2592,97 @@ export default function Page() {
         }
 
         .chipActive {
-          background: #111827;
+          background: #0f172a;
+          border-color: #0f172a;
           color: #ffffff;
-          border-color: #111827;
         }
 
         .wideChip {
           min-width: 128px;
         }
 
-        .presetChip {
+        .presetButton {
           min-width: calc(50% - 5px);
           padding: 0 14px;
         }
 
+        .menuSummary {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+          align-items: start;
+        }
+
+        .menuThumb {
+          aspect-ratio: 1.25 / 1;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #e5e7eb;
+        }
+
+        .menuThumbImage,
+        .menuThumbPlaceholder {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .menuThumbPlaceholder {
+          background: linear-gradient(135deg, #e7ebf0 0%, #d8dee7 100%);
+        }
+
+        .menuSummaryRight {
+          display: grid;
+          gap: 8px;
+        }
+
+        .menuHeadline {
+          color: #111827;
+          font-size: 16px;
+          line-height: 1.2;
+          font-weight: 900;
+        }
+
+        .menuMiniList {
+          display: grid;
+          gap: 6px;
+        }
+
+        .menuMiniItem {
+          min-height: 42px;
+          border-radius: 10px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #ffffff;
+          padding: 0 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          color: #374151;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
         .categoryStack,
         .itemList,
-        .optionGroupStack {
+        .optionStack {
           display: grid;
           gap: 12px;
         }
 
         .categoryCard,
-        .optionGroupCard {
+        .optionCard {
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.1);
-          padding: 12px;
           background: #ffffff;
+          padding: 12px;
           display: grid;
           gap: 10px;
         }
 
         .categoryCardActive {
-          border-color: rgba(17, 24, 39, 0.24);
+          border-color: rgba(15, 23, 42, 0.22);
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
         }
 
@@ -2867,29 +2718,29 @@ export default function Page() {
         }
 
         .itemCardActive {
-          border-color: rgba(17, 24, 39, 0.24);
+          border-color: rgba(15, 23, 42, 0.22);
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
         }
 
-        .itemCardImageWrap {
+        .itemImageWrap {
           width: 100%;
           aspect-ratio: 1.35 / 1;
           background: #eef1f5;
         }
 
-        .itemCardImage,
-        .itemCardImagePlaceholder {
+        .itemImage,
+        .itemImagePlaceholder {
           width: 100%;
           height: 100%;
           display: block;
           object-fit: cover;
         }
 
-        .itemCardImagePlaceholder {
+        .itemImagePlaceholder {
           background: linear-gradient(135deg, #e7ebf0 0%, #d8dee7 100%);
         }
 
-        .itemCardInfo {
+        .itemInfo {
           padding: 10px 12px;
           display: flex;
           align-items: center;
@@ -2897,13 +2748,13 @@ export default function Page() {
           gap: 8px;
         }
 
-        .itemCardInfo strong {
+        .itemInfo strong {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
         }
 
-        .itemCardInfo span {
+        .itemInfo span {
           color: #111827;
           font-size: 15px;
           font-weight: 800;
@@ -2921,11 +2772,11 @@ export default function Page() {
           align-items: center;
         }
 
-        .choiceNameInput {
+        .choiceName {
           flex: 1 1 auto;
         }
 
-        .choicePriceInput {
+        .choicePrice {
           width: 92px;
           flex: 0 0 auto;
         }
@@ -2959,6 +2810,7 @@ export default function Page() {
         }
 
         .navItem {
+          min-height: 56px;
           border-radius: 12px;
           color: #6b7280;
           display: grid;
@@ -2967,35 +2819,19 @@ export default function Page() {
           gap: 6px;
           font-size: 11px;
           font-weight: 800;
-          min-height: 56px;
         }
 
         .navItemActive {
-          background: #111827;
+          background: #0f172a;
           color: #ffffff;
         }
 
-        .navIcon {
+        .navDot {
           width: 12px;
           height: 12px;
           border-radius: 3px;
           background: currentColor;
           display: inline-block;
-        }
-
-        .iconBox :global(svg),
-        .summaryChevron :global(svg),
-        .summaryMetaLabel :global(svg),
-        .previewIcon :global(svg),
-        .menuMiniArrow :global(svg) {
-          width: 100%;
-          height: 100%;
-          display: block;
-        }
-
-        .summaryMetaLabel :global(svg) {
-          width: 18px;
-          height: 18px;
         }
       `}</style>
     </main>
