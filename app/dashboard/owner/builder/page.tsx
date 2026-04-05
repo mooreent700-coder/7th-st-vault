@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type ThemeMode = 'light' | 'dark';
-type StorefrontLanguage = 'en' | 'es';
-type BuilderLanguage = 'en' | 'es';
+type LanguageMode = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
 
 type RestaurantRow = {
@@ -20,8 +19,8 @@ type RestaurantRow = {
   hero_image?: string | null;
   logo_image?: string | null;
   storefront_theme?: ThemeMode | null;
-  order_language?: string | null;
   storefront_language?: string | null;
+  order_language?: string | null;
   pickup_enabled?: boolean | null;
   delivery_enabled?: boolean | null;
   delivery_fee?: number | null;
@@ -102,6 +101,8 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
+type SectionKey = 'store' | 'branding' | 'settings' | 'categories' | 'items' | 'options';
+
 type CopyBlock = {
   eyebrow: string;
   title: string;
@@ -109,24 +110,38 @@ type CopyBlock = {
   openStore: string;
   saveBuilder: string;
   saving: string;
+  loading: string;
+  couldNotLoad: string;
+  couldNotSave: string;
+  builderSaved: string;
+  couldNotUploadHero: string;
+  couldNotUploadLogo: string;
+  couldNotUploadItem: string;
   storeSetup: string;
+  branding: string;
+  settings: string;
+  categoryBuilder: string;
+  itemBuilder: string;
+  optionGroups: string;
   storeName: string;
   slug: string;
-  liveUrl: string;
   phone: string;
   address: string;
+  liveUrl: string;
   uploadHeroImage: string;
   uploadLogo: string;
+  uploadItemImage: string;
   heroPreview: string;
   logoPreview: string;
+  itemPreview: string;
   builderLanguage: string;
-  storefrontTheme: string;
   storefrontLanguage: string;
+  orderLanguage: string;
+  storefrontTheme: string;
   english: string;
   spanish: string;
   light: string;
   dark: string;
-  pickupDeliveryControls: string;
   pickupOn: string;
   pickupOff: string;
   deliveryOn: string;
@@ -134,87 +149,91 @@ type CopyBlock = {
   deliveryFee: string;
   deliveryRadius: string;
   deliveryMinimum: string;
-  categoryBuilder: string;
   addCategory: string;
   categoryName: string;
-  delete: string;
-  untitledCategory: string;
-  itemsIn: string;
   addItem: string;
-  available: string;
-  soldOut: string;
-  itemBuilder: string;
-  deleteItem: string;
-  uploadItemImage: string;
-  itemPreview: string;
   itemName: string;
+  itemNameFallback: string;
   basePrice: string;
   description: string;
   describeItem: string;
   availability: string;
-  optionGroups: string;
+  available: string;
+  soldOut: string;
+  delete: string;
+  deleteItem: string;
+  noOptionGroups: string;
   protein: string;
   size: string;
   drink: string;
   extras: string;
   removals: string;
   custom: string;
-  noOptionGroups: string;
-  groupName: string;
+  customOptions: string;
   required: string;
   optional: string;
   singleChoice: string;
   multipleChoice: string;
   choiceName: string;
   addChoice: string;
-  newItem: string;
-  sampleItem: string;
-  sampleDescription: string;
-  customOptions: string;
-  livePreview: string;
-  imageOnlyMainGrid: string;
-  storefrontPreview: string;
-  category: string;
-  itemNameFallback: string;
-  itemDetailsPlaceholder: string;
-  builderSaved: string;
-  loadingBuilder: string;
-  couldNotLoad: string;
-  couldNotSave: string;
-  couldNotUploadHero: string;
-  couldNotUploadLogo: string;
-  couldNotUploadItem: string;
   newChoice: string;
   options: string;
+  livePreview: string;
   heroInfoBlock: string;
+  storefrontPreview: string;
+  sampleItem: string;
+  sampleDescription: string;
+  newItem: string;
+  category: string;
+  untitledCategory: string;
+  itemsIn: string;
+  preview: string;
+  builder: string;
+  dashboard: string;
+  flyers: string;
+  orders: string;
 };
 
-const COPY: Record<BuilderLanguage, CopyBlock> = {
+const COPY: Record<LanguageMode, CopyBlock> = {
   en: {
     eyebrow: 'MENUFLOW BUILDER',
     title: 'Build Your Store',
-    subtitle: 'Upload branding, set delivery rules, build categories and items, then save.',
+    subtitle: 'Create the storefront, menu, options, and live experience from one place.',
     openStore: 'Open Store',
     saveBuilder: 'Save Builder',
     saving: 'Saving...',
+    loading: 'Loading builder...',
+    couldNotLoad: 'Could not load builder.',
+    couldNotSave: 'Could not save builder.',
+    builderSaved: 'Builder saved.',
+    couldNotUploadHero: 'Could not upload hero image.',
+    couldNotUploadLogo: 'Could not upload logo image.',
+    couldNotUploadItem: 'Could not upload item image.',
     storeSetup: 'Store Setup',
+    branding: 'Branding',
+    settings: 'Settings',
+    categoryBuilder: 'Categories',
+    itemBuilder: 'Item Builder',
+    optionGroups: 'Option Groups',
     storeName: 'Store Name',
     slug: 'Slug',
-    liveUrl: 'Live URL',
     phone: 'Phone',
     address: 'Address',
+    liveUrl: 'Live URL',
     uploadHeroImage: 'Upload Hero Image',
     uploadLogo: 'Upload Logo',
+    uploadItemImage: 'Upload Item Image',
     heroPreview: 'Hero Preview',
     logoPreview: 'Logo Preview',
+    itemPreview: 'Item Preview',
     builderLanguage: 'Builder Language',
-    storefrontTheme: 'Storefront Theme',
     storefrontLanguage: 'Storefront Language',
+    orderLanguage: 'Order Language',
+    storefrontTheme: 'Storefront Theme',
     english: 'English',
     spanish: 'Spanish',
     light: 'Light',
     dark: 'Dark',
-    pickupDeliveryControls: 'Pickup / Delivery Controls',
     pickupOn: 'Pickup On',
     pickupOff: 'Pickup Off',
     deliveryOn: 'Delivery On',
@@ -222,85 +241,89 @@ const COPY: Record<BuilderLanguage, CopyBlock> = {
     deliveryFee: 'Delivery Fee',
     deliveryRadius: 'Delivery Radius',
     deliveryMinimum: 'Delivery Minimum',
-    categoryBuilder: 'Category Builder',
     addCategory: 'Add Category',
     categoryName: 'Category Name',
-    delete: 'Delete',
-    untitledCategory: 'Untitled Category',
-    itemsIn: 'Items in',
     addItem: 'Add Item',
-    available: 'Available',
-    soldOut: 'Sold Out',
-    itemBuilder: 'Item Builder',
-    deleteItem: 'Delete Item',
-    uploadItemImage: 'Upload Item Image',
-    itemPreview: 'Item Preview',
     itemName: 'Item Name',
+    itemNameFallback: 'Item Name',
     basePrice: 'Base Price',
     description: 'Description',
     describeItem: 'Describe the item...',
     availability: 'Availability',
-    optionGroups: 'Option Groups',
+    available: 'Available',
+    soldOut: 'Sold Out',
+    delete: 'Delete',
+    deleteItem: 'Delete Item',
+    noOptionGroups: 'No option groups yet.',
     protein: 'Protein',
     size: 'Size',
     drink: 'Drink',
     extras: 'Extras',
     removals: 'Removals',
     custom: 'Custom',
-    noOptionGroups: 'No option groups yet.',
-    groupName: 'Group Name',
+    customOptions: 'Custom Options',
     required: 'Required',
     optional: 'Optional',
     singleChoice: 'Single Choice',
     multipleChoice: 'Multiple Choice',
     choiceName: 'Choice Name',
     addChoice: 'Add Choice',
-    newItem: 'New Item',
-    sampleItem: 'Sample Item',
-    sampleDescription: 'Tap to edit this item.',
-    customOptions: 'Custom Options',
-    livePreview: 'Live Preview',
-    imageOnlyMainGrid: 'IMAGE-ONLY MAIN GRID',
-    storefrontPreview: 'Storefront Preview',
-    category: 'Category',
-    itemNameFallback: 'Item Name',
-    itemDetailsPlaceholder: 'Item details will show here in the popup preview.',
-    builderSaved: 'Builder saved.',
-    loadingBuilder: 'Loading builder...',
-    couldNotLoad: 'Could not load builder.',
-    couldNotSave: 'Could not save builder.',
-    couldNotUploadHero: 'Could not upload hero image.',
-    couldNotUploadLogo: 'Could not upload logo image.',
-    couldNotUploadItem: 'Could not upload item image.',
     newChoice: 'New Choice',
     options: 'Options',
+    livePreview: 'Live Preview',
     heroInfoBlock: 'Store Info',
+    storefrontPreview: 'Storefront Preview',
+    sampleItem: 'Sample Item',
+    sampleDescription: 'Tap to edit this item.',
+    newItem: 'New Item',
+    category: 'Category',
+    untitledCategory: 'Untitled Category',
+    itemsIn: 'Items in',
+    preview: 'Preview',
+    builder: 'Builder',
+    dashboard: 'Dashboard',
+    flyers: 'Flyers',
+    orders: 'Orders',
   },
   es: {
     eyebrow: 'CONSTRUCTOR MENUFLOW',
     title: 'Construye Tu Tienda',
-    subtitle: 'Sube tu branding, configura entrega, crea categorías y productos, y guarda.',
+    subtitle: 'Crea la tienda, el menú, las opciones y la experiencia en vivo desde un solo lugar.',
     openStore: 'Abrir Tienda',
     saveBuilder: 'Guardar Constructor',
     saving: 'Guardando...',
-    storeSetup: 'Configuración de Tienda',
+    loading: 'Cargando constructor...',
+    couldNotLoad: 'No se pudo cargar el constructor.',
+    couldNotSave: 'No se pudo guardar el constructor.',
+    builderSaved: 'Constructor guardado.',
+    couldNotUploadHero: 'No se pudo subir la imagen hero.',
+    couldNotUploadLogo: 'No se pudo subir el logo.',
+    couldNotUploadItem: 'No se pudo subir la imagen del producto.',
+    storeSetup: 'Configuración',
+    branding: 'Branding',
+    settings: 'Ajustes',
+    categoryBuilder: 'Categorías',
+    itemBuilder: 'Constructor de Producto',
+    optionGroups: 'Grupos de Opciones',
     storeName: 'Nombre del Negocio',
     slug: 'Slug',
-    liveUrl: 'URL en vivo',
     phone: 'Teléfono',
     address: 'Dirección',
+    liveUrl: 'URL en vivo',
     uploadHeroImage: 'Subir Imagen Hero',
     uploadLogo: 'Subir Logo',
+    uploadItemImage: 'Subir Imagen del Producto',
     heroPreview: 'Vista previa hero',
     logoPreview: 'Vista previa logo',
+    itemPreview: 'Vista previa del producto',
     builderLanguage: 'Idioma del Constructor',
-    storefrontTheme: 'Tema de la Tienda',
     storefrontLanguage: 'Idioma de la Tienda',
+    orderLanguage: 'Idioma del Pedido',
+    storefrontTheme: 'Tema de la Tienda',
     english: 'Inglés',
     spanish: 'Español',
     light: 'Claro',
     dark: 'Oscuro',
-    pickupDeliveryControls: 'Controles de Recogida / Entrega',
     pickupOn: 'Recogida Activada',
     pickupOff: 'Recogida Desactivada',
     deliveryOn: 'Entrega Activada',
@@ -308,59 +331,49 @@ const COPY: Record<BuilderLanguage, CopyBlock> = {
     deliveryFee: 'Costo de Entrega',
     deliveryRadius: 'Radio de Entrega',
     deliveryMinimum: 'Mínimo de Entrega',
-    categoryBuilder: 'Constructor de Categorías',
     addCategory: 'Agregar Categoría',
     categoryName: 'Nombre de Categoría',
-    delete: 'Eliminar',
-    untitledCategory: 'Categoría sin nombre',
-    itemsIn: 'Productos en',
     addItem: 'Agregar Producto',
-    available: 'Disponible',
-    soldOut: 'Agotado',
-    itemBuilder: 'Constructor de Producto',
-    deleteItem: 'Eliminar Producto',
-    uploadItemImage: 'Subir Imagen del Producto',
-    itemPreview: 'Vista previa del producto',
     itemName: 'Nombre del Producto',
+    itemNameFallback: 'Nombre del producto',
     basePrice: 'Precio Base',
     description: 'Descripción',
     describeItem: 'Describe el producto...',
     availability: 'Disponibilidad',
-    optionGroups: 'Grupos de Opciones',
+    available: 'Disponible',
+    soldOut: 'Agotado',
+    delete: 'Eliminar',
+    deleteItem: 'Eliminar Producto',
+    noOptionGroups: 'Todavía no hay grupos de opciones.',
     protein: 'Proteína',
     size: 'Tamaño',
     drink: 'Bebida',
     extras: 'Extras',
     removals: 'Quitar',
     custom: 'Personalizado',
-    noOptionGroups: 'Todavía no hay grupos de opciones.',
-    groupName: 'Nombre del Grupo',
+    customOptions: 'Opciones Personalizadas',
     required: 'Requerido',
     optional: 'Opcional',
     singleChoice: 'Una Opción',
     multipleChoice: 'Múltiples Opciones',
     choiceName: 'Nombre de Opción',
     addChoice: 'Agregar Opción',
-    newItem: 'Nuevo Producto',
-    sampleItem: 'Producto de Ejemplo',
-    sampleDescription: 'Toca para editar este producto.',
-    customOptions: 'Opciones Personalizadas',
-    livePreview: 'Vista en Vivo',
-    imageOnlyMainGrid: 'CUADRÍCULA SOLO IMÁGENES',
-    storefrontPreview: 'Vista previa de la tienda',
-    category: 'Categoría',
-    itemNameFallback: 'Nombre del producto',
-    itemDetailsPlaceholder: 'Los detalles del producto aparecerán aquí en la vista previa.',
-    builderSaved: 'Constructor guardado.',
-    loadingBuilder: 'Cargando constructor...',
-    couldNotLoad: 'No se pudo cargar el constructor.',
-    couldNotSave: 'No se pudo guardar el constructor.',
-    couldNotUploadHero: 'No se pudo subir la imagen hero.',
-    couldNotUploadLogo: 'No se pudo subir el logo.',
-    couldNotUploadItem: 'No se pudo subir la imagen del producto.',
     newChoice: 'Nueva Opción',
     options: 'Opciones',
+    livePreview: 'Vista en Vivo',
     heroInfoBlock: 'Información de Tienda',
+    storefrontPreview: 'Vista previa de la tienda',
+    sampleItem: 'Producto de Ejemplo',
+    sampleDescription: 'Toca para editar este producto.',
+    newItem: 'Nuevo Producto',
+    category: 'Categoría',
+    untitledCategory: 'Categoría sin nombre',
+    itemsIn: 'Productos en',
+    preview: 'Vista',
+    builder: 'Constructor',
+    dashboard: 'Panel',
+    flyers: 'Flyers',
+    orders: 'Pedidos',
   },
 };
 
@@ -494,8 +507,34 @@ function pickDeterministicImage(urls: string[], seed: string) {
   return urls[hash % urls.length];
 }
 
+function getEmptyStarter(copy: CopyBlock): BuilderCategory[] {
+  const starterCategoryId = uid('cat');
+  const starterItemId = uid('item');
+
+  return [
+    {
+      id: starterCategoryId,
+      name: 'Featured',
+      sort_order: 0,
+      items: [
+        {
+          id: starterItemId,
+          category_id: starterCategoryId,
+          name: copy.sampleItem,
+          base_price: '12',
+          description: copy.sampleDescription,
+          image_url: '',
+          availability: 'available',
+          option_groups: [],
+        },
+      ],
+    },
+  ];
+}
+
 export default function OwnerBuilderPage() {
   const router = useRouter();
+  const previewShellRef = useRef<HTMLDivElement | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -509,7 +548,10 @@ export default function OwnerBuilderPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [builderLanguage, setBuilderLanguage] = useState<BuilderLanguage>('en');
+  const [builderLanguage, setBuilderLanguage] = useState<LanguageMode>('en');
+  const [storefrontLanguage, setStorefrontLanguage] = useState<LanguageMode>('en');
+  const [orderLanguage, setOrderLanguage] = useState<LanguageMode>('en');
+  const [theme, setTheme] = useState<ThemeMode>('light');
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -517,8 +559,6 @@ export default function OwnerBuilderPage() {
   const [address, setAddress] = useState('');
   const [heroImage, setHeroImage] = useState('');
   const [logoImage, setLogoImage] = useState('');
-  const [theme, setTheme] = useState<ThemeMode>('light');
-  const [storefrontLanguage, setStorefrontLanguage] = useState<StorefrontLanguage>('en');
 
   const [pickupEnabled, setPickupEnabled] = useState(true);
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
@@ -527,19 +567,26 @@ export default function OwnerBuilderPage() {
   const [deliveryMinimum, setDeliveryMinimum] = useState('0');
 
   const [categories, setCategories] = useState<BuilderCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [selectedItemId, setSelectedItemId] = useState<string>('');
-  const [previewItemId, setPreviewItemId] = useState<string>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedItemId, setSelectedItemId] = useState('');
+  const [previewItemId, setPreviewItemId] = useState('');
+  const [mobileView, setMobileView] = useState<'builder' | 'preview'>('builder');
+  const [expandedSections, setExpandedSections] = useState<Record<SectionKey, boolean>>({
+    store: true,
+    branding: true,
+    settings: true,
+    categories: true,
+    items: true,
+    options: true,
+  });
   const [placeholderMap, setPlaceholderMap] = useState<Record<string, string[]>>({});
 
   const copy = COPY[builderLanguage];
+  const normalizedSlug = useMemo(() => slugify(slug), [slug]);
+  const previewLink = normalizedSlug ? `/store/${normalizedSlug}` : '';
 
   useEffect(() => {
-    const stored =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem('menuflow_builder_language')
-        : null;
-
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('menuflow_builder_language') : null;
     if (stored === 'en' || stored === 'es') {
       setBuilderLanguage(stored);
     }
@@ -560,12 +607,10 @@ export default function OwnerBuilderPage() {
         const nextMap: Record<string, string[]> = {};
 
         for (const folder of folders) {
-          const { data, error: listError } = await supabase.storage
-            .from(PLACEHOLDER_BUCKET)
-            .list(folder, {
-              limit: 100,
-              sortBy: { column: 'name', order: 'asc' },
-            });
+          const { data, error: listError } = await supabase.storage.from(PLACEHOLDER_BUCKET).list(folder, {
+            limit: 100,
+            sortBy: { column: 'name', order: 'asc' },
+          });
 
           if (listError) {
             nextMap[folder] = [];
@@ -576,9 +621,7 @@ export default function OwnerBuilderPage() {
 
           for (const file of data || []) {
             if (!file.name || file.name.startsWith('.')) continue;
-            const { data: publicUrlData } = supabase.storage
-              .from(PLACEHOLDER_BUCKET)
-              .getPublicUrl(`${folder}/${file.name}`);
+            const { data: publicUrlData } = supabase.storage.from(PLACEHOLDER_BUCKET).getPublicUrl(`${folder}/${file.name}`);
             if (publicUrlData?.publicUrl) {
               urls.push(publicUrlData.publicUrl);
             }
@@ -635,8 +678,8 @@ export default function OwnerBuilderPage() {
             hero_image,
             logo_image,
             storefront_theme,
-            order_language,
             storefront_language,
+            order_language,
             pickup_enabled,
             delivery_enabled,
             delivery_fee,
@@ -665,11 +708,7 @@ export default function OwnerBuilderPage() {
           setLogoImage(row.logo_image || '');
           setTheme((row.storefront_theme as ThemeMode) || 'light');
           setStorefrontLanguage((row.storefront_language || 'en') === 'es' ? 'es' : 'en');
-
-          const inferredBuilderLanguage =
-            (row.order_language || 'EN').toString().toUpperCase() === 'ES' ? 'es' : 'en';
-          setBuilderLanguage(inferredBuilderLanguage);
-
+          setOrderLanguage((row.order_language || 'EN').toString().toUpperCase() === 'ES' ? 'es' : 'en');
           setPickupEnabled(row.pickup_enabled ?? true);
           setDeliveryEnabled(row.delivery_enabled ?? false);
           setDeliveryFee(String(row.delivery_fee ?? 0));
@@ -678,33 +717,14 @@ export default function OwnerBuilderPage() {
         }
 
         if (currentRestaurantId) {
-          await loadMenuBuilder(currentRestaurantId, active);
+          await loadMenuBuilder(currentRestaurantId);
         } else {
-          const starterCategoryId = uid('cat');
-          const starterItemId = uid('item');
-          const starter: BuilderCategory[] = [
-            {
-              id: starterCategoryId,
-              name: 'Featured',
-              sort_order: 0,
-              items: [
-                {
-                  id: starterItemId,
-                  category_id: starterCategoryId,
-                  name: COPY.en.sampleItem,
-                  base_price: '12',
-                  description: COPY.en.sampleDescription,
-                  image_url: '',
-                  availability: 'available',
-                  option_groups: [],
-                },
-              ],
-            },
-          ];
+          const starter = getEmptyStarter(COPY[builderLanguage]);
+          if (!active) return;
           setCategories(starter);
-          setSelectedCategoryId(starterCategoryId);
-          setSelectedItemId(starterItemId);
-          setPreviewItemId(starterItemId);
+          setSelectedCategoryId(starter[0].id);
+          setSelectedItemId(starter[0].items[0].id);
+          setPreviewItemId(starter[0].items[0].id);
         }
       } catch (err: any) {
         if (!active) return;
@@ -714,20 +734,24 @@ export default function OwnerBuilderPage() {
       }
     }
 
-    async function loadMenuBuilder(currentRestaurantId: string, activeState: boolean) {
-      const { data: categoryData } = await supabase
+    async function loadMenuBuilder(currentRestaurantId: string) {
+      const { data: categoryData, error: categoryError } = await supabase
         .from('menu_categories')
         .select('id, restaurant_id, name, sort_order')
         .eq('restaurant_id', currentRestaurantId)
         .order('sort_order', { ascending: true });
 
-      const { data: itemData } = await supabase
+      if (categoryError) throw categoryError;
+
+      const { data: itemData, error: itemError } = await supabase
         .from('menu_items')
         .select(
           'id, restaurant_id, category_id, name, description, price, base_price, image_url, availability, is_available, sort_order'
         )
         .eq('restaurant_id', currentRestaurantId)
         .order('sort_order', { ascending: true });
+
+      if (itemError) throw itemError;
 
       const itemRows = (itemData || []) as ItemRow[];
       const itemIds = itemRows.map((item) => item.id);
@@ -736,108 +760,85 @@ export default function OwnerBuilderPage() {
       let choiceData: OptionChoiceRow[] = [];
 
       if (itemIds.length) {
-        const { data: groups } = await supabase
+        const { data: groups, error: groupError } = await supabase
           .from('menu_option_groups')
           .select('id, item_id, name, is_required, is_multiple, selection_mode, sort_order')
           .in('item_id', itemIds)
           .order('sort_order', { ascending: true });
 
+        if (groupError) throw groupError;
         groupData = (groups || []) as OptionGroupRow[];
 
         const groupIds = groupData.map((group) => group.id);
 
         if (groupIds.length) {
-          const { data: choices } = await supabase
+          const { data: choices, error: choiceError } = await supabase
             .from('menu_option_choices')
             .select('id, option_group_id, name, price, price_delta, sort_order')
             .in('option_group_id', groupIds)
             .order('sort_order', { ascending: true });
 
+          if (choiceError) throw choiceError;
           choiceData = (choices || []) as OptionChoiceRow[];
         }
       }
 
-      if (!activeState) return;
+      if (!active) return;
 
-      const mappedCategories: BuilderCategory[] = ((categoryData || []) as CategoryRow[]).map(
-        (category, categoryIndex): BuilderCategory => {
-          const categoryItems: BuilderItem[] = itemRows
-            .filter((item) => item.category_id === category.id)
-            .map((item): BuilderItem => {
-              const groups: BuilderOptionGroup[] = groupData
-                .filter((group) => group.item_id === item.id)
-                .map((group): BuilderOptionGroup => ({
-                  id: group.id,
-                  name: group.name || COPY[builderLanguage].options,
-                  presetType: 'custom',
-                  required: !!group.is_required,
-                  selection: normalizeSelectionMode(group),
-                  options: choiceData
-                    .filter((choice) => choice.option_group_id === group.id)
-                    .map(
-                      (choice): BuilderOption => ({
-                        id: choice.id,
-                        name: choice.name || COPY[builderLanguage].newChoice,
-                        price: String(choice.price_delta ?? choice.price ?? 0),
-                      })
-                    ),
-                }));
+      const mappedCategories: BuilderCategory[] = ((categoryData || []) as CategoryRow[]).map((category, categoryIndex) => {
+        const categoryItems: BuilderItem[] = itemRows
+          .filter((item) => item.category_id === category.id)
+          .map((item) => {
+            const groups: BuilderOptionGroup[] = groupData
+              .filter((group) => group.item_id === item.id)
+              .map((group) => ({
+                id: group.id,
+                name: group.name || COPY[builderLanguage].options,
+                presetType: 'custom',
+                required: !!group.is_required,
+                selection: normalizeSelectionMode(group),
+                options: choiceData
+                  .filter((choice) => choice.option_group_id === group.id)
+                  .map((choice) => ({
+                    id: choice.id,
+                    name: choice.name || COPY[builderLanguage].newChoice,
+                    price: String(choice.price_delta ?? choice.price ?? 0),
+                  })),
+              }));
 
-              return {
-                id: item.id,
-                category_id: category.id,
-                name: item.name || '',
-                base_price: String(item.base_price ?? item.price ?? 0),
-                description: item.description || '',
-                image_url: item.image_url || '',
-                availability: normalizeAvailability(item),
-                option_groups: groups,
-              };
-            });
+            return {
+              id: item.id,
+              category_id: category.id,
+              name: item.name || '',
+              base_price: String(item.base_price ?? item.price ?? 0),
+              description: item.description || '',
+              image_url: item.image_url || '',
+              availability: normalizeAvailability(item),
+              option_groups: groups,
+            };
+          });
 
-          return {
-            id: category.id,
-            name: category.name || `${COPY[builderLanguage].category} ${categoryIndex + 1}`,
-            sort_order: category.sort_order ?? categoryIndex,
-            items: categoryItems,
-          };
-        }
-      );
+        return {
+          id: category.id,
+          name: category.name || `${COPY[builderLanguage].category} ${categoryIndex + 1}`,
+          sort_order: category.sort_order ?? categoryIndex,
+          items: categoryItems,
+        };
+      });
 
       if (mappedCategories.length) {
         setCategories(mappedCategories);
-        setSelectedCategoryId(mappedCategories[0].id);
-        const firstItem = mappedCategories[0].items[0];
-        if (firstItem) {
-          setSelectedItemId(firstItem.id);
-          setPreviewItemId(firstItem.id);
-        }
+        const firstCategory = mappedCategories[0];
+        const firstItem = firstCategory.items[0] || null;
+        setSelectedCategoryId(firstCategory.id);
+        setSelectedItemId(firstItem?.id || '');
+        setPreviewItemId(firstItem?.id || '');
       } else {
-        const starterCategoryId = uid('cat');
-        const starterItemId = uid('item');
-        const starter: BuilderCategory[] = [
-          {
-            id: starterCategoryId,
-            name: 'Featured',
-            sort_order: 0,
-            items: [
-              {
-                id: starterItemId,
-                category_id: starterCategoryId,
-                name: COPY[builderLanguage].sampleItem,
-                base_price: '12',
-                description: COPY[builderLanguage].sampleDescription,
-                image_url: '',
-                availability: 'available',
-                option_groups: [],
-              },
-            ],
-          },
-        ];
+        const starter = getEmptyStarter(COPY[builderLanguage]);
         setCategories(starter);
-        setSelectedCategoryId(starterCategoryId);
-        setSelectedItemId(starterItemId);
-        setPreviewItemId(starterItemId);
+        setSelectedCategoryId(starter[0].id);
+        setSelectedItemId(starter[0].items[0].id);
+        setPreviewItemId(starter[0].items[0].id);
       }
     }
 
@@ -846,11 +847,56 @@ export default function OwnerBuilderPage() {
     return () => {
       active = false;
     };
-  }, [router, builderLanguage]);
+  }, [router]);
 
-  const normalizedSlug = useMemo(() => slugify(slug), [slug]);
+  useEffect(() => {
+    if (!categories.length) return;
 
-  const previewLink = normalizedSlug ? `/store/${normalizedSlug}` : '/store/demo';
+    const selectedCategoryStillExists = categories.some((category) => category.id === selectedCategoryId);
+    const allItems = categories.flatMap((category) => category.items);
+    const selectedItemStillExists = allItems.some((item) => item.id === selectedItemId);
+    const previewItemStillExists = allItems.some((item) => item.id === previewItemId);
+
+    if (!selectedCategoryStillExists) {
+      const firstCategory = categories[0];
+      setSelectedCategoryId(firstCategory.id);
+      setSelectedItemId(firstCategory.items[0]?.id || '');
+      setPreviewItemId(firstCategory.items[0]?.id || '');
+      return;
+    }
+
+    if (!selectedItemStillExists) {
+      const currentCategory = categories.find((category) => category.id === selectedCategoryId) || categories[0];
+      setSelectedItemId(currentCategory.items[0]?.id || '');
+    }
+
+    if (!previewItemStillExists) {
+      const currentCategory = categories.find((category) => category.id === selectedCategoryId) || categories[0];
+      setPreviewItemId(currentCategory.items[0]?.id || '');
+    }
+  }, [categories, selectedCategoryId, selectedItemId, previewItemId]);
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.id === selectedCategoryId) || categories[0] || null,
+    [categories, selectedCategoryId]
+  );
+
+  const selectedItem = useMemo(() => {
+    const allItems = categories.flatMap((category) => category.items);
+    return allItems.find((item) => item.id === selectedItemId) || allItems[0] || null;
+  }, [categories, selectedItemId]);
+
+  const previewItem = useMemo(() => {
+    const allItems = categories.flatMap((category) => category.items);
+    return allItems.find((item) => item.id === previewItemId) || null;
+  }, [categories, previewItemId]);
+
+  function toggleSection(section: SectionKey) {
+    setExpandedSections((current) => ({
+      ...current,
+      [section]: !current[section],
+    }));
+  }
 
   function getCategoryNameById(categoryId: string) {
     return categories.find((category) => category.id === categoryId)?.name || '';
@@ -870,27 +916,23 @@ export default function OwnerBuilderPage() {
     return getPlaceholderForItem(item);
   }
 
-  const selectedCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategoryId) || categories[0] || null,
-    [categories, selectedCategoryId]
-  );
+  function selectCategory(categoryId: string) {
+    const category = categories.find((entry) => entry.id === categoryId);
+    setSelectedCategoryId(categoryId);
+    const firstItem = category?.items[0] || null;
+    setSelectedItemId(firstItem?.id || '');
+    setPreviewItemId(firstItem?.id || '');
+  }
 
-  const selectedItem = useMemo(() => {
-    const allItems = categories.flatMap((category) => category.items);
-    return allItems.find((item) => item.id === selectedItemId) || allItems[0] || null;
-  }, [categories, selectedItemId]);
-
-  const previewItem = useMemo(() => {
-    const allItems = categories.flatMap((category) => category.items);
-    return allItems.find((item) => item.id === previewItemId) || null;
-  }, [categories, previewItemId]);
-
-  const previewThemeClass =
-    theme === 'dark' ? 'previewShell previewDark' : 'previewShell previewLight';
+  function selectItem(itemId: string) {
+    setSelectedItemId(itemId);
+    setPreviewItemId(itemId);
+  }
 
   async function uploadToBucket(file: File, bucket: 'heroes' | 'logos' | 'menu-items') {
     const ext = file.name.split('.').pop() || 'jpg';
-    const path = `${ownerId || 'owner'}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const safeOwnerId = ownerId || 'owner';
+    const path = `${safeOwnerId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
     const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
       cacheControl: '3600',
@@ -944,9 +986,7 @@ export default function OwnerBuilderPage() {
       setCategories((current) =>
         current.map((category) => ({
           ...category,
-          items: category.items.map((item) =>
-            item.id === itemId ? { ...item, image_url: url } : item
-          ),
+          items: category.items.map((item) => (item.id === itemId ? { ...item, image_url: url } : item)),
         }))
       );
     } catch (err: any) {
@@ -982,13 +1022,12 @@ export default function OwnerBuilderPage() {
     setSelectedCategoryId(newCategoryId);
     setSelectedItemId(newItemId);
     setPreviewItemId(newItemId);
+    setExpandedSections((current) => ({ ...current, categories: true, items: true }));
   }
 
   function updateCategory(categoryId: string, value: string) {
     setCategories((current) =>
-      current.map((category) =>
-        category.id === categoryId ? { ...category, name: value } : category
-      )
+      current.map((category) => (category.id === categoryId ? { ...category, name: value } : category))
     );
   }
 
@@ -1004,6 +1043,7 @@ export default function OwnerBuilderPage() {
 
   function addItem(categoryId: string) {
     const itemId = uid('item');
+
     setCategories((current) =>
       current.map((category) =>
         category.id === categoryId
@@ -1026,27 +1066,25 @@ export default function OwnerBuilderPage() {
           : category
       )
     );
+
     setSelectedCategoryId(categoryId);
     setSelectedItemId(itemId);
     setPreviewItemId(itemId);
+    setExpandedSections((current) => ({ ...current, items: true }));
   }
 
   function updateItem(itemId: string, patch: Partial<BuilderItem>) {
     setCategories((current) =>
       current.map((category) => ({
         ...category,
-        items: category.items.map((item) =>
-          item.id === itemId ? { ...item, ...patch } : item
-        ),
+        items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
       }))
     );
   }
 
   function deleteItem(categoryId: string, itemId: string) {
     const nextCategories = categories.map((category) =>
-      category.id === categoryId
-        ? { ...category, items: category.items.filter((item) => item.id !== itemId) }
-        : category
+      category.id === categoryId ? { ...category, items: category.items.filter((item) => item.id !== itemId) } : category
     );
 
     setCategories(nextCategories);
@@ -1094,19 +1132,15 @@ export default function OwnerBuilderPage() {
       current.map((category) => ({
         ...category,
         items: category.items.map((item) =>
-          item.id === itemId
-            ? { ...item, option_groups: [...item.option_groups, group] }
-            : item
+          item.id === itemId ? { ...item, option_groups: [...item.option_groups, group] } : item
         ),
       }))
     );
+
+    setExpandedSections((current) => ({ ...current, options: true }));
   }
 
-  function updateOptionGroup(
-    itemId: string,
-    groupId: string,
-    patch: Partial<BuilderOptionGroup>
-  ) {
+  function updateOptionGroup(itemId: string, groupId: string, patch: Partial<BuilderOptionGroup>) {
     setCategories((current) =>
       current.map((category) => ({
         ...category,
@@ -1114,9 +1148,7 @@ export default function OwnerBuilderPage() {
           item.id === itemId
             ? {
                 ...item,
-                option_groups: item.option_groups.map((group) =>
-                  group.id === groupId ? { ...group, ...patch } : group
-                ),
+                option_groups: item.option_groups.map((group) => (group.id === groupId ? { ...group, ...patch } : group)),
               }
             : item
         ),
@@ -1165,12 +1197,7 @@ export default function OwnerBuilderPage() {
     );
   }
 
-  function updateOptionChoice(
-    itemId: string,
-    groupId: string,
-    optionId: string,
-    patch: Partial<BuilderOption>
-  ) {
+  function updateOptionChoice(itemId: string, groupId: string, optionId: string, patch: Partial<BuilderOption>) {
     setCategories((current) =>
       current.map((category) => ({
         ...category,
@@ -1182,9 +1209,7 @@ export default function OwnerBuilderPage() {
                   group.id === groupId
                     ? {
                         ...group,
-                        options: group.options.map((option) =>
-                          option.id === optionId ? { ...option, ...patch } : option
-                        ),
+                        options: group.options.map((option) => (option.id === optionId ? { ...option, ...patch } : option)),
                       }
                     : group
                 ),
@@ -1236,7 +1261,7 @@ export default function OwnerBuilderPage() {
         logo_image: logoImage.trim() || null,
         storefront_theme: theme,
         storefront_language: storefrontLanguage,
-        order_language: builderLanguage === 'es' ? 'ES' : 'EN',
+        order_language: orderLanguage === 'es' ? 'ES' : 'EN',
         pickup_enabled: pickupEnabled,
         delivery_enabled: deliveryEnabled,
         delivery_fee: Number(deliveryFee || 0),
@@ -1247,11 +1272,7 @@ export default function OwnerBuilderPage() {
       let currentRestaurantId = restaurantId;
 
       if (restaurantId) {
-        const { error: updateError } = await supabase
-          .from('restaurants')
-          .update(restaurantPayload)
-          .eq('id', restaurantId);
-
+        const { error: updateError } = await supabase.from('restaurants').update(restaurantPayload).eq('id', restaurantId);
         if (updateError) throw updateError;
       } else {
         const { data: inserted, error: insertError } = await supabase
@@ -1267,6 +1288,67 @@ export default function OwnerBuilderPage() {
 
       if (!currentRestaurantId) throw new Error('Missing restaurant id.');
 
+      const { data: existingCategories, error: existingCategoriesError } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingCategoriesError) throw existingCategoriesError;
+
+      const { data: existingItems, error: existingItemsError } = await supabase
+        .from('menu_items')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingItemsError) throw existingItemsError;
+
+      const existingCategoryIds = (existingCategories || []).map((row) => row.id);
+      const existingItemIds = (existingItems || []).map((row) => row.id);
+
+      let existingGroupIds: string[] = [];
+
+      if (existingItemIds.length) {
+        const { data: existingGroups, error: existingGroupsError } = await supabase
+          .from('menu_option_groups')
+          .select('id')
+          .in('item_id', existingItemIds);
+
+        if (existingGroupsError) throw existingGroupsError;
+        existingGroupIds = (existingGroups || []).map((row) => row.id);
+      }
+
+      if (existingGroupIds.length) {
+        const { error: deleteChoicesError } = await supabase
+          .from('menu_option_choices')
+          .delete()
+          .in('option_group_id', existingGroupIds);
+
+        if (deleteChoicesError) throw deleteChoicesError;
+      }
+
+      if (existingItemIds.length) {
+        const { error: deleteGroupsError } = await supabase
+          .from('menu_option_groups')
+          .delete()
+          .in('item_id', existingItemIds);
+
+        if (deleteGroupsError) throw deleteGroupsError;
+      }
+
+      if (existingItemIds.length) {
+        const { error: deleteItemsError } = await supabase.from('menu_items').delete().in('id', existingItemIds);
+        if (deleteItemsError) throw deleteItemsError;
+      }
+
+      if (existingCategoryIds.length) {
+        const { error: deleteCategoriesError } = await supabase
+          .from('menu_categories')
+          .delete()
+          .in('id', existingCategoryIds);
+
+        if (deleteCategoriesError) throw deleteCategoriesError;
+      }
+
       const allCategories = categories.map((category, categoryIndex) => ({
         id: category.id,
         restaurant_id: currentRestaurantId,
@@ -1274,35 +1356,26 @@ export default function OwnerBuilderPage() {
         sort_order: categoryIndex,
       }));
 
-      await supabase.from('menu_categories').delete().eq('restaurant_id', currentRestaurantId);
-
       if (allCategories.length) {
-        const { error: categoryInsertError } = await supabase
-          .from('menu_categories')
-          .insert(allCategories);
+        const { error: categoryInsertError } = await supabase.from('menu_categories').insert(allCategories);
         if (categoryInsertError) throw categoryInsertError;
       }
 
       const allItems = categories.flatMap((category, categoryIndex) =>
-        category.items.map((item, itemIndex) => {
-          const fallbackImage = getResolvedItemImage(item);
-          return {
-            id: item.id,
-            restaurant_id: currentRestaurantId,
-            category_id: category.id,
-            name: item.name.trim() || copy.itemNameFallback,
-            base_price: Number(item.base_price || 0),
-            price: Number(item.base_price || 0),
-            description: item.description.trim() || null,
-            image_url: fallbackImage || null,
-            availability: item.availability,
-            is_available: item.availability === 'available',
-            sort_order: itemIndex + categoryIndex * 100,
-          };
-        })
+        category.items.map((item, itemIndex) => ({
+          id: item.id,
+          restaurant_id: currentRestaurantId,
+          category_id: category.id,
+          name: item.name.trim() || copy.itemNameFallback,
+          base_price: Number(item.base_price || 0),
+          price: Number(item.base_price || 0),
+          description: item.description.trim() || null,
+          image_url: (getResolvedItemImage(item) || '').trim() || null,
+          availability: item.availability,
+          is_available: item.availability === 'available',
+          sort_order: itemIndex + categoryIndex * 100,
+        }))
       );
-
-      await supabase.from('menu_items').delete().eq('restaurant_id', currentRestaurantId);
 
       if (allItems.length) {
         const { error: itemInsertError } = await supabase.from('menu_items').insert(allItems);
@@ -1310,7 +1383,7 @@ export default function OwnerBuilderPage() {
       }
 
       const allOptionGroups = categories.flatMap((category) =>
-        category.items.flatMap((item, groupIndexBase) =>
+        category.items.flatMap((item) =>
           item.option_groups.map((group, groupIndex) => ({
             id: group.id,
             item_id: item.id,
@@ -1318,28 +1391,14 @@ export default function OwnerBuilderPage() {
             is_required: group.required,
             is_multiple: group.selection === 'multiple',
             selection_mode: group.selection,
-            sort_order: groupIndex + groupIndexBase * 10,
+            sort_order: groupIndex,
           }))
         )
       );
 
-      const itemIds = allItems.map((item) => item.id);
-
-      if (itemIds.length) {
-        await supabase.from('menu_option_groups').delete().in('item_id', itemIds);
-      }
-
       if (allOptionGroups.length) {
-        const { error: groupInsertError } = await supabase
-          .from('menu_option_groups')
-          .insert(allOptionGroups);
+        const { error: groupInsertError } = await supabase.from('menu_option_groups').insert(allOptionGroups);
         if (groupInsertError) throw groupInsertError;
-      }
-
-      const groupIds = allOptionGroups.map((group) => group.id);
-
-      if (groupIds.length) {
-        await supabase.from('menu_option_choices').delete().in('option_group_id', groupIds);
       }
 
       const allChoices = categories.flatMap((category) =>
@@ -1358,9 +1417,7 @@ export default function OwnerBuilderPage() {
       );
 
       if (allChoices.length) {
-        const { error: choiceInsertError } = await supabase
-          .from('menu_option_choices')
-          .insert(allChoices);
+        const { error: choiceInsertError } = await supabase.from('menu_option_choices').insert(allChoices);
         if (choiceInsertError) throw choiceInsertError;
       }
 
@@ -1372,29 +1429,61 @@ export default function OwnerBuilderPage() {
     }
   }
 
+  const previewThemeClass = theme === 'dark' ? 'previewPhone previewDark' : 'previewPhone previewLight';
+
+  function BottomNav() {
+    return (
+      <div className="bottomNav">
+        <button type="button" className="bottomNavItem">
+          <span className="bottomDot" />
+          <span>{copy.dashboard}</span>
+        </button>
+        <button type="button" className="bottomNavItem bottomNavItemActive">
+          <span className="bottomDot" />
+          <span>{copy.builder}</span>
+        </button>
+        <button type="button" className="bottomNavItem" onClick={() => setMobileView('preview')}>
+          <span className="bottomDot" />
+          <span>{copy.preview}</span>
+        </button>
+        <button type="button" className="bottomNavItem">
+          <span className="bottomDot" />
+          <span>{copy.flyers}</span>
+        </button>
+        <button type="button" className="bottomNavItem">
+          <span className="bottomDot" />
+          <span>{copy.orders}</span>
+        </button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <main className="page">
         <section className="shell">
-          <div className="eyebrow">{copy.eyebrow}</div>
-          <h1>{copy.loadingBuilder}</h1>
+          <div className="loadingWrap">
+            <div className="eyebrow">{copy.eyebrow}</div>
+            <h1>{copy.loading}</h1>
+          </div>
 
           <style jsx>{`
             .page {
               min-height: 100vh;
-              background: #f3f3f0;
-              padding: 24px;
-              font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-                'Segoe UI', sans-serif;
+              background: #f3f2ee;
+              padding: 18px;
+              font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             }
             .shell {
-              max-width: 1420px;
+              max-width: 1500px;
               margin: 0 auto;
-              background: #f9f9f6;
+            }
+            .loadingWrap {
+              background: #ffffff;
               border: 1px solid rgba(14, 23, 43, 0.08);
-              border-radius: 36px;
+              border-radius: 34px;
               padding: 28px;
-              box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+              box-shadow: 0 24px 60px rgba(15, 23, 42, 0.05);
             }
             .eyebrow {
               color: #7d8596;
@@ -1407,7 +1496,7 @@ export default function OwnerBuilderPage() {
             h1 {
               margin: 0;
               color: #0e1730;
-              font-size: clamp(34px, 6vw, 60px);
+              font-size: clamp(34px, 6vw, 64px);
               line-height: 0.96;
               letter-spacing: -0.05em;
               font-weight: 900;
@@ -1421,14 +1510,14 @@ export default function OwnerBuilderPage() {
   return (
     <main className="page">
       <section className="shell">
-        <div className="topRow">
-          <div className="heroCopyCard">
+        <div className="topBar">
+          <div className="topBarLeft">
             <div className="eyebrow">{copy.eyebrow}</div>
             <h1>{copy.title}</h1>
             <p>{copy.subtitle}</p>
           </div>
 
-          <div className="topActions">
+          <div className="topBarRight">
             <div className="languageSwitch">
               <button
                 type="button"
@@ -1446,9 +1535,15 @@ export default function OwnerBuilderPage() {
               </button>
             </div>
 
-            <Link href={previewLink} className="ghostButton" target="_blank">
-              {copy.openStore}
-            </Link>
+            {previewLink ? (
+              <Link href={previewLink} target="_blank" className="ghostButton">
+                {copy.openStore}
+              </Link>
+            ) : (
+              <button type="button" className="ghostButton" disabled>
+                {copy.openStore}
+              </button>
+            )}
 
             <button type="button" className="primaryButton" onClick={handleSave} disabled={saving}>
               {saving ? copy.saving : copy.saveBuilder}
@@ -1459,786 +1554,771 @@ export default function OwnerBuilderPage() {
         {error ? <div className="message error">{error}</div> : null}
         {success ? <div className="message success">{success}</div> : null}
 
-        <div className="grid">
-          <section className="leftColumn">
-            <section className="panel">
-              <div className="panelTitle">{copy.storeSetup}</div>
-
-              <div className="fieldGrid">
-                <label className="field">
-                  <span className="label">{copy.storeName}</span>
-                  <input
-                    className="input"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your Restaurant"
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">{copy.slug}</span>
-                  <input
-                    className="input"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    placeholder="your-store"
-                  />
-                  <span className="helpText">
-                    {copy.liveUrl}: /store/{normalizedSlug || 'your-store'}
-                  </span>
-                </label>
-
-                <label className="field">
-                  <span className="label">{copy.phone}</span>
-                  <input
-                    className="input"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="3235553355"
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">{copy.address}</span>
-                  <input
-                    className="input"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="123 Main St"
-                  />
-                </label>
+        <div className="builderGrid">
+          <section className="previewStage">
+            <div className="previewStageHeader">
+              <div>
+                <div className="sectionEyebrow">{copy.livePreview}</div>
+                <div className="previewTitle">{name.trim() || 'Your Store'}</div>
               </div>
-            </section>
 
-            <section className="panel">
-              <div className="panelTitle">{copy.uploadHeroImage.replace('Upload ', '').replace('Subir ', '')}</div>
+              <div className="mobileViewSwitch">
+                <button
+                  type="button"
+                  className={mobileView === 'builder' ? 'mobileSwitchButton mobileSwitchButtonActive' : 'mobileSwitchButton'}
+                  onClick={() => setMobileView('builder')}
+                >
+                  {copy.builder}
+                </button>
+                <button
+                  type="button"
+                  className={mobileView === 'preview' ? 'mobileSwitchButton mobileSwitchButtonActive' : 'mobileSwitchButton'}
+                  onClick={() => setMobileView('preview')}
+                >
+                  {copy.preview}
+                </button>
+              </div>
+            </div>
 
-              <div className="uploadGrid">
-                <div className="uploadCard">
-                  <div className="uploadTitle">{copy.uploadHeroImage}</div>
-                  <label className="uploadButton">
-                    {uploadingHero ? copy.saving : copy.uploadHeroImage}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => {
-                        void handleHeroUpload(e.target.files?.[0] || null);
-                      }}
-                    />
-                  </label>
-                  {heroImage ? (
-                    <img src={heroImage} alt="Hero" className="thumbImage" />
-                  ) : (
-                    <div className="thumbPlaceholder">{copy.heroPreview}</div>
-                  )}
-                </div>
-
-                <div className="uploadCard">
-                  <div className="uploadTitle">{copy.uploadLogo}</div>
-                  <label className="uploadButton">
-                    {uploadingLogo ? copy.saving : copy.uploadLogo}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={(e) => {
-                        void handleLogoUpload(e.target.files?.[0] || null);
-                      }}
-                    />
-                  </label>
+            <div className="previewHeroWide">
+              {heroImage ? <img src={heroImage} alt="Hero" className="previewHeroWideImage" /> : <div className="previewHeroWideFallback" />}
+              <div className="previewHeroShade" />
+              <div className="previewHeroWideContent">
+                <div className="previewHeroWideBrand">
                   {logoImage ? (
-                    <img src={logoImage} alt="Logo" className="thumbImage logoThumb" />
+                    <img src={logoImage} alt="Logo" className="previewHeroWideLogo" />
                   ) : (
-                    <div className="thumbPlaceholder">{copy.logoPreview}</div>
+                    <div className="previewHeroWideLogoFallback">{(name.trim() || 'M').charAt(0).toUpperCase()}</div>
                   )}
-                </div>
-              </div>
-            </section>
 
-            <section className="panel">
-              <div className="panelTitle">{copy.builderLanguage}</div>
-
-              <div className="controlStack">
-                <div className="controlBlock">
-                  <div className="label">{copy.builderLanguage}</div>
-                  <div className="toggleRow">
-                    <button
-                      type="button"
-                      className={builderLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setBuilderLanguage('en')}
-                    >
-                      {copy.english}
-                    </button>
-                    <button
-                      type="button"
-                      className={builderLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setBuilderLanguage('es')}
-                    >
-                      {copy.spanish}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="controlBlock">
-                  <div className="label">{copy.storefrontTheme}</div>
-                  <div className="toggleRow">
-                    <button
-                      type="button"
-                      className={theme === 'light' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setTheme('light')}
-                    >
-                      {copy.light}
-                    </button>
-                    <button
-                      type="button"
-                      className={theme === 'dark' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setTheme('dark')}
-                    >
-                      {copy.dark}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="controlBlock">
-                  <div className="label">{copy.storefrontLanguage}</div>
-                  <div className="toggleRow">
-                    <button
-                      type="button"
-                      className={storefrontLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setStorefrontLanguage('en')}
-                    >
-                      EN
-                    </button>
-                    <button
-                      type="button"
-                      className={storefrontLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
-                      onClick={() => setStorefrontLanguage('es')}
-                    >
-                      ES
-                    </button>
+                  <div className="previewHeroWideText">
+                    <div className="previewHeroWideName">{name.trim() || 'Your Store'}</div>
+                    <div className="previewHeroWideSub">{copy.storefrontPreview}</div>
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
 
-            <section className="panel">
-              <div className="panelTitle">{copy.pickupDeliveryControls}</div>
-
-              <div className="deliveryToggleRow">
-                <button
-                  type="button"
-                  className={pickupEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
-                  onClick={() => setPickupEnabled((current) => !current)}
-                >
-                  {pickupEnabled ? copy.pickupOn : copy.pickupOff}
-                </button>
-
-                <button
-                  type="button"
-                  className={deliveryEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
-                  onClick={() => setDeliveryEnabled((current) => !current)}
-                >
-                  {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
-                </button>
+            <div className="topWideInfo">
+              <div className="topWideInfoCard">
+                <span>{copy.address}</span>
+                <strong>{address.trim() || '123 Main St'}</strong>
               </div>
-
-              <div className="fieldGrid threeCols">
-                <label className="field">
-                  <span className="label">{copy.deliveryFee}</span>
-                  <input
-                    className="input"
-                    value={deliveryFee}
-                    onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))}
-                    placeholder="5"
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">{copy.deliveryRadius}</span>
-                  <input
-                    className="input"
-                    value={deliveryRadius}
-                    onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))}
-                    placeholder="5"
-                  />
-                </label>
-
-                <label className="field">
-                  <span className="label">{copy.deliveryMinimum}</span>
-                  <input
-                    className="input"
-                    value={deliveryMinimum}
-                    onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))}
-                    placeholder="20"
-                  />
-                </label>
+              <div className="topWideInfoCard">
+                <span>{copy.phone}</span>
+                <strong>{phone.trim() || '3235553355'}</strong>
               </div>
-            </section>
-
-            <section className="panel">
-              <div className="panelHeader">
-                <div className="panelTitle noMargin">{copy.categoryBuilder}</div>
-                <button type="button" className="primaryButton small" onClick={addCategory}>
-                  {copy.addCategory}
-                </button>
+              <div className="topWideInfoCard">
+                <span>{copy.storefrontTheme}</span>
+                <strong>{theme === 'dark' ? copy.dark : copy.light}</strong>
               </div>
-
-              <div className="categoryList">
-                {categories.map((category) => (
-                  <div
-                    key={category.id}
-                    className={
-                      category.id === selectedCategoryId
-                        ? 'categoryCard categoryCardActive'
-                        : 'categoryCard'
-                    }
-                  >
-                    <button
-                      type="button"
-                      className="categorySelect"
-                      onClick={() => {
-                        setSelectedCategoryId(category.id);
-                        const firstItem = category.items[0];
-                        if (firstItem) {
-                          setSelectedItemId(firstItem.id);
-                          setPreviewItemId(firstItem.id);
-                        }
-                      }}
-                    >
-                      <span>{category.name || copy.untitledCategory}</span>
-                      <span className="categoryCount">{category.items.length}</span>
-                    </button>
-
-                    <div className="categoryEditRow">
-                      <input
-                        className="input compactInput"
-                        value={category.name}
-                        onChange={(e) => updateCategory(category.id, e.target.value)}
-                        placeholder={copy.categoryName}
-                      />
-
-                      <button
-                        type="button"
-                        className="dangerButton"
-                        onClick={() => deleteCategory(category.id)}
-                      >
-                        {copy.delete}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {selectedCategory ? (
-              <section className="panel">
-                <div className="panelHeader">
-                  <div className="panelTitle noMargin">
-                    {copy.itemsIn} {selectedCategory.name || copy.category}
-                  </div>
-                  <button
-                    type="button"
-                    className="primaryButton small"
-                    onClick={() => addItem(selectedCategory.id)}
-                  >
-                    {copy.addItem}
-                  </button>
-                </div>
-
-                <div className="itemCardGrid">
-                  {selectedCategory.items.map((item) => {
-                    const resolvedImage = getResolvedItemImage(item);
-
-                    return (
-                      <button
-                        type="button"
-                        key={item.id}
-                        className={item.id === selectedItemId ? 'itemVisualCard itemVisualCardActive' : 'itemVisualCard'}
-                        onClick={() => {
-                          setSelectedItemId(item.id);
-                          setPreviewItemId(item.id);
-                        }}
-                      >
-                        <div className="itemVisualImageWrap">
-                          {resolvedImage ? (
-                            <img src={resolvedImage} alt={item.name} className="itemVisualImage" />
-                          ) : (
-                            <div className="itemVisualFallback" />
-                          )}
-                        </div>
-
-                        <div className="itemVisualBody">
-                          <div className="itemVisualTop">
-                            <div className="itemVisualName">{item.name || copy.itemNameFallback}</div>
-                            <div className="itemVisualPrice">{money(item.base_price)}</div>
-                          </div>
-                          <div
-                            className={
-                              item.availability === 'available'
-                                ? 'availability availabilityOn'
-                                : 'availability availabilityOff'
-                            }
-                          >
-                            {item.availability === 'available' ? copy.available : copy.soldOut}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ) : null}
-
-            {selectedItem ? (
-              <section className="panel">
-                <div className="panelHeader">
-                  <div className="panelTitle noMargin">{copy.itemBuilder}</div>
-                  <button
-                    type="button"
-                    className="dangerButton"
-                    onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}
-                  >
-                    {copy.deleteItem}
-                  </button>
-                </div>
-
-                <div className="fieldGrid">
-                  <div className="uploadCard fullWidthCard">
-                    <div className="uploadTitle">{copy.uploadItemImage}</div>
-                    <label className="uploadButton">
-                      {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={(e) => {
-                          void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null);
-                        }}
-                      />
-                    </label>
-
-                    {getResolvedItemImage(selectedItem) ? (
-                      <img
-                        src={getResolvedItemImage(selectedItem)}
-                        alt={selectedItem.name}
-                        className="thumbImage itemThumb"
-                      />
-                    ) : (
-                      <div className="thumbPlaceholder itemThumbPlaceholder">{copy.itemPreview}</div>
-                    )}
-                  </div>
-
-                  <label className="field">
-                    <span className="label">{copy.itemName}</span>
-                    <input
-                      className="input"
-                      value={selectedItem.name}
-                      onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
-                      placeholder={copy.itemName}
-                    />
-                  </label>
-
-                  <label className="field">
-                    <span className="label">{copy.basePrice}</span>
-                    <input
-                      className="input"
-                      value={selectedItem.base_price}
-                      onChange={(e) =>
-                        updateItem(selectedItem.id, {
-                          base_price: sanitizeNumberInput(e.target.value),
-                        })
-                      }
-                      placeholder="12.99"
-                    />
-                  </label>
-
-                  <label className="field fullWidth">
-                    <span className="label">{copy.description}</span>
-                    <textarea
-                      className="textarea"
-                      value={selectedItem.description}
-                      onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
-                      placeholder={copy.describeItem}
-                    />
-                  </label>
-
-                  <div className="field fullWidth">
-                    <span className="label">{copy.availability}</span>
-                    <div className="toggleRow">
-                      <button
-                        type="button"
-                        className={
-                          selectedItem.availability === 'available'
-                            ? 'toggleButton toggleActive'
-                            : 'toggleButton'
-                        }
-                        onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
-                      >
-                        {copy.available}
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          selectedItem.availability === 'sold_out'
-                            ? 'toggleButton toggleActive'
-                            : 'toggleButton'
-                        }
-                        onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
-                      >
-                        {copy.soldOut}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="optionGroupHeader">
-                  <div className="panelTitle noMargin">{copy.optionGroups}</div>
-                  <div className="optionActionWrap">
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'protein')}
-                    >
-                      {copy.protein}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'size')}
-                    >
-                      {copy.size}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'drink')}
-                    >
-                      {copy.drink}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'extras')}
-                    >
-                      {copy.extras}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'removals')}
-                    >
-                      {copy.removals}
-                    </button>
-                    <button
-                      type="button"
-                      className="ghostTiny"
-                      onClick={() => addOptionGroup(selectedItem.id, 'custom')}
-                    >
-                      {copy.custom}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="optionGroupList">
-                  {selectedItem.option_groups.length ? (
-                    selectedItem.option_groups.map((group) => (
-                      <div key={group.id} className="optionGroupCard">
-                        <div className="panelHeader optionGroupTop">
-                          <input
-                            className="input compactInput strongInput"
-                            value={group.name}
-                            onChange={(e) =>
-                              updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })
-                            }
-                            placeholder={copy.groupName}
-                          />
-
-                          <button
-                            type="button"
-                            className="dangerButton"
-                            onClick={() => deleteOptionGroup(selectedItem.id, group.id)}
-                          >
-                            {copy.delete}
-                          </button>
-                        </div>
-
-                        <div className="optionMetaRow">
-                          <button
-                            type="button"
-                            className={group.required ? 'toggleButton toggleActive' : 'toggleButton'}
-                            onClick={() =>
-                              updateOptionGroup(selectedItem.id, group.id, { required: !group.required })
-                            }
-                          >
-                            {group.required ? copy.required : copy.optional}
-                          </button>
-
-                          <button
-                            type="button"
-                            className={
-                              group.selection === 'single' ? 'toggleButton toggleActive' : 'toggleButton'
-                            }
-                            onClick={() =>
-                              updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })
-                            }
-                          >
-                            {copy.singleChoice}
-                          </button>
-
-                          <button
-                            type="button"
-                            className={
-                              group.selection === 'multiple'
-                                ? 'toggleButton toggleActive'
-                                : 'toggleButton'
-                            }
-                            onClick={() =>
-                              updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })
-                            }
-                          >
-                            {copy.multipleChoice}
-                          </button>
-                        </div>
-
-                        <div className="choiceList">
-                          {group.options.map((option) => (
-                            <div key={option.id} className="choiceRow">
-                              <input
-                                className="input compactInput"
-                                value={option.name}
-                                onChange={(e) =>
-                                  updateOptionChoice(selectedItem.id, group.id, option.id, {
-                                    name: e.target.value,
-                                  })
-                                }
-                                placeholder={copy.choiceName}
-                              />
-
-                              <input
-                                className="input compactInput priceInput"
-                                value={option.price}
-                                onChange={(e) =>
-                                  updateOptionChoice(selectedItem.id, group.id, option.id, {
-                                    price: sanitizeNumberInput(e.target.value),
-                                  })
-                                }
-                                placeholder="0"
-                              />
-
-                              <button
-                                type="button"
-                                className="dangerButton"
-                                onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
-                              >
-                                {copy.delete}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          type="button"
-                          className="primaryButton small"
-                          onClick={() => addOptionChoice(selectedItem.id, group.id)}
-                        >
-                          {copy.addChoice}
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="emptyBlock">{copy.noOptionGroups}</div>
-                  )}
-                </div>
-              </section>
-            ) : null}
+            </div>
           </section>
 
-          <section className="rightColumn">
-            <section className="panel stickyPanel">
-              <div className="panelHeader">
-                <div className="panelTitle noMargin">{copy.livePreview}</div>
-                <div className="previewStatus">{copy.imageOnlyMainGrid}</div>
-              </div>
+          <div className="contentGrid">
+            <section className={mobileView === 'preview' ? 'leftPanel leftPanelHiddenMobile' : 'leftPanel'}>
+              <div className="mobileBuilderPhone">
+                <div className="phoneChrome">
+                  <div className="phoneStatus" />
+                  <div className="phoneTop">
+                    <div>
+                      <div className="phoneEyebrow">{copy.eyebrow}</div>
+                      <div className="phoneTitle">{copy.title}</div>
+                    </div>
+                    <button type="button" className="phoneSave" onClick={handleSave} disabled={saving}>
+                      {saving ? copy.saving : copy.saveBuilder}
+                    </button>
+                  </div>
 
-              <div className={previewThemeClass}>
-                <div className="previewHero">
-                  {heroImage ? (
-                    <img src={heroImage} alt="Hero" className="previewHeroImage" />
-                  ) : (
-                    <div className="previewHeroFallback" />
-                  )}
-
-                  <div className="previewOverlay" />
-
-                  <div className="previewHeroContent">
-                    <div className="previewBrandRow">
-                      {logoImage ? (
-                        <img src={logoImage} alt="Logo" className="previewLogo" />
-                      ) : (
-                        <div className="previewLogoFallback">
-                          {(name.trim() || 'M').charAt(0).toUpperCase()}
+                  <div className="builderScroll">
+                    <section className="builderCard">
+                      <button type="button" className="builderCardHeader" onClick={() => toggleSection('store')}>
+                        <div>
+                          <div className="builderCardEyebrow">01</div>
+                          <div className="builderCardTitle">{copy.storeSetup}</div>
                         </div>
-                      )}
-
-                      <div>
-                        <div className="previewName">{name.trim() || 'Your Store'}</div>
-                        <div className="previewTag">{copy.storefrontPreview}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="previewInfoBand">
-                  <div className="previewInfoTitle">{copy.heroInfoBlock}</div>
-                  <div className="previewInfoGrid">
-                    <div className="previewInfoCell">
-                      <span>{copy.address}</span>
-                      <strong>{address.trim() || '123 Main St'}</strong>
-                    </div>
-                    <div className="previewInfoCell">
-                      <span>{copy.phone}</span>
-                      <strong>{phone.trim() || '3235553355'}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="previewContent">
-                  <div className="previewTopMeta">
-                    <div className="previewMetaPill">
-                      {pickupEnabled ? copy.pickupOn : copy.pickupOff}
-                    </div>
-                    <div className="previewMetaPill">
-                      {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
-                    </div>
-                    <div className="previewMetaPill">
-                      {theme === 'dark' ? copy.dark : copy.light}
-                    </div>
-                  </div>
-
-                  <div className="previewCategoryTabs">
-                    {categories.map((category) => (
-                      <button
-                        type="button"
-                        key={category.id}
-                        className={
-                          category.id === selectedCategoryId
-                            ? 'previewCategoryTab previewCategoryTabActive'
-                            : 'previewCategoryTab'
-                        }
-                        onClick={() => setSelectedCategoryId(category.id)}
-                      >
-                        {category.name || copy.category}
+                        <div className="builderCardToggle">{expandedSections.store ? '−' : '+'}</div>
                       </button>
-                    ))}
-                  </div>
 
-                  <div className="previewGrid">
-                    {(selectedCategory?.items || []).map((item) => {
-                      const resolvedImage = getResolvedItemImage(item);
+                      {expandedSections.store ? (
+                        <div className="builderCardBody">
+                          <label className="field">
+                            <span className="label">{copy.storeName}</span>
+                            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your Restaurant" />
+                          </label>
 
-                      return (
-                        <button
-                          type="button"
-                          key={item.id}
-                          className={item.id === previewItemId ? 'previewGridCard previewGridCardActive' : 'previewGridCard'}
-                          onClick={() => setPreviewItemId(item.id)}
-                        >
-                          {resolvedImage ? (
-                            <img src={resolvedImage} alt={item.name} className="previewGridImage" />
-                          ) : (
-                            <div className="previewGridFallback" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+                          <label className="field">
+                            <span className="label">{copy.slug}</span>
+                            <input className="input" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="your-store" />
+                            <span className="helpText">
+                              {copy.liveUrl}: /store/{normalizedSlug || 'your-store'}
+                            </span>
+                          </label>
 
-              {previewItem ? (
-                <div className="previewPopup">
-                  <div className="previewPopupImageWrap">
-                    {getResolvedItemImage(previewItem) ? (
-                      <img
-                        src={getResolvedItemImage(previewItem)}
-                        alt={previewItem.name}
-                        className="previewPopupImage"
-                      />
-                    ) : (
-                      <div className="previewPopupFallback" />
-                    )}
-                  </div>
+                          <label className="field">
+                            <span className="label">{copy.phone}</span>
+                            <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="3235553355" />
+                          </label>
 
-                  <div className="previewPopupBody">
-                    <div className="previewPopupHeaderRow">
-                      <div className="previewPopupName">
-                        {previewItem.name || copy.itemNameFallback}
-                      </div>
-                      <div className="previewPopupPrice">{money(previewItem.base_price)}</div>
-                    </div>
+                          <label className="field">
+                            <span className="label">{copy.address}</span>
+                            <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St" />
+                          </label>
+                        </div>
+                      ) : null}
+                    </section>
 
-                    <div className="previewPopupDescription">
-                      {previewItem.description || copy.itemDetailsPlaceholder}
-                    </div>
+                    <section className="builderCard">
+                      <button type="button" className="builderCardHeader" onClick={() => toggleSection('branding')}>
+                        <div>
+                          <div className="builderCardEyebrow">02</div>
+                          <div className="builderCardTitle">{copy.branding}</div>
+                        </div>
+                        <div className="builderCardToggle">{expandedSections.branding ? '−' : '+'}</div>
+                      </button>
 
-                    {previewItem.option_groups.length ? (
-                      <div className="previewOptionsWrap">
-                        {previewItem.option_groups.map((group) => (
-                          <div key={group.id} className="previewOptionGroup">
-                            <div className="previewOptionHeader">
-                              <span>{group.name}</span>
-                              <span>{group.required ? copy.required : copy.optional}</span>
+                      {expandedSections.branding ? (
+                        <div className="builderCardBody">
+                          <div className="uploadStack">
+                            <div className="uploadMiniCard">
+                              <div className="uploadMiniTitle">{copy.uploadHeroImage}</div>
+                              <label className="uploadButton">
+                                {uploadingHero ? copy.saving : copy.uploadHeroImage}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => {
+                                    void handleHeroUpload(e.target.files?.[0] || null);
+                                  }}
+                                />
+                              </label>
+                              {heroImage ? <img src={heroImage} alt="Hero" className="uploadPreview" /> : <div className="uploadPlaceholder">{copy.heroPreview}</div>}
                             </div>
 
-                            <div className="previewChoiceWrap">
-                              {group.options.map((option) => (
-                                <div key={option.id} className="previewChoiceRow">
-                                  <span>{option.name}</span>
-                                  <span>{money(option.price)}</span>
+                            <div className="uploadMiniCard">
+                              <div className="uploadMiniTitle">{copy.uploadLogo}</div>
+                              <label className="uploadButton">
+                                {uploadingLogo ? copy.saving : copy.uploadLogo}
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => {
+                                    void handleLogoUpload(e.target.files?.[0] || null);
+                                  }}
+                                />
+                              </label>
+                              {logoImage ? <img src={logoImage} alt="Logo" className="uploadPreview logoPreview" /> : <div className="uploadPlaceholder">{copy.logoPreview}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="builderCard">
+                      <button type="button" className="builderCardHeader" onClick={() => toggleSection('settings')}>
+                        <div>
+                          <div className="builderCardEyebrow">03</div>
+                          <div className="builderCardTitle">{copy.settings}</div>
+                        </div>
+                        <div className="builderCardToggle">{expandedSections.settings ? '−' : '+'}</div>
+                      </button>
+
+                      {expandedSections.settings ? (
+                        <div className="builderCardBody">
+                          <div className="controlBlock">
+                            <div className="label">{copy.builderLanguage}</div>
+                            <div className="toggleRow">
+                              <button
+                                type="button"
+                                className={builderLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setBuilderLanguage('en')}
+                              >
+                                {copy.english}
+                              </button>
+                              <button
+                                type="button"
+                                className={builderLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setBuilderLanguage('es')}
+                              >
+                                {copy.spanish}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="controlBlock">
+                            <div className="label">{copy.storefrontLanguage}</div>
+                            <div className="toggleRow">
+                              <button
+                                type="button"
+                                className={storefrontLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setStorefrontLanguage('en')}
+                              >
+                                EN
+                              </button>
+                              <button
+                                type="button"
+                                className={storefrontLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setStorefrontLanguage('es')}
+                              >
+                                ES
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="controlBlock">
+                            <div className="label">{copy.orderLanguage}</div>
+                            <div className="toggleRow">
+                              <button
+                                type="button"
+                                className={orderLanguage === 'en' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setOrderLanguage('en')}
+                              >
+                                EN
+                              </button>
+                              <button
+                                type="button"
+                                className={orderLanguage === 'es' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setOrderLanguage('es')}
+                              >
+                                ES
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="controlBlock">
+                            <div className="label">{copy.storefrontTheme}</div>
+                            <div className="toggleRow">
+                              <button
+                                type="button"
+                                className={theme === 'light' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setTheme('light')}
+                              >
+                                {copy.light}
+                              </button>
+                              <button
+                                type="button"
+                                className={theme === 'dark' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setTheme('dark')}
+                              >
+                                {copy.dark}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="controlBlock">
+                            <div className="label">Pickup / Delivery</div>
+                            <div className="toggleRow">
+                              <button
+                                type="button"
+                                className={pickupEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setPickupEnabled((current) => !current)}
+                              >
+                                {pickupEnabled ? copy.pickupOn : copy.pickupOff}
+                              </button>
+                              <button
+                                type="button"
+                                className={deliveryEnabled ? 'toggleButton toggleActive' : 'toggleButton'}
+                                onClick={() => setDeliveryEnabled((current) => !current)}
+                              >
+                                {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="fieldGrid">
+                            <label className="field">
+                              <span className="label">{copy.deliveryFee}</span>
+                              <input
+                                className="input"
+                                value={deliveryFee}
+                                onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))}
+                                placeholder="5"
+                              />
+                            </label>
+
+                            <label className="field">
+                              <span className="label">{copy.deliveryRadius}</span>
+                              <input
+                                className="input"
+                                value={deliveryRadius}
+                                onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))}
+                                placeholder="5"
+                              />
+                            </label>
+
+                            <label className="field">
+                              <span className="label">{copy.deliveryMinimum}</span>
+                              <input
+                                className="input"
+                                value={deliveryMinimum}
+                                onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))}
+                                placeholder="20"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="builderCard">
+                      <button type="button" className="builderCardHeader" onClick={() => toggleSection('categories')}>
+                        <div>
+                          <div className="builderCardEyebrow">04</div>
+                          <div className="builderCardTitle">{copy.categoryBuilder}</div>
+                        </div>
+                        <div className="builderCardToggle">{expandedSections.categories ? '−' : '+'}</div>
+                      </button>
+
+                      {expandedSections.categories ? (
+                        <div className="builderCardBody">
+                          <button type="button" className="primaryButton fullWidthButton" onClick={addCategory}>
+                            {copy.addCategory}
+                          </button>
+
+                          <div className="categoryStack">
+                            {categories.map((category) => (
+                              <div
+                                key={category.id}
+                                className={category.id === selectedCategoryId ? 'categoryPillCard categoryPillCardActive' : 'categoryPillCard'}
+                              >
+                                <button type="button" className="categoryPillSelect" onClick={() => selectCategory(category.id)}>
+                                  <span>{category.name || copy.untitledCategory}</span>
+                                  <span className="categoryPillCount">{category.items.length}</span>
+                                </button>
+
+                                <div className="categoryEditBlock">
+                                  <input
+                                    className="input compactInput"
+                                    value={category.name}
+                                    onChange={(e) => updateCategory(category.id, e.target.value)}
+                                    placeholder={copy.categoryName}
+                                  />
+                                  <button type="button" className="dangerButton" onClick={() => deleteCategory(category.id)}>
+                                    {copy.delete}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    {selectedCategory ? (
+                      <section className="builderCard">
+                        <button type="button" className="builderCardHeader" onClick={() => toggleSection('items')}>
+                          <div>
+                            <div className="builderCardEyebrow">05</div>
+                            <div className="builderCardTitle">
+                              {copy.itemsIn} {selectedCategory.name || copy.category}
+                            </div>
+                          </div>
+                          <div className="builderCardToggle">{expandedSections.items ? '−' : '+'}</div>
+                        </button>
+
+                        {expandedSections.items ? (
+                          <div className="builderCardBody">
+                            <button type="button" className="primaryButton fullWidthButton" onClick={() => addItem(selectedCategory.id)}>
+                              {copy.addItem}
+                            </button>
+
+                            <div className="visualItemGrid">
+                              {selectedCategory.items.map((item) => {
+                                const resolvedImage = getResolvedItemImage(item);
+
+                                return (
+                                  <button
+                                    type="button"
+                                    key={item.id}
+                                    className={item.id === selectedItemId ? 'visualItemCard visualItemCardActive' : 'visualItemCard'}
+                                    onClick={() => selectItem(item.id)}
+                                  >
+                                    <div className="visualItemImageWrap">
+                                      {resolvedImage ? <img src={resolvedImage} alt={item.name} className="visualItemImage" /> : <div className="visualItemFallback" />}
+                                    </div>
+                                    <div className="visualItemInfo">
+                                      <div className="visualItemName">{item.name || copy.itemNameFallback}</div>
+                                      <div className="visualItemPrice">{money(item.base_price)}</div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {selectedItem ? (
+                              <div className="itemEditorPanel">
+                                <div className="itemEditorTop">
+                                  <div className="itemEditorTitle">{copy.itemBuilder}</div>
+                                  <button
+                                    type="button"
+                                    className="dangerButton"
+                                    onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}
+                                  >
+                                    {copy.deleteItem}
+                                  </button>
+                                </div>
+
+                                <div className="uploadMiniCard">
+                                  <div className="uploadMiniTitle">{copy.uploadItemImage}</div>
+                                  <label className="uploadButton">
+                                    {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      hidden
+                                      onChange={(e) => {
+                                        void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null);
+                                      }}
+                                    />
+                                  </label>
+
+                                  {getResolvedItemImage(selectedItem) ? (
+                                    <img src={getResolvedItemImage(selectedItem)} alt={selectedItem.name} className="uploadPreview" />
+                                  ) : (
+                                    <div className="uploadPlaceholder">{copy.itemPreview}</div>
+                                  )}
+                                </div>
+
+                                <label className="field">
+                                  <span className="label">{copy.itemName}</span>
+                                  <input
+                                    className="input"
+                                    value={selectedItem.name}
+                                    onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
+                                    placeholder={copy.itemName}
+                                  />
+                                </label>
+
+                                <label className="field">
+                                  <span className="label">{copy.basePrice}</span>
+                                  <input
+                                    className="input"
+                                    value={selectedItem.base_price}
+                                    onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })}
+                                    placeholder="12.99"
+                                  />
+                                </label>
+
+                                <label className="field">
+                                  <span className="label">{copy.description}</span>
+                                  <textarea
+                                    className="textarea"
+                                    value={selectedItem.description}
+                                    onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
+                                    placeholder={copy.describeItem}
+                                  />
+                                </label>
+
+                                <div className="field">
+                                  <span className="label">{copy.availability}</span>
+                                  <div className="toggleRow">
+                                    <button
+                                      type="button"
+                                      className={selectedItem.availability === 'available' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                      onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
+                                    >
+                                      {copy.available}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={selectedItem.availability === 'sold_out' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                      onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
+                                    >
+                                      {copy.soldOut}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </section>
+                    ) : null}
+
+                    {selectedItem ? (
+                      <section className="builderCard">
+                        <button type="button" className="builderCardHeader" onClick={() => toggleSection('options')}>
+                          <div>
+                            <div className="builderCardEyebrow">06</div>
+                            <div className="builderCardTitle">{copy.optionGroups}</div>
+                          </div>
+                          <div className="builderCardToggle">{expandedSections.options ? '−' : '+'}</div>
+                        </button>
+
+                        {expandedSections.options ? (
+                          <div className="builderCardBody">
+                            <div className="optionActionWrap">
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
+                                {copy.protein}
+                              </button>
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
+                                {copy.size}
+                              </button>
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
+                                {copy.drink}
+                              </button>
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
+                                {copy.extras}
+                              </button>
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
+                                {copy.removals}
+                              </button>
+                              <button type="button" className="ghostTiny" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
+                                {copy.custom}
+                              </button>
+                            </div>
+
+                            <div className="optionGroupList">
+                              {selectedItem.option_groups.length ? (
+                                selectedItem.option_groups.map((group) => (
+                                  <div key={group.id} className="optionGroupCard">
+                                    <div className="optionGroupTop">
+                                      <input
+                                        className="input compactInput"
+                                        value={group.name}
+                                        onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
+                                        placeholder={copy.options}
+                                      />
+
+                                      <button type="button" className="dangerButton" onClick={() => deleteOptionGroup(selectedItem.id, group.id)}>
+                                        {copy.delete}
+                                      </button>
+                                    </div>
+
+                                    <div className="toggleRow">
+                                      <button
+                                        type="button"
+                                        className={group.required ? 'toggleButton toggleActive' : 'toggleButton'}
+                                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
+                                      >
+                                        {group.required ? copy.required : copy.optional}
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className={group.selection === 'single' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
+                                      >
+                                        {copy.singleChoice}
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className={group.selection === 'multiple' ? 'toggleButton toggleActive' : 'toggleButton'}
+                                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
+                                      >
+                                        {copy.multipleChoice}
+                                      </button>
+                                    </div>
+
+                                    <div className="choiceList">
+                                      {group.options.map((option) => (
+                                        <div key={option.id} className="choiceRow">
+                                          <input
+                                            className="input compactInput"
+                                            value={option.name}
+                                            onChange={(e) =>
+                                              updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
+                                            }
+                                            placeholder={copy.choiceName}
+                                          />
+
+                                          <input
+                                            className="input compactInput priceInput"
+                                            value={option.price}
+                                            onChange={(e) =>
+                                              updateOptionChoice(selectedItem.id, group.id, option.id, {
+                                                price: sanitizeNumberInput(e.target.value),
+                                              })
+                                            }
+                                            placeholder="0"
+                                          />
+
+                                          <button
+                                            type="button"
+                                            className="dangerButton"
+                                            onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
+                                          >
+                                            {copy.delete}
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    <button type="button" className="primaryButton fullWidthButton" onClick={() => addOptionChoice(selectedItem.id, group.id)}>
+                                      {copy.addChoice}
+                                    </button>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="emptyBlock">{copy.noOptionGroups}</div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+                      </section>
+                    ) : null}
+                  </div>
+
+                  <BottomNav />
+                </div>
+              </div>
+            </section>
+
+            <section className={mobileView === 'builder' ? 'rightPanel rightPanelMobileHidden' : 'rightPanel'}>
+              <div className="previewDeviceWrap" ref={previewShellRef}>
+                <div className="deviceFrame">
+                  <div className="deviceNotch" />
+                  <div className={previewThemeClass}>
+                    <div className="previewHero">
+                      {heroImage ? <img src={heroImage} alt="Hero" className="previewHeroImage" /> : <div className="previewHeroFallback" />}
+                      <div className="previewOverlay" />
+                      <div className="previewHeroContent">
+                        <div className="previewBrandRow">
+                          {logoImage ? (
+                            <img src={logoImage} alt="Logo" className="previewLogo" />
+                          ) : (
+                            <div className="previewLogoFallback">{(name.trim() || 'M').charAt(0).toUpperCase()}</div>
+                          )}
+
+                          <div>
+                            <div className="previewName">{name.trim() || 'Your Store'}</div>
+                            <div className="previewTag">{copy.storefrontPreview}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="previewInfoBand">
+                      <div className="previewInfoTitle">{copy.heroInfoBlock}</div>
+                      <div className="previewInfoGrid">
+                        <div className="previewInfoCell">
+                          <span>{copy.address}</span>
+                          <strong>{address.trim() || '123 Main St'}</strong>
+                        </div>
+                        <div className="previewInfoCell">
+                          <span>{copy.phone}</span>
+                          <strong>{phone.trim() || '3235553355'}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="previewContent">
+                      <div className="previewTopMeta">
+                        <div className="previewMetaPill">{pickupEnabled ? copy.pickupOn : copy.pickupOff}</div>
+                        <div className="previewMetaPill">{deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}</div>
+                        <div className="previewMetaPill">{theme === 'dark' ? copy.dark : copy.light}</div>
+                      </div>
+
+                      <div className="previewCategoryTabs">
+                        {categories.map((category) => (
+                          <button
+                            type="button"
+                            key={category.id}
+                            className={category.id === selectedCategoryId ? 'previewCategoryTab previewCategoryTabActive' : 'previewCategoryTab'}
+                            onClick={() => selectCategory(category.id)}
+                          >
+                            {category.name || copy.category}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="previewGrid">
+                        {(selectedCategory?.items || []).map((item) => {
+                          const resolvedImage = getResolvedItemImage(item);
+
+                          return (
+                            <button
+                              type="button"
+                              key={item.id}
+                              className={item.id === previewItemId ? 'previewGridCard previewGridCardActive' : 'previewGridCard'}
+                              onClick={() => setPreviewItemId(item.id)}
+                            >
+                              {resolvedImage ? <img src={resolvedImage} alt={item.name} className="previewGridImage" /> : <div className="previewGridFallback" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {previewItem ? (
+                      <div className="previewPopup">
+                        <div className="previewPopupImageWrap">
+                          {getResolvedItemImage(previewItem) ? (
+                            <img src={getResolvedItemImage(previewItem)} alt={previewItem.name} className="previewPopupImage" />
+                          ) : (
+                            <div className="previewPopupFallback" />
+                          )}
+                        </div>
+
+                        <div className="previewPopupBody">
+                          <div className="previewPopupHeaderRow">
+                            <div className="previewPopupName">{previewItem.name || copy.itemNameFallback}</div>
+                            <div className="previewPopupPrice">{money(previewItem.base_price)}</div>
+                          </div>
+
+                          <div className="previewPopupDescription">{previewItem.description || copy.describeItem}</div>
+
+                          {previewItem.option_groups.length ? (
+                            <div className="previewOptionsWrap">
+                              {previewItem.option_groups.map((group) => (
+                                <div key={group.id} className="previewOptionGroup">
+                                  <div className="previewOptionHeader">
+                                    <span>{group.name}</span>
+                                    <span>{group.required ? copy.required : copy.optional}</span>
+                                  </div>
+
+                                  <div className="previewChoiceWrap">
+                                    {group.options.map((option) => (
+                                      <div key={option.id} className="previewChoiceRow">
+                                        <span>{option.name}</span>
+                                        <span>{money(option.price)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        ))}
+                          ) : null}
+
+                          <button type="button" className="previewAddToCart">
+                            Add to Cart
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>
                 </div>
-              ) : null}
+              </div>
             </section>
-          </section>
+          </div>
         </div>
       </section>
 
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: #f2f2ef;
-          padding: 24px;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-            'Segoe UI', sans-serif;
+          background: #f3f2ee;
+          padding: 18px;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         .shell {
-          max-width: 1440px;
+          max-width: 1550px;
           margin: 0 auto;
-          background: #f8f8f5;
-          border: 1px solid rgba(14, 23, 48, 0.08);
-          border-radius: 36px;
-          padding: 28px;
-          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
         }
 
-        .topRow {
+        .topBar {
           display: flex;
           justify-content: space-between;
-          align-items: start;
+          align-items: flex-start;
           gap: 18px;
-          margin-bottom: 20px;
+          margin-bottom: 16px;
         }
 
-        .heroCopyCard {
+        .topBarLeft {
           min-width: 0;
         }
 
@@ -2254,8 +2334,8 @@ export default function OwnerBuilderPage() {
         h1 {
           margin: 0;
           color: #0e1730;
-          font-size: clamp(36px, 6vw, 64px);
-          line-height: 0.94;
+          font-size: clamp(38px, 7vw, 68px);
+          line-height: 0.92;
           letter-spacing: -0.06em;
           font-weight: 900;
         }
@@ -2263,13 +2343,13 @@ export default function OwnerBuilderPage() {
         p {
           margin: 14px 0 0;
           color: #667081;
-          font-size: 18px;
-          line-height: 1.45;
+          font-size: 17px;
+          line-height: 1.5;
           font-weight: 800;
           max-width: 760px;
         }
 
-        .topActions {
+        .topBarRight {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -2288,8 +2368,8 @@ export default function OwnerBuilderPage() {
         }
 
         .langButton {
-          min-width: 74px;
-          min-height: 48px;
+          min-width: 72px;
+          min-height: 46px;
           border-radius: 999px;
           border: none;
           background: transparent;
@@ -2309,7 +2389,9 @@ export default function OwnerBuilderPage() {
         .uploadButton,
         .toggleButton,
         .dangerButton,
-        .ghostTiny {
+        .ghostTiny,
+        .mobileSwitchButton,
+        .phoneSave {
           min-height: 52px;
           border-radius: 18px;
           font-size: 15px;
@@ -2329,12 +2411,6 @@ export default function OwnerBuilderPage() {
           color: #ffffff;
         }
 
-        .primaryButton.small {
-          min-height: 46px;
-          padding: 0 16px;
-          border-radius: 16px;
-        }
-
         .ghostButton {
           padding: 0 20px;
           background: #ffffff;
@@ -2342,51 +2418,21 @@ export default function OwnerBuilderPage() {
           border: 1px solid rgba(14, 23, 48, 0.1);
         }
 
-        .uploadButton {
-          padding: 0 18px;
-          background: #000000;
-          color: #ffffff;
-          width: fit-content;
-        }
-
-        .toggleButton {
-          padding: 0 20px;
-          background: #ffffff;
-          color: #0e1730;
-          border: 1px solid rgba(14, 23, 48, 0.1);
-        }
-
-        .toggleActive {
-          background: #000000;
-          color: #ffffff;
-          border-color: #000000;
-        }
-
-        .dangerButton {
-          padding: 0 16px;
-          background: #f7e3e3;
-          color: #9e2c2c;
-        }
-
-        .ghostTiny {
-          min-height: 42px;
-          padding: 0 14px;
-          border-radius: 14px;
-          background: #ffffff;
-          color: #0e1730;
-          border: 1px solid rgba(14, 23, 48, 0.1);
-          font-size: 14px;
-        }
-
+        .ghostButton:disabled,
         .primaryButton:disabled,
-        .uploadButton:disabled {
+        .uploadButton:disabled,
+        .phoneSave:disabled {
           opacity: 0.55;
           cursor: not-allowed;
         }
 
+        .fullWidthButton {
+          width: 100%;
+        }
+
         .message {
           margin-bottom: 14px;
-          border-radius: 18px;
+          border-radius: 20px;
           padding: 14px 16px;
           font-size: 15px;
           font-weight: 800;
@@ -2404,70 +2450,308 @@ export default function OwnerBuilderPage() {
           border: 1px solid rgba(22, 85, 52, 0.1);
         }
 
-        .grid {
+        .builderGrid {
           display: grid;
-          grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
-          gap: 20px;
+          gap: 18px;
         }
 
-        .leftColumn,
-        .rightColumn {
+        .previewStage {
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.07);
+          border-radius: 34px;
+          padding: 18px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.04);
+        }
+
+        .previewStageHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+          flex-wrap: wrap;
+        }
+
+        .sectionEyebrow {
+          color: #7d8596;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 6px;
+        }
+
+        .previewTitle {
+          color: #0e1730;
+          font-size: 24px;
+          font-weight: 900;
+          letter-spacing: -0.04em;
+        }
+
+        .mobileViewSwitch {
+          display: inline-flex;
+          background: #f3f2ee;
+          padding: 6px;
+          border-radius: 999px;
+          gap: 6px;
+        }
+
+        .mobileSwitchButton {
+          min-height: 42px;
+          padding: 0 16px;
+          border-radius: 999px;
+          background: transparent;
+          color: #5f6b7d;
+        }
+
+        .mobileSwitchButtonActive {
+          background: #000000;
+          color: #ffffff;
+        }
+
+        .previewHeroWide {
+          position: relative;
+          min-height: 280px;
+          border-radius: 28px;
+          overflow: hidden;
+          background: #0f0f0f;
+        }
+
+        .previewHeroWideImage,
+        .previewHeroWideFallback {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          background: linear-gradient(135deg, #171717 0%, #3b3b3b 100%);
+        }
+
+        .previewHeroShade {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.68) 100%);
+        }
+
+        .previewHeroWideContent {
+          position: relative;
+          z-index: 2;
+          min-height: 280px;
+          display: flex;
+          align-items: end;
+          padding: 20px;
+        }
+
+        .previewHeroWideBrand {
+          display: flex;
+          align-items: end;
+          gap: 16px;
+        }
+
+        .previewHeroWideLogo,
+        .previewHeroWideLogoFallback {
+          width: 82px;
+          height: 82px;
+          border-radius: 24px;
+          object-fit: cover;
+          background: #ffffff;
+          color: #0e1730;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          font-weight: 900;
+          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15);
+        }
+
+        .previewHeroWideName {
+          color: #ffffff;
+          font-size: clamp(34px, 6vw, 62px);
+          line-height: 0.92;
+          letter-spacing: -0.06em;
+          font-weight: 900;
+        }
+
+        .previewHeroWideSub {
+          margin-top: 8px;
+          color: rgba(255, 255, 255, 0.92);
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .topWideInfo {
           display: grid;
-          gap: 20px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 14px;
+        }
+
+        .topWideInfoCard {
+          border-radius: 22px;
+          padding: 16px;
+          background: #f7f6f2;
+          border: 1px solid rgba(14, 23, 48, 0.06);
+          display: grid;
+          gap: 6px;
+        }
+
+        .topWideInfoCard span {
+          color: #7d8596;
+          font-size: 12px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
+        .topWideInfoCard strong {
+          color: #0e1730;
+          font-size: 15px;
+          font-weight: 900;
+          line-height: 1.35;
+        }
+
+        .contentGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
+          gap: 18px;
+          align-items: start;
+        }
+
+        .leftPanel,
+        .rightPanel {
+          min-width: 0;
+        }
+
+        .mobileBuilderPhone {
+          background: transparent;
+        }
+
+        .phoneChrome {
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.07);
+          border-radius: 36px;
+          padding: 14px 14px 94px;
+          box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
+          position: relative;
+          min-height: 920px;
+        }
+
+        .phoneStatus {
+          width: 120px;
+          height: 8px;
+          border-radius: 999px;
+          background: #141414;
+          margin: 2px auto 14px;
+        }
+
+        .phoneTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 14px;
+          padding: 0 4px;
+        }
+
+        .phoneEyebrow {
+          color: #7d8596;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 6px;
+        }
+
+        .phoneTitle {
+          color: #0e1730;
+          font-size: 30px;
+          line-height: 0.96;
+          letter-spacing: -0.05em;
+          font-weight: 900;
+        }
+
+        .phoneSave {
+          padding: 0 16px;
+          background: #000000;
+          color: #ffffff;
+          min-height: 44px;
+          border-radius: 16px;
+          flex-shrink: 0;
+        }
+
+        .builderScroll {
+          display: grid;
+          gap: 14px;
           align-content: start;
         }
 
-        .panel {
-          background: #ffffff;
-          border: 1px solid rgba(14, 23, 48, 0.07);
-          border-radius: 30px;
-          padding: 22px;
-          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.03);
+        .builderCard {
+          border-radius: 28px;
+          background: #f8f7f3;
+          border: 1px solid rgba(14, 23, 48, 0.06);
+          overflow: hidden;
         }
 
-        .stickyPanel {
-          position: sticky;
-          top: 24px;
-        }
-
-        .panelTitle {
-          color: #0e1730;
-          font-size: 22px;
-          font-weight: 900;
-          margin-bottom: 16px;
-          letter-spacing: -0.03em;
-        }
-
-        .panelHeader {
+        .builderCardHeader {
+          width: 100%;
+          border: none;
+          background: transparent;
+          padding: 18px;
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 12px;
-          margin-bottom: 16px;
-          flex-wrap: wrap;
+          text-align: left;
+          cursor: pointer;
         }
 
-        .noMargin {
-          margin: 0;
+        .builderCardEyebrow {
+          color: #7d8596;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 6px;
+        }
+
+        .builderCardTitle {
+          color: #0e1730;
+          font-size: 22px;
+          line-height: 1;
+          letter-spacing: -0.04em;
+          font-weight: 900;
+        }
+
+        .builderCardToggle {
+          width: 38px;
+          height: 38px;
+          border-radius: 999px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          color: #0e1730;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .builderCardBody {
+          padding: 0 18px 18px;
+          display: grid;
+          gap: 14px;
         }
 
         .fieldGrid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
-
-        .threeCols {
           grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .field {
           display: grid;
           gap: 8px;
-        }
-
-        .fullWidth {
-          grid-column: 1 / -1;
         }
 
         .label {
@@ -2481,38 +2765,29 @@ export default function OwnerBuilderPage() {
         .input,
         .textarea {
           width: 100%;
-          border-radius: 20px;
+          border-radius: 18px;
           border: 1px solid rgba(14, 23, 48, 0.1);
-          background: #fbfbf8;
-          padding: 0 18px;
+          background: #ffffff;
+          padding: 0 16px;
           color: #0e1730;
-          font-size: 17px;
+          font-size: 16px;
           font-weight: 800;
           outline: none;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
         }
 
         .input {
-          min-height: 58px;
+          min-height: 54px;
         }
 
         .textarea {
-          min-height: 132px;
-          padding: 16px 18px;
+          min-height: 126px;
+          padding: 16px;
           resize: vertical;
         }
 
         .compactInput {
-          min-height: 50px;
+          min-height: 48px;
           font-size: 15px;
-        }
-
-        .strongInput {
-          min-width: 240px;
-        }
-
-        .priceInput {
-          max-width: 120px;
         }
 
         .helpText {
@@ -2521,36 +2796,43 @@ export default function OwnerBuilderPage() {
           font-weight: 800;
         }
 
-        .uploadGrid {
+        .uploadStack {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          gap: 12px;
         }
 
-        .uploadCard {
-          border: 1px dashed rgba(14, 23, 48, 0.14);
-          border-radius: 26px;
-          padding: 18px;
+        .uploadMiniCard {
+          border-radius: 24px;
+          padding: 14px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
           display: grid;
-          gap: 14px;
-          background: #fcfcfa;
+          gap: 12px;
         }
 
-        .uploadTitle {
+        .uploadMiniTitle {
           color: #0e1730;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 900;
         }
 
-        .thumbImage,
-        .thumbPlaceholder {
+        .uploadButton {
+          padding: 0 18px;
+          background: #000000;
+          color: #ffffff;
+          width: fit-content;
+        }
+
+        .uploadPreview,
+        .uploadPlaceholder {
           width: 100%;
-          height: 200px;
-          border-radius: 22px;
+          height: 190px;
+          border-radius: 20px;
           object-fit: cover;
         }
 
-        .thumbPlaceholder {
+        .uploadPlaceholder {
           display: flex;
           align-items: center;
           justify-content: center;
@@ -2560,28 +2842,10 @@ export default function OwnerBuilderPage() {
           font-weight: 900;
         }
 
-        .logoThumb {
+        .logoPreview {
           object-fit: contain;
           background: #ffffff;
           padding: 18px;
-          border: 1px solid rgba(14, 23, 48, 0.06);
-        }
-
-        .itemThumb {
-          height: 240px;
-        }
-
-        .itemThumbPlaceholder {
-          height: 240px;
-        }
-
-        .fullWidthCard {
-          grid-column: 1 / -1;
-        }
-
-        .controlStack {
-          display: grid;
-          gap: 18px;
         }
 
         .controlBlock {
@@ -2590,100 +2854,115 @@ export default function OwnerBuilderPage() {
         }
 
         .toggleRow,
-        .deliveryToggleRow,
-        .optionActionWrap,
-        .optionMetaRow {
+        .optionActionWrap {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
         }
 
-        .categoryList,
+        .toggleButton {
+          padding: 0 18px;
+          background: #ffffff;
+          color: #0e1730;
+          border: 1px solid rgba(14, 23, 48, 0.1);
+        }
+
+        .toggleActive {
+          background: #000000;
+          color: #ffffff;
+          border-color: #000000;
+        }
+
+        .categoryStack,
         .optionGroupList {
           display: grid;
-          gap: 14px;
+          gap: 12px;
         }
 
-        .categoryCard,
-        .optionGroupCard {
-          border: 1px solid rgba(14, 23, 48, 0.08);
+        .categoryPillCard {
           border-radius: 24px;
-          padding: 16px;
           background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          padding: 12px;
         }
 
-        .categoryCardActive {
+        .categoryPillCardActive {
           border-color: rgba(14, 23, 48, 0.22);
           box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
         }
 
-        .categorySelect {
+        .categoryPillSelect {
+          width: 100%;
           border: none;
           background: transparent;
-          width: 100%;
+          padding: 0;
           text-align: left;
-          cursor: pointer;
+          color: #0e1730;
+          font-size: 18px;
+          font-weight: 900;
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 12px;
-          padding: 0;
-          color: #0e1730;
-          font-size: 18px;
-          font-weight: 900;
+          cursor: pointer;
         }
 
-        .categoryCount {
-          min-width: 38px;
-          min-height: 38px;
+        .categoryPillCount {
+          min-width: 36px;
+          min-height: 36px;
           border-radius: 999px;
+          background: #f3f2ee;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          background: #f1f1ef;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 900;
-          color: #0e1730;
         }
 
-        .categoryEditRow {
+        .categoryEditBlock {
           display: flex;
           gap: 10px;
           align-items: center;
-          margin-top: 14px;
+          margin-top: 12px;
         }
 
-        .itemCardGrid {
+        .dangerButton {
+          padding: 0 14px;
+          background: #f7e3e3;
+          color: #9e2c2c;
+          min-height: 48px;
+        }
+
+        .visualItemGrid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
+          gap: 12px;
         }
 
-        .itemVisualCard {
-          border: 1px solid rgba(14, 23, 48, 0.08);
-          background: #ffffff;
+        .visualItemCard {
           border-radius: 24px;
           padding: 10px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
           text-align: left;
           cursor: pointer;
-          transition: 0.16s ease;
         }
 
-        .itemVisualCardActive {
+        .visualItemCardActive {
           border-color: rgba(14, 23, 48, 0.22);
           box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
         }
 
-        .itemVisualImageWrap {
+        .visualItemImageWrap {
           width: 100%;
           aspect-ratio: 1 / 1;
-          border-radius: 20px;
+          border-radius: 18px;
           overflow: hidden;
           background: #eef1f5;
         }
 
-        .itemVisualImage,
-        .itemVisualFallback {
+        .visualItemImage,
+        .visualItemFallback {
           width: 100%;
           height: 100%;
           object-fit: cover;
@@ -2691,75 +2970,74 @@ export default function OwnerBuilderPage() {
           background: linear-gradient(135deg, #e9edf2 0%, #dfe5ec 100%);
         }
 
-        .itemVisualBody {
-          padding: 12px 4px 4px;
-          display: grid;
-          gap: 10px;
-        }
-
-        .itemVisualTop {
+        .visualItemInfo {
           display: flex;
           justify-content: space-between;
-          align-items: start;
           gap: 10px;
+          align-items: center;
+          padding: 10px 4px 2px;
         }
 
-        .itemVisualName {
+        .visualItemName {
           color: #0e1730;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 900;
           line-height: 1.1;
         }
 
-        .itemVisualPrice {
+        .visualItemPrice {
           color: #0e1730;
-          font-size: 15px;
+          font-size: 14px;
           font-weight: 900;
           white-space: nowrap;
         }
 
-        .availability {
-          min-height: 36px;
-          padding: 0 14px;
-          border-radius: 999px;
-          display: inline-flex;
+        .itemEditorPanel {
+          border-radius: 24px;
+          padding: 14px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          display: grid;
+          gap: 14px;
+        }
+
+        .itemEditorTop,
+        .optionGroupTop {
+          display: flex;
+          justify-content: space-between;
           align-items: center;
-          justify-content: center;
-          font-size: 13px;
+          gap: 10px;
+        }
+
+        .itemEditorTitle {
+          color: #0e1730;
+          font-size: 20px;
           font-weight: 900;
-          width: fit-content;
+          letter-spacing: -0.03em;
         }
 
-        .availabilityOn {
-          background: #ebf6ee;
-          color: #2d6c3d;
-        }
-
-        .availabilityOff {
-          background: #f8e9e9;
-          color: #9a1f1f;
-        }
-
-        .optionGroupHeader {
-          margin-top: 18px;
+        .optionGroupCard {
+          border-radius: 22px;
+          padding: 14px;
+          background: #ffffff;
+          border: 1px solid rgba(14, 23, 48, 0.08);
           display: grid;
           gap: 12px;
-        }
-
-        .optionGroupTop {
-          margin-bottom: 12px;
         }
 
         .choiceList {
           display: grid;
           gap: 10px;
-          margin: 14px 0;
         }
 
         .choiceRow {
           display: flex;
           gap: 10px;
           align-items: center;
+        }
+
+        .priceInput {
+          max-width: 110px;
         }
 
         .emptyBlock {
@@ -2770,27 +3048,91 @@ export default function OwnerBuilderPage() {
           font-size: 15px;
           font-weight: 800;
           text-align: center;
-          background: #fcfcfa;
+          background: #ffffff;
         }
 
-        .previewStatus {
-          min-height: 36px;
+        .ghostTiny {
+          min-height: 42px;
           padding: 0 14px;
-          border-radius: 999px;
-          background: #efefec;
+          border-radius: 14px;
+          background: #ffffff;
           color: #0e1730;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
+          border: 1px solid rgba(14, 23, 48, 0.1);
+          font-size: 14px;
         }
 
-        .previewShell {
+        .bottomNav {
+          position: absolute;
+          left: 14px;
+          right: 14px;
+          bottom: 14px;
+          min-height: 74px;
+          border-radius: 24px;
+          background: rgba(255, 255, 255, 0.94);
+          border: 1px solid rgba(14, 23, 48, 0.08);
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 6px;
+          padding: 8px;
+          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+          backdrop-filter: blur(12px);
+        }
+
+        .bottomNavItem {
+          border: none;
+          background: transparent;
+          border-radius: 18px;
+          color: #6a7588;
+          display: grid;
+          justify-items: center;
+          align-content: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+          min-height: 58px;
+        }
+
+        .bottomNavItemActive {
+          background: #0e1730;
+          color: #ffffff;
+        }
+
+        .bottomDot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: currentColor;
+        }
+
+        .previewDeviceWrap {
+          position: sticky;
+          top: 18px;
+        }
+
+        .deviceFrame {
+          width: min(100%, 460px);
+          margin: 0 auto;
+          background: #0d0d0d;
+          border-radius: 42px;
+          padding: 10px;
+          box-shadow: 0 30px 70px rgba(15, 23, 42, 0.22);
+        }
+
+        .deviceNotch {
+          width: 140px;
+          height: 22px;
+          border-radius: 0 0 18px 18px;
+          background: #0d0d0d;
+          margin: 0 auto -8px;
+          position: relative;
+          z-index: 4;
+        }
+
+        .previewPhone {
+          min-height: 880px;
+          border-radius: 34px;
           overflow: hidden;
-          border-radius: 30px;
           border: 1px solid rgba(14, 23, 48, 0.08);
         }
 
@@ -2806,7 +3148,7 @@ export default function OwnerBuilderPage() {
 
         .previewHero {
           position: relative;
-          height: 290px;
+          height: 280px;
           overflow: hidden;
           background: #111111;
         }
@@ -3021,7 +3363,7 @@ export default function OwnerBuilderPage() {
         }
 
         .previewPopup {
-          margin-top: 16px;
+          margin: 16px 18px 18px;
           border: 1px solid rgba(14, 23, 48, 0.08);
           border-radius: 28px;
           overflow: hidden;
@@ -3115,20 +3457,52 @@ export default function OwnerBuilderPage() {
           font-weight: 800;
         }
 
-        @media (max-width: 1180px) {
-          .grid {
+        .previewAddToCart {
+          width: 100%;
+          min-height: 54px;
+          border: none;
+          border-radius: 18px;
+          background: #000000;
+          color: #ffffff;
+          font-size: 15px;
+          font-weight: 900;
+          margin-top: 16px;
+          cursor: pointer;
+        }
+
+        @media (max-width: 1240px) {
+          .contentGrid {
             grid-template-columns: 1fr;
           }
 
-          .stickyPanel {
+          .previewDeviceWrap {
             position: static;
+          }
+
+          .deviceFrame {
+            width: min(100%, 520px);
           }
         }
 
         @media (max-width: 900px) {
-          .fieldGrid,
-          .threeCols,
-          .uploadGrid {
+          .topBar {
+            flex-direction: column;
+          }
+
+          .topBarRight {
+            width: 100%;
+            justify-content: flex-start;
+          }
+
+          .topWideInfo {
+            grid-template-columns: 1fr;
+          }
+
+          .fieldGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .uploadStack {
             grid-template-columns: 1fr;
           }
 
@@ -3137,23 +3511,60 @@ export default function OwnerBuilderPage() {
           }
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 768px) {
           .page {
+            padding: 14px;
+          }
+
+          .contentGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .leftPanelHiddenMobile {
+            display: none;
+          }
+
+          .rightPanelMobileHidden {
+            display: none;
+          }
+
+          .phoneChrome {
+            min-height: auto;
+          }
+
+          .deviceFrame {
+            width: 100%;
+            max-width: 430px;
+          }
+
+          .previewPhone {
+            min-height: auto;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .previewHeroWide {
+            min-height: 220px;
+          }
+
+          .previewHeroWideContent {
+            min-height: 220px;
             padding: 16px;
           }
 
-          .shell {
-            padding: 18px;
-            border-radius: 28px;
+          .previewHeroWideBrand {
+            align-items: center;
           }
 
-          .topRow {
-            flex-direction: column;
+          .previewHeroWideLogo,
+          .previewHeroWideLogoFallback {
+            width: 68px;
+            height: 68px;
+            border-radius: 20px;
           }
 
-          .topActions {
-            width: 100%;
-            justify-content: stretch;
+          .previewHeroWideName {
+            font-size: 34px;
           }
 
           .languageSwitch {
@@ -3166,26 +3577,24 @@ export default function OwnerBuilderPage() {
             flex: 1 1 0;
           }
 
-          .itemCardGrid {
+          .topBarRight {
+            justify-content: stretch;
+          }
+
+          .visualItemGrid {
             grid-template-columns: 1fr;
           }
 
           .choiceRow,
-          .categoryEditRow {
+          .categoryEditBlock,
+          .itemEditorTop,
+          .optionGroupTop {
             flex-direction: column;
             align-items: stretch;
           }
 
-          .previewHero {
-            height: 230px;
-          }
-
-          .previewName {
-            font-size: 34px;
-          }
-
-          .previewPopupImageWrap {
-            height: 200px;
+          .priceInput {
+            max-width: none;
           }
 
           .previewInfoGrid {
