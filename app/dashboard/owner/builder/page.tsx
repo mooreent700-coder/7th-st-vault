@@ -400,3 +400,5 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   single: 'singles',
   singles: 'singles',
   wing: 'wings',
+  wings: 'wings',
+};
