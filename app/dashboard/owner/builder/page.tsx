@@ -187,7 +187,6 @@ type CopyBlock = {
   newChoice: string;
   options: string;
   heroInfoBlock: string;
-  placeholderError: string;
 };
 
 const COPY: Record<BuilderLanguage, CopyBlock> = {
@@ -276,7 +275,6 @@ const COPY: Record<BuilderLanguage, CopyBlock> = {
     newChoice: 'New Choice',
     options: 'Options',
     heroInfoBlock: 'Store Info',
-    placeholderError: 'Could not load placeholder images.',
   },
   es: {
     eyebrow: 'CONSTRUCTOR MENUFLOW',
@@ -363,7 +361,6 @@ const COPY: Record<BuilderLanguage, CopyBlock> = {
     newChoice: 'Nueva Opción',
     options: 'Opciones',
     heroInfoBlock: 'Información de Tienda',
-    placeholderError: 'No se pudieron cargar imágenes de relleno.',
   },
 };
 
@@ -560,39 +557,37 @@ export default function OwnerBuilderPage() {
     async function loadPlaceholderMap() {
       try {
         const folders = Array.from(new Set(Object.values(CATEGORY_FOLDER_MAP)));
-        const results = await Promise.all(
-          folders.map(async (folder) => {
-            const { data, error: listError } = await supabase.storage
-              .from(PLACEHOLDER_BUCKET)
-              .list(folder, {
-                limit: 100,
-                sortBy: { column: 'name', order: 'asc' },
-              });
-
-            if (listError) {
-              return [folder, []] as const;
-            }
-
-            const urls =
-              (data || [])
-                .filter((file) => file.name && !file.name.startsWith('.'))
-                .map((file) => {
-                  const { data: publicUrlData } = supabase.storage
-                    .from(PLACEHOLDER_BUCKET)
-                    .getPublicUrl(`${folder}/${file.name}`);
-                  return publicUrlData.publicUrl;
-                }) || [];
-
-            return [folder, urls] as const;
-          })
-        );
-
-        if (!active) return;
-
         const nextMap: Record<string, string[]> = {};
-        for (const [folder, urls] of results) {
+
+        for (const folder of folders) {
+          const { data, error: listError } = await supabase.storage
+            .from(PLACEHOLDER_BUCKET)
+            .list(folder, {
+              limit: 100,
+              sortBy: { column: 'name', order: 'asc' },
+            });
+
+          if (listError) {
+            nextMap[folder] = [];
+            continue;
+          }
+
+          const urls: string[] = [];
+
+          for (const file of data || []) {
+            if (!file.name || file.name.startsWith('.')) continue;
+            const { data: publicUrlData } = supabase.storage
+              .from(PLACEHOLDER_BUCKET)
+              .getPublicUrl(`${folder}/${file.name}`);
+            if (publicUrlData?.publicUrl) {
+              urls.push(publicUrlData.publicUrl);
+            }
+          }
+
           nextMap[folder] = urls;
         }
+
+        if (!active) return;
         setPlaceholderMap(nextMap);
       } catch {
         if (!active) return;
