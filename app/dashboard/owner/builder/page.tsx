@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -101,9 +101,10 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
-type SectionKey = 'store' | 'branding' | 'theme' | 'menu' | 'item' | 'options';
+type ExpandedSection = 'store' | 'branding' | 'theme' | 'menu' | 'item' | 'options' | null;
 
 type CopyBlock = {
+  builder: string;
   title: string;
   subtitle: string;
   loading: string;
@@ -175,10 +176,17 @@ type CopyBlock = {
   addChoice: string;
   newChoice: string;
   noOptionGroups: string;
+  dashboard: string;
+  flyers: string;
+  orders: string;
+  more: string;
+  categoriesAndItems: string;
+  heroAndLogoImages: string;
 };
 
 const COPY: Record<LanguageMode, CopyBlock> = {
   en: {
+    builder: 'BUILDER',
     title: 'Build Your Store',
     subtitle: 'Upload branding, build your menu, go live.',
     loading: 'Loading builder...',
@@ -250,8 +258,15 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     addChoice: 'Add Choice',
     newChoice: 'New Choice',
     noOptionGroups: 'No option groups yet.',
+    dashboard: 'Dashboard',
+    flyers: 'Flyers',
+    orders: 'Orders',
+    more: 'More',
+    categoriesAndItems: 'Categories & Items',
+    heroAndLogoImages: 'Hero & Logo Images',
   },
   es: {
+    builder: 'BUILDER',
     title: 'Construye Tu Tienda',
     subtitle: 'Sube branding, crea tu menú y publícalo.',
     loading: 'Cargando constructor...',
@@ -323,6 +338,12 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     addChoice: 'Agregar Opción',
     newChoice: 'Nueva Opción',
     noOptionGroups: 'Todavía no hay grupos de opciones.',
+    dashboard: 'Panel',
+    flyers: 'Flyers',
+    orders: 'Pedidos',
+    more: 'Más',
+    categoriesAndItems: 'Categorías y Productos',
+    heroAndLogoImages: 'Hero y Logo',
   },
 };
 
@@ -510,6 +531,25 @@ function IconImage() {
   );
 }
 
+function IconPalette() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3.5c-4.9 0-8.9 3.5-8.9 7.8 0 2 1 3.6 2.7 4.7 1 .6 1.4 1.4 1.2 2.2-.3 1.1.6 2 1.7 1.8.7-.1 1.4-.4 2.1-.4h1.1c4.9 0 8.9-3.5 8.9-7.8S16.9 3.5 12 3.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="7.8" cy="10" r="1.1" fill="currentColor" />
+      <circle cx="10.8" cy="7.9" r="1.1" fill="currentColor" />
+      <circle cx="14.6" cy="8" r="1.1" fill="currentColor" />
+      <circle cx="16.8" cy="11" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
+
 function IconGrid() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -569,6 +609,24 @@ function IconEye() {
   );
 }
 
+function IconDots() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.9" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.9" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconDash() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 12h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function Page() {
   const router = useRouter();
 
@@ -605,14 +663,7 @@ export default function Page() {
   const [categories, setCategories] = useState<BuilderCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
-  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
-    store: false,
-    branding: false,
-    theme: false,
-    menu: false,
-    item: false,
-    options: false,
-  });
+  const [expanded, setExpanded] = useState<ExpandedSection>(null);
   const [placeholderMap, setPlaceholderMap] = useState<Record<string, string[]>>({});
 
   const copy = COPY[builderLanguage];
@@ -926,16 +977,8 @@ export default function Page() {
     return getPlaceholderForItem(item);
   }
 
-  function setOpen(section: SectionKey) {
-    setExpanded({
-      store: false,
-      branding: false,
-      theme: false,
-      menu: false,
-      item: false,
-      options: false,
-      [section]: true,
-    });
+  function setOpen(section: ExpandedSection) {
+    setExpanded((current) => (current === section ? null : section));
   }
 
   function selectCategory(categoryId: string) {
@@ -946,7 +989,7 @@ export default function Page() {
 
   function selectItem(itemId: string) {
     setSelectedItemId(itemId);
-    setOpen('item');
+    setExpanded('item');
   }
 
   async function uploadToBucket(file: File, bucket: 'heroes' | 'logos' | 'menu-items') {
@@ -973,7 +1016,7 @@ export default function Page() {
       setError('');
       const url = await uploadToBucket(file, 'heroes');
       setHeroImage(url);
-      setOpen('branding');
+      setExpanded('branding');
     } catch (err: any) {
       setError(err?.message || copy.couldNotUploadHero);
     } finally {
@@ -989,7 +1032,7 @@ export default function Page() {
       setError('');
       const url = await uploadToBucket(file, 'logos');
       setLogoImage(url);
-      setOpen('branding');
+      setExpanded('branding');
     } catch (err: any) {
       setError(err?.message || copy.couldNotUploadLogo);
     } finally {
@@ -1043,7 +1086,7 @@ export default function Page() {
     setCategories((current) => [...current, newCategory]);
     setSelectedCategoryId(newCategoryId);
     setSelectedItemId(newItemId);
-    setOpen('menu');
+    setExpanded('menu');
   }
 
   function updateCategory(categoryId: string, value: string) {
@@ -1086,7 +1129,7 @@ export default function Page() {
     );
     setSelectedCategoryId(categoryId);
     setSelectedItemId(itemId);
-    setOpen('item');
+    setExpanded('item');
   }
 
   function updateItem(itemId: string, patch: Partial<BuilderItem>) {
@@ -1151,7 +1194,7 @@ export default function Page() {
       }))
     );
 
-    setOpen('options');
+    setExpanded('options');
   }
 
   function updateOptionGroup(itemId: string, groupId: string, patch: Partial<BuilderOptionGroup>) {
@@ -1450,68 +1493,80 @@ export default function Page() {
   function SummaryCard({
     icon,
     title,
-    value,
-    right,
+    summary,
+    rightLabel,
     section,
   }: {
-    icon: React.ReactNode;
+    icon: ReactNode;
     title: string;
-    value: React.ReactNode;
-    right?: React.ReactNode;
-    section: SectionKey;
+    summary?: ReactNode;
+    rightLabel?: ReactNode;
+    section: ExpandedSection;
   }) {
     return (
-      <button type="button" className="summaryCard" onClick={() => setOpen(section)}>
-        <div className="summaryTop">
-          <div className="summaryTitleWrap">
-            <span className="summaryIcon">{icon}</span>
-            <span className="summaryTitle">{title}</span>
+      <div className="summaryWrap">
+        <button type="button" className="summaryCard" onClick={() => setOpen(section)}>
+          <div className="summaryRow">
+            <div className="summaryLeft">
+              <span className="iconBox">{icon}</span>
+              <span className="summaryTitle">{title}</span>
+            </div>
+
+            <div className="summaryRight">
+              {rightLabel ? <span className="summaryMetaLabel">{rightLabel}</span> : null}
+              <span className="summaryChevron">
+                <IconChevron />
+              </span>
+            </div>
           </div>
-          <div className="summaryRight">
-            {right}
-            <span className="summaryChevron">
-              <IconChevron />
-            </span>
-          </div>
-        </div>
-        <div className="summaryValue">{value}</div>
-      </button>
+
+          {summary ? <div className="summaryBody">{summary}</div> : null}
+        </button>
+      </div>
     );
   }
 
   if (loading) {
     return (
       <main className="page">
-        <div className="deviceShell">
-          <div className="deviceHeaderBar" />
+        <div className="appShell loadingShell">
+          <div className="topNotch" />
           <div className="loadingCard">{copy.loading}</div>
         </div>
 
         <style jsx>{`
           .page {
             min-height: 100vh;
-            background: #f2f1ed;
-            padding: 18px;
+            background: #eef0f4;
+            padding: 18px 12px 28px;
             display: grid;
             place-items: start center;
             font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           }
-          .deviceShell {
+          .appShell {
             width: min(100%, 430px);
+            border-radius: 34px;
+            background: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+            padding: 14px;
           }
-          .deviceHeaderBar {
+          .loadingShell {
+            min-height: 200px;
+          }
+          .topNotch {
             width: 122px;
             height: 8px;
             border-radius: 999px;
-            background: #111;
-            margin: 4px auto 14px;
+            background: #111827;
+            margin: 2px auto 16px;
           }
           .loadingCard {
-            border-radius: 28px;
-            padding: 22px;
-            background: #fff;
-            border: 1px solid rgba(14, 23, 48, 0.08);
-            color: #0e1730;
+            border-radius: 18px;
+            padding: 20px;
+            background: #f8fafc;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            color: #111827;
             font-size: 18px;
             font-weight: 900;
           }
@@ -1522,652 +1577,662 @@ export default function Page() {
 
   return (
     <main className="page">
-      <div className="deviceShell">
-        <div className="deviceFrame">
-          <div className="notch" />
+      <div className="appShell">
+        <div className="topNotch" />
 
-          <div className="topAppBar">
-            <div className="brandWordmark">
-              <span className="brandBold">MENUFLOW</span>
-              <span className="brandLight"> BUILDER</span>
-            </div>
-
-            <div className="topActions">
-              <div className="langMini">
-                <button
-                  type="button"
-                  className="langMiniButton"
-                  onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
-                >
-                  {builderLanguage.toUpperCase()}
-                  <span className="langCaret">⌄</span>
-                </button>
-              </div>
-
-              <button type="button" className="saveMini" onClick={handleSave} disabled={saving}>
-                {saving ? copy.saving : copy.save}
-              </button>
-            </div>
+        <div className="topBar">
+          <div className="brand">
+            <span className="brandStrong">MENUFLOW</span>
+            <span className="brandSoft"> {copy.builder}</span>
           </div>
 
-          {error ? <div className="message error">{error}</div> : null}
-          {success ? <div className="message success">{success}</div> : null}
+          <div className="topBarActions">
+            <button
+              type="button"
+              className="langButton"
+              onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
+            >
+              {builderLanguage.toUpperCase()}
+              <span className="langCaret">⌄</span>
+            </button>
 
-          <section className="heroSection">
-            {heroImage ? <img src={heroImage} alt="Hero" className="heroImage" /> : <div className="heroFallback" />}
+            <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
+              {saving ? copy.saving : copy.save}
+            </button>
+          </div>
+        </div>
 
-            <div className="heroShade" />
+        {error ? <div className="message error">{error}</div> : null}
+        {success ? <div className="message success">{success}</div> : null}
 
-            <div className="heroOverlayContent">
-              <div className="heroIdentity">
-                {logoImage ? (
-                  <img src={logoImage} alt="Logo" className="heroLogo" />
-                ) : (
-                  <div className="heroLogoFallback">{(name.trim() || 'M').charAt(0).toUpperCase()}</div>
-                )}
+        <section className="heroWrap">
+          {heroImage ? <img src={heroImage} alt="Hero" className="heroImage" /> : <div className="heroImage heroFallback" />}
+          <div className="heroShade" />
 
-                <div className="heroText">
-                  <div className="heroName">{name.trim() || 'Your Store'}</div>
-                </div>
+          <div className="heroContent">
+            <div className="heroIdentity">
+              {logoImage ? (
+                <img src={logoImage} alt="Logo" className="heroLogo" />
+              ) : (
+                <div className="heroLogo heroLogoFallback">{(name.trim() || 'M').charAt(0).toUpperCase()}</div>
+              )}
+
+              <div className="heroName">{name.trim() || 'Your Store'}</div>
+            </div>
+
+            <div className="heroMeta">
+              <span>{address.trim() || '123 Main St, Los Angeles, CA'}</span>
+              <span>{phone.trim() || '323-555-1234'}</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="introCard">
+          <h1 className="title">{copy.title}</h1>
+          <p className="subtitle">{copy.subtitle}</p>
+
+          {previewLink ? (
+            <Link href={previewLink} target="_blank" className="previewStoreButton">
+              <span className="previewIcon">
+                <IconEye />
+              </span>
+              {copy.previewStore}
+            </Link>
+          ) : (
+            <button type="button" className="previewStoreButton" disabled>
+              <span className="previewIcon">
+                <IconEye />
+              </span>
+              {copy.previewStore}
+            </button>
+          )}
+        </section>
+
+        <section className="stack">
+          <SummaryCard
+            section="store"
+            icon={<IconStore />}
+            title={copy.storeSetup}
+            rightLabel={<IconEdit />}
+            summary={
+              <div className="simpleSummary">
+                <div className="simpleSummaryTitle">{name.trim() || 'Your Store'}</div>
+                <div>{phone.trim() || '323-555-1234'}</div>
+                <div>{address.trim() || '123 Main St, Los Angeles, CA'}</div>
+              </div>
+            }
+          />
+
+          {expanded === 'store' ? (
+            <div className="panel">
+              <label className="field">
+                <span className="fieldLabel">{copy.storeName}</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Fiesta Grill" />
+              </label>
+
+              <div className="miniInfoCard">
+                <span className="fieldLabel">{copy.liveUrl}</span>
+                <strong>{slug ? `/store/${slug}` : '/store/your-store'}</strong>
               </div>
 
-              <div className="heroMeta">
-                <span>{address.trim() || '123 Main St, Los Angeles, CA'}</span>
-                <span>{phone.trim() || '323-555-1234'}</span>
+              <label className="field">
+                <span className="fieldLabel">{copy.phone}</span>
+                <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="323-555-1234" />
+              </label>
+
+              <label className="field">
+                <span className="fieldLabel">{copy.address}</span>
+                <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Los Angeles, CA" />
+              </label>
+            </div>
+          ) : null}
+
+          <SummaryCard
+            section="branding"
+            icon={<IconImage />}
+            title={copy.branding}
+            rightLabel={copy.heroAndLogoImages}
+          />
+
+          {expanded === 'branding' ? (
+            <div className="panel">
+              <div className="uploadCard">
+                <div className="uploadCardTitle">{copy.uploadHeroImage}</div>
+                <label className="primaryAction">
+                  {uploadingHero ? copy.saving : copy.uploadHeroImage}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      void handleHeroUpload(e.target.files?.[0] || null);
+                    }}
+                  />
+                </label>
+
+                {heroImage ? (
+                  <img src={heroImage} alt="Hero" className="uploadPreview" />
+                ) : (
+                  <div className="uploadPreviewPlaceholder">{copy.heroPreview}</div>
+                )}
+              </div>
+
+              <div className="uploadCard">
+                <div className="uploadCardTitle">{copy.uploadLogo}</div>
+                <label className="primaryAction">
+                  {uploadingLogo ? copy.saving : copy.uploadLogo}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      void handleLogoUpload(e.target.files?.[0] || null);
+                    }}
+                  />
+                </label>
+
+                {logoImage ? (
+                  <img src={logoImage} alt="Logo" className="logoPreview" />
+                ) : (
+                  <div className="uploadPreviewPlaceholder">{copy.logoPreview}</div>
+                )}
               </div>
             </div>
-          </section>
+          ) : null}
 
-          <section className="introSection">
-            <h1 className="pageTitle">{copy.title}</h1>
-            <p className="pageSub">{copy.subtitle}</p>
-
-            {previewLink ? (
-              <Link href={previewLink} target="_blank" className="previewButton">
-                <span className="previewEye">
-                  <IconEye />
-                </span>
-                {copy.previewStore}
-              </Link>
-            ) : (
-              <button type="button" className="previewButton" disabled>
-                <span className="previewEye">
-                  <IconEye />
-                </span>
-                {copy.previewStore}
-              </button>
-            )}
-          </section>
-
-          <section className="stack">
-            <SummaryCard
-              section="store"
-              icon={<IconStore />}
-              title={copy.storeSetup}
-              right={
-                <span className="miniEdit">
-                  <IconEdit />
-                </span>
-              }
-              value={
-                <>
-                  <strong>{name.trim() || 'Your Store'}</strong>
-                  <span>{phone.trim() || '323-555-1234'}</span>
-                  <span>{address.trim() || '123 Main St, Los Angeles, CA'}</span>
-                </>
-              }
-            />
-
-            {expanded.store ? (
-              <div className="editorCard">
-                <label className="field">
-                  <span className="fieldLabel">{copy.storeName}</span>
-                  <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Fiesta Grill" />
-                </label>
-
-                <div className="summaryInline">
-                  <span className="fieldLabel">{copy.liveUrl}</span>
-                  <strong>{normalizedSlug ? `/store/${normalizedSlug}` : '/store/your-store'}</strong>
-                </div>
-
-                <label className="field">
-                  <span className="fieldLabel">{copy.phone}</span>
-                  <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="323-555-1234" />
-                </label>
-
-                <label className="field">
-                  <span className="fieldLabel">{copy.address}</span>
-                  <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, Los Angeles, CA" />
-                </label>
+          <SummaryCard
+            section="theme"
+            icon={<IconPalette />}
+            title={copy.theme}
+            rightLabel={
+              <div className="inlineToggle" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className={theme === 'light' ? 'inlineToggleButton inlineToggleButtonActive' : 'inlineToggleButton'}
+                  onClick={() => setTheme('light')}
+                >
+                  {copy.light}
+                </button>
+                <button
+                  type="button"
+                  className={theme === 'dark' ? 'inlineToggleButton inlineToggleButtonActive' : 'inlineToggleButton'}
+                  onClick={() => setTheme('dark')}
+                >
+                  {copy.dark}
+                </button>
               </div>
-            ) : null}
+            }
+          />
 
-            <SummaryCard
-              section="branding"
-              icon={<IconImage />}
-              title={copy.branding}
-              value={
-                <div className="rowSummary">
-                  <span>Hero & Logo Images</span>
-                </div>
-              }
-            />
-
-            {expanded.branding ? (
-              <div className="editorCard">
-                <div className="uploadGrid">
-                  <div className="uploadPanel">
-                    <div className="uploadTitle">{copy.uploadHeroImage}</div>
-                    <label className="uploadAction">
-                      {uploadingHero ? copy.saving : copy.uploadHeroImage}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={(e) => {
-                          void handleHeroUpload(e.target.files?.[0] || null);
-                        }}
-                      />
-                    </label>
-                    {heroImage ? <img src={heroImage} alt="Hero" className="uploadPreview" /> : <div className="uploadPlaceholder">{copy.heroPreview}</div>}
-                  </div>
-
-                  <div className="uploadPanel">
-                    <div className="uploadTitle">{copy.uploadLogo}</div>
-                    <label className="uploadAction">
-                      {uploadingLogo ? copy.saving : copy.uploadLogo}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={(e) => {
-                          void handleLogoUpload(e.target.files?.[0] || null);
-                        }}
-                      />
-                    </label>
-                    {logoImage ? <img src={logoImage} alt="Logo" className="logoPreview" /> : <div className="uploadPlaceholder">{copy.logoPreview}</div>}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <SummaryCard
-              section="theme"
-              icon={<IconGrid />}
-              title={copy.theme}
-              right={
-                <div className="miniToggle">
+          {expanded === 'theme' ? (
+            <div className="panel">
+              <div className="field">
+                <span className="fieldLabel">{copy.builderLanguage}</span>
+                <div className="chipRow">
                   <button
                     type="button"
-                    className={theme === 'light' ? 'miniToggleBtn miniToggleBtnActive' : 'miniToggleBtn'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTheme('light');
-                    }}
+                    className={builderLanguage === 'en' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setBuilderLanguage('en')}
                   >
-                    {copy.light}
+                    {copy.english}
                   </button>
                   <button
                     type="button"
-                    className={theme === 'dark' ? 'miniToggleBtn miniToggleBtnActive' : 'miniToggleBtn'}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTheme('dark');
-                    }}
+                    className={builderLanguage === 'es' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setBuilderLanguage('es')}
                   >
-                    {copy.dark}
+                    {copy.spanish}
                   </button>
                 </div>
-              }
-              value={<div className="rowSummary">{theme === 'dark' ? copy.dark : copy.light}</div>}
-            />
-
-            {expanded.theme ? (
-              <div className="editorCard">
-                <div className="fieldBlock">
-                  <span className="fieldLabel">{copy.builderLanguage}</span>
-                  <div className="chipRow">
-                    <button
-                      type="button"
-                      className={builderLanguage === 'en' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setBuilderLanguage('en')}
-                    >
-                      {copy.english}
-                    </button>
-                    <button
-                      type="button"
-                      className={builderLanguage === 'es' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setBuilderLanguage('es')}
-                    >
-                      {copy.spanish}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="fieldBlock">
-                  <span className="fieldLabel">{copy.storefrontLanguage}</span>
-                  <div className="chipRow">
-                    <button
-                      type="button"
-                      className={storefrontLanguage === 'en' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setStorefrontLanguage('en')}
-                    >
-                      EN
-                    </button>
-                    <button
-                      type="button"
-                      className={storefrontLanguage === 'es' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setStorefrontLanguage('es')}
-                    >
-                      ES
-                    </button>
-                  </div>
-                </div>
-
-                <div className="fieldBlock">
-                  <span className="fieldLabel">{copy.orderLanguage}</span>
-                  <div className="chipRow">
-                    <button
-                      type="button"
-                      className={orderLanguage === 'en' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setOrderLanguage('en')}
-                    >
-                      EN
-                    </button>
-                    <button
-                      type="button"
-                      className={orderLanguage === 'es' ? 'chip chipActive' : 'chip'}
-                      onClick={() => setOrderLanguage('es')}
-                    >
-                      ES
-                    </button>
-                  </div>
-                </div>
-
-                <div className="fieldBlock">
-                  <span className="fieldLabel">{copy.pickupOn.replace(' On', '').replace(' Activada', '')} / {copy.deliveryOn.replace(' On', '').replace(' Activada', '')}</span>
-                  <div className="chipRow">
-                    <button
-                      type="button"
-                      className={pickupEnabled ? 'chip chipActive wideChip' : 'chip wideChip'}
-                      onClick={() => setPickupEnabled((current) => !current)}
-                    >
-                      {pickupEnabled ? copy.pickupOn : copy.pickupOff}
-                    </button>
-                    <button
-                      type="button"
-                      className={deliveryEnabled ? 'chip chipActive wideChip' : 'chip wideChip'}
-                      onClick={() => setDeliveryEnabled((current) => !current)}
-                    >
-                      {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
-                    </button>
-                  </div>
-                </div>
-
-                <label className="field">
-                  <span className="fieldLabel">{copy.deliveryFee}</span>
-                  <input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} placeholder="0" />
-                </label>
-
-                <label className="field">
-                  <span className="fieldLabel">{copy.deliveryRadius}</span>
-                  <input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} placeholder="5" />
-                </label>
-
-                <label className="field">
-                  <span className="fieldLabel">{copy.deliveryMinimum}</span>
-                  <input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} placeholder="0" />
-                </label>
               </div>
-            ) : null}
 
-            <SummaryCard
-              section="menu"
-              icon={<IconGrid />}
-              title={copy.menu}
-              value={
-                <div className="menuSummary">
-                  <div className="menuSummaryImageWrap">
-                    {categoryPreviewImage ? <img src={categoryPreviewImage} alt="Menu preview" className="menuSummaryImage" /> : <div className="menuSummaryFallback" />}
+              <div className="field">
+                <span className="fieldLabel">{copy.storefrontLanguage}</span>
+                <div className="chipRow">
+                  <button
+                    type="button"
+                    className={storefrontLanguage === 'en' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setStorefrontLanguage('en')}
+                  >
+                    EN
+                  </button>
+                  <button
+                    type="button"
+                    className={storefrontLanguage === 'es' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setStorefrontLanguage('es')}
+                  >
+                    ES
+                  </button>
+                </div>
+              </div>
+
+              <div className="field">
+                <span className="fieldLabel">{copy.orderLanguage}</span>
+                <div className="chipRow">
+                  <button
+                    type="button"
+                    className={orderLanguage === 'en' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setOrderLanguage('en')}
+                  >
+                    EN
+                  </button>
+                  <button
+                    type="button"
+                    className={orderLanguage === 'es' ? 'chip chipActive' : 'chip'}
+                    onClick={() => setOrderLanguage('es')}
+                  >
+                    ES
+                  </button>
+                </div>
+              </div>
+
+              <div className="field">
+                <span className="fieldLabel">
+                  {copy.pickupOn.replace(' On', '').replace(' Activada', '')} / {copy.deliveryOn.replace(' On', '').replace(' Activada', '')}
+                </span>
+                <div className="chipRow">
+                  <button
+                    type="button"
+                    className={pickupEnabled ? 'chip chipActive wideChip' : 'chip wideChip'}
+                    onClick={() => setPickupEnabled((current) => !current)}
+                  >
+                    {pickupEnabled ? copy.pickupOn : copy.pickupOff}
+                  </button>
+                  <button
+                    type="button"
+                    className={deliveryEnabled ? 'chip chipActive wideChip' : 'chip wideChip'}
+                    onClick={() => setDeliveryEnabled((current) => !current)}
+                  >
+                    {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
+                  </button>
+                </div>
+              </div>
+
+              <label className="field">
+                <span className="fieldLabel">{copy.deliveryFee}</span>
+                <input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} placeholder="0" />
+              </label>
+
+              <label className="field">
+                <span className="fieldLabel">{copy.deliveryRadius}</span>
+                <input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} placeholder="5" />
+              </label>
+
+              <label className="field">
+                <span className="fieldLabel">{copy.deliveryMinimum}</span>
+                <input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} placeholder="0" />
+              </label>
+            </div>
+          ) : null}
+
+          <SummaryCard
+            section="menu"
+            icon={<IconGrid />}
+            title={copy.menu}
+            rightLabel={copy.categoriesAndItems}
+            summary={
+              <div className="menuSummary">
+                <div className="menuThumb">
+                  {categoryPreviewImage ? <img src={categoryPreviewImage} alt="Menu preview" className="menuThumbImage" /> : <div className="menuThumbPlaceholder" />}
+                </div>
+
+                <div className="menuSummaryText">
+                  <div className="menuSummaryHeadline">
+                    {(selectedCategory?.name || 'Featured') + (categories.length > 1 ? ` +${categories.length - 1} more` : '')}
                   </div>
 
-                  <div className="menuSummaryContent">
-                    <div className="menuSummaryHeadline">
-                      {(selectedCategory?.name || 'Featured') + (categories.length > 1 ? ` +${categories.length - 1} more` : '')}
-                    </div>
-
-                    <div className="miniList">
-                      {safeArray(selectedCategory?.items).slice(0, 2).map((item) => (
-                        <button type="button" key={item.id} className="miniListItem" onClick={(e) => {
+                  <div className="menuMiniList">
+                    {safeArray(selectedCategory?.items).slice(0, 2).map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className="menuMiniListItem"
+                        onClick={(e) => {
                           e.stopPropagation();
                           selectItem(item.id);
-                        }}>
-                          <span>{item.name || copy.itemNameFallback}</span>
-                          <span className="miniListArrow">
-                            <IconChevron />
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                        }}
+                      >
+                        <span>{item.name || copy.itemNameFallback}</span>
+                        <span className="menuMiniArrow">
+                          <IconChevron />
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              }
-            />
-
-            {expanded.menu ? (
-              <div className="editorCard">
-                <button type="button" className="primaryCta" onClick={addCategory}>
-                  {copy.addCategory}
-                </button>
-
-                <div className="categoryList">
-                  {categories.map((category) => (
-                    <div
-                      key={category.id}
-                      className={category.id === selectedCategoryId ? 'categoryCard categoryCardActive' : 'categoryCard'}
-                    >
-                      <div className="categoryCardHeader">
-                        <button type="button" className="categorySelect" onClick={() => selectCategory(category.id)}>
-                          <span>{category.name || 'Featured'}</span>
-                          <span className="categoryBadge">{category.items.length}</span>
-                        </button>
-                      </div>
-
-                      <input
-                        className="input slimInput"
-                        value={category.name}
-                        onChange={(e) => updateCategory(category.id, e.target.value)}
-                        placeholder={copy.categoryName}
-                      />
-
-                      <button type="button" className="dangerCta" onClick={() => deleteCategory(category.id)}>
-                        {copy.delete}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {selectedCategory ? (
-                  <>
-                    <button type="button" className="primaryCta" onClick={() => addItem(selectedCategory.id)}>
-                      {copy.addItem}
-                    </button>
-
-                    <div className="itemGrid">
-                      {selectedCategory.items.map((item) => {
-                        const itemImage = getResolvedItemImage(item);
-                        return (
-                          <button
-                            type="button"
-                            key={item.id}
-                            className={item.id === selectedItemId ? 'itemCard itemCardActive' : 'itemCard'}
-                            onClick={() => selectItem(item.id)}
-                          >
-                            <div className="itemCardImageWrap">
-                              {itemImage ? <img src={itemImage} alt={item.name} className="itemCardImage" /> : <div className="itemCardFallback" />}
-                            </div>
-                            <div className="itemCardBody">
-                              <strong>{item.name || copy.itemNameFallback}</strong>
-                              <span>{money(item.base_price)}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : null}
               </div>
-            ) : null}
+            }
+          />
 
-            {selectedItem ? (
-              <>
-                <SummaryCard
-                  section="item"
-                  icon={<IconGrid />}
-                  title={copy.itemBuilder}
-                  value={
-                    <div className="rowSummary">
-                      <strong>{selectedItem.name || copy.itemNameFallback}</strong>
-                      <span>{money(selectedItem.base_price)}</span>
-                    </div>
-                  }
-                />
+          {expanded === 'menu' ? (
+            <div className="panel">
+              <button type="button" className="primaryWide" onClick={addCategory}>
+                {copy.addCategory}
+              </button>
 
-                {expanded.item ? (
-                  <div className="editorCard">
-                    <button type="button" className="dangerCta" onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}>
-                      {copy.deleteItem}
+              <div className="categoryStack">
+                {categories.map((category) => (
+                  <div
+                    key={category.id}
+                    className={category.id === selectedCategoryId ? 'categoryCard categoryCardActive' : 'categoryCard'}
+                  >
+                    <button type="button" className="categoryHeader" onClick={() => selectCategory(category.id)}>
+                      <span>{category.name || 'Featured'}</span>
+                      <span className="categoryCount">{category.items.length}</span>
                     </button>
 
-                    <div className="uploadPanel">
-                      <div className="uploadTitle">{copy.uploadItemImage}</div>
-                      <label className="uploadAction">
-                        {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          onChange={(e) => {
-                            void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null);
-                          }}
-                        />
-                      </label>
-                      {selectedItemImage ? <img src={selectedItemImage} alt={selectedItem.name} className="uploadPreview" /> : <div className="uploadPlaceholder">{copy.itemPreview}</div>}
-                    </div>
+                    <input
+                      className="input slimInput"
+                      value={category.name}
+                      onChange={(e) => updateCategory(category.id, e.target.value)}
+                      placeholder={copy.categoryName}
+                    />
 
-                    <label className="field">
-                      <span className="fieldLabel">{copy.itemName}</span>
-                      <input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} />
-                    </label>
-
-                    <label className="field">
-                      <span className="fieldLabel">{copy.basePrice}</span>
-                      <input className="input" value={selectedItem.base_price} onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })} />
-                    </label>
-
-                    <label className="field">
-                      <span className="fieldLabel">{copy.description}</span>
-                      <textarea className="textarea" value={selectedItem.description} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} />
-                    </label>
-
-                    <div className="fieldBlock">
-                      <span className="fieldLabel">{copy.availability}</span>
-                      <div className="chipRow">
-                        <button
-                          type="button"
-                          className={selectedItem.availability === 'available' ? 'chip chipActive wideChip' : 'chip wideChip'}
-                          onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
-                        >
-                          {copy.available}
-                        </button>
-                        <button
-                          type="button"
-                          className={selectedItem.availability === 'sold_out' ? 'chip chipActive wideChip' : 'chip wideChip'}
-                          onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
-                        >
-                          {copy.soldOut}
-                        </button>
-                      </div>
-                    </div>
+                    <button type="button" className="dangerWide" onClick={() => deleteCategory(category.id)}>
+                      {copy.delete}
+                    </button>
                   </div>
-                ) : null}
+                ))}
+              </div>
 
-                <SummaryCard
-                  section="options"
-                  icon={<IconGrid />}
-                  title={copy.optionGroups}
-                  value={<div className="rowSummary">{selectedItem.option_groups.length ? `${selectedItem.option_groups.length} groups` : copy.noOptionGroups}</div>}
-                />
+              {selectedCategory ? (
+                <>
+                  <button type="button" className="primaryWide" onClick={() => addItem(selectedCategory.id)}>
+                    {copy.addItem}
+                  </button>
 
-                {expanded.options ? (
-                  <div className="editorCard">
-                    <div className="optionPresetGrid">
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
-                        {copy.protein}
-                      </button>
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
-                        {copy.size}
-                      </button>
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
-                        {copy.drink}
-                      </button>
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
-                        {copy.extras}
-                      </button>
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
-                        {copy.removals}
-                      </button>
-                      <button type="button" className="optionPreset" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
-                        {copy.custom}
-                      </button>
-                    </div>
-
-                    {selectedItem.option_groups.length ? (
-                      <div className="optionGroupList">
-                        {selectedItem.option_groups.map((group) => (
-                          <div key={group.id} className="optionGroupCard">
-                            <input
-                              className="input slimInput"
-                              value={group.name}
-                              onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
-                            />
-
-                            <div className="chipRow">
-                              <button
-                                type="button"
-                                className={group.required ? 'chip chipActive' : 'chip'}
-                                onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
-                              >
-                                {group.required ? copy.required : copy.optional}
-                              </button>
-                              <button
-                                type="button"
-                                className={group.selection === 'single' ? 'chip chipActive' : 'chip'}
-                                onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
-                              >
-                                {copy.singleChoice}
-                              </button>
-                              <button
-                                type="button"
-                                className={group.selection === 'multiple' ? 'chip chipActive' : 'chip'}
-                                onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
-                              >
-                                {copy.multipleChoice}
-                              </button>
-                            </div>
-
-                            <div className="choiceStack">
-                              {group.options.map((option) => (
-                                <div key={option.id} className="choiceRow">
-                                  <input
-                                    className="input slimInput flexInput"
-                                    value={option.name}
-                                    onChange={(e) =>
-                                      updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
-                                    }
-                                    placeholder={copy.choiceName}
-                                  />
-                                  <input
-                                    className="input slimInput priceInput"
-                                    value={option.price}
-                                    onChange={(e) =>
-                                      updateOptionChoice(selectedItem.id, group.id, option.id, {
-                                        price: sanitizeNumberInput(e.target.value),
-                                      })
-                                    }
-                                    placeholder="0"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="miniDanger"
-                                    onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
-                                  >
-                                    {copy.delete}
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-
-                            <button type="button" className="secondaryCta" onClick={() => addOptionChoice(selectedItem.id, group.id)}>
-                              {copy.addChoice}
-                            </button>
-                            <button type="button" className="miniDanger wideMiniDanger" onClick={() => deleteOptionGroup(selectedItem.id, group.id)}>
-                              {copy.delete}
-                            </button>
+                  <div className="itemList">
+                    {selectedCategory.items.map((item) => {
+                      const itemImage = getResolvedItemImage(item);
+                      return (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={item.id === selectedItemId ? 'itemCard itemCardActive' : 'itemCard'}
+                          onClick={() => selectItem(item.id)}
+                        >
+                          <div className="itemCardImageWrap">
+                            {itemImage ? <img src={itemImage} alt={item.name} className="itemCardImage" /> : <div className="itemCardImagePlaceholder" />}
                           </div>
-                        ))}
-                      </div>
+
+                          <div className="itemCardInfo">
+                            <strong>{item.name || copy.itemNameFallback}</strong>
+                            <span>{money(item.base_price)}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {selectedItem ? (
+            <>
+              <SummaryCard
+                section="item"
+                icon={<IconGrid />}
+                title={copy.itemBuilder}
+                summary={
+                  <div className="simpleSummary">
+                    <div className="simpleSummaryTitle">{selectedItem.name || copy.itemNameFallback}</div>
+                    <div>{money(selectedItem.base_price)}</div>
+                  </div>
+                }
+              />
+
+              {expanded === 'item' ? (
+                <div className="panel">
+                  <button type="button" className="dangerWide" onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}>
+                    {copy.deleteItem}
+                  </button>
+
+                  <div className="uploadCard">
+                    <div className="uploadCardTitle">{copy.uploadItemImage}</div>
+                    <label className="primaryAction">
+                      {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => {
+                          void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null);
+                        }}
+                      />
+                    </label>
+
+                    {selectedItemImage ? (
+                      <img src={selectedItemImage} alt={selectedItem.name} className="uploadPreview" />
                     ) : (
-                      <div className="emptyState">{copy.noOptionGroups}</div>
+                      <div className="uploadPreviewPlaceholder">{copy.itemPreview}</div>
                     )}
                   </div>
-                ) : null}
-              </>
-            ) : null}
-          </section>
 
-          <nav className="bottomNav">
-            <button type="button" className="navItem">
-              <span className="navIcon" />
-              <span>Dashboard</span>
-            </button>
-            <button type="button" className="navItem">
-              <span className="navIcon" />
-              <span>Builder</span>
-            </button>
-            <button type="button" className="navItem navItemActive">
-              <span className="navIcon" />
-              <span>Preview</span>
-            </button>
-            <button type="button" className="navItem">
-              <span className="navIcon" />
-              <span>Flyers</span>
-            </button>
-            <button type="button" className="navItem">
-              <span className="navIcon" />
-              <span>Orders</span>
-            </button>
-            <button type="button" className="navItem">
-              <span className="navIcon" />
-              <span>More</span>
-            </button>
-          </nav>
-        </div>
+                  <label className="field">
+                    <span className="fieldLabel">{copy.itemName}</span>
+                    <input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} />
+                  </label>
+
+                  <label className="field">
+                    <span className="fieldLabel">{copy.basePrice}</span>
+                    <input
+                      className="input"
+                      value={selectedItem.base_price}
+                      onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })}
+                    />
+                  </label>
+
+                  <label className="field">
+                    <span className="fieldLabel">{copy.description}</span>
+                    <textarea
+                      className="textarea"
+                      value={selectedItem.description}
+                      onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
+                    />
+                  </label>
+
+                  <div className="field">
+                    <span className="fieldLabel">{copy.availability}</span>
+                    <div className="chipRow">
+                      <button
+                        type="button"
+                        className={selectedItem.availability === 'available' ? 'chip chipActive wideChip' : 'chip wideChip'}
+                        onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
+                      >
+                        {copy.available}
+                      </button>
+                      <button
+                        type="button"
+                        className={selectedItem.availability === 'sold_out' ? 'chip chipActive wideChip' : 'chip wideChip'}
+                        onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
+                      >
+                        {copy.soldOut}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <SummaryCard
+                section="options"
+                icon={<IconGrid />}
+                title={copy.optionGroups}
+                summary={
+                  <div className="simpleSummary">
+                    <div>{selectedItem.option_groups.length ? `${selectedItem.option_groups.length} groups` : copy.noOptionGroups}</div>
+                  </div>
+                }
+              />
+
+              {expanded === 'options' ? (
+                <div className="panel">
+                  <div className="presetGrid">
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
+                      {copy.protein}
+                    </button>
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
+                      {copy.size}
+                    </button>
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
+                      {copy.drink}
+                    </button>
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
+                      {copy.extras}
+                    </button>
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
+                      {copy.removals}
+                    </button>
+                    <button type="button" className="presetChip" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
+                      {copy.custom}
+                    </button>
+                  </div>
+
+                  {selectedItem.option_groups.length ? (
+                    <div className="optionGroupStack">
+                      {selectedItem.option_groups.map((group) => (
+                        <div key={group.id} className="optionGroupCard">
+                          <input
+                            className="input slimInput"
+                            value={group.name}
+                            onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
+                          />
+
+                          <div className="chipRow">
+                            <button
+                              type="button"
+                              className={group.required ? 'chip chipActive' : 'chip'}
+                              onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
+                            >
+                              {group.required ? copy.required : copy.optional}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={group.selection === 'single' ? 'chip chipActive' : 'chip'}
+                              onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
+                            >
+                              {copy.singleChoice}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={group.selection === 'multiple' ? 'chip chipActive' : 'chip'}
+                              onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
+                            >
+                              {copy.multipleChoice}
+                            </button>
+                          </div>
+
+                          <div className="choiceStack">
+                            {group.options.map((option) => (
+                              <div key={option.id} className="choiceRow">
+                                <input
+                                  className="input slimInput choiceNameInput"
+                                  value={option.name}
+                                  onChange={(e) =>
+                                    updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
+                                  }
+                                  placeholder={copy.choiceName}
+                                />
+                                <input
+                                  className="input slimInput choicePriceInput"
+                                  value={option.price}
+                                  onChange={(e) =>
+                                    updateOptionChoice(selectedItem.id, group.id, option.id, {
+                                      price: sanitizeNumberInput(e.target.value),
+                                    })
+                                  }
+                                  placeholder="0"
+                                />
+                                <button
+                                  type="button"
+                                  className="miniDanger"
+                                  onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
+                                >
+                                  {copy.delete}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button type="button" className="secondaryWide" onClick={() => addOptionChoice(selectedItem.id, group.id)}>
+                            {copy.addChoice}
+                          </button>
+
+                          <button type="button" className="dangerWide" onClick={() => deleteOptionGroup(selectedItem.id, group.id)}>
+                            {copy.delete}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="emptyState">{copy.noOptionGroups}</div>
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </section>
+
+        <nav className="bottomNav">
+          <button type="button" className="navItem">
+            <span className="navIcon" />
+            <span>{copy.dashboard}</span>
+          </button>
+          <button type="button" className="navItem">
+            <span className="navIcon" />
+            <span>{copy.builder}</span>
+          </button>
+          <button type="button" className="navItem navItemActive">
+            <span className="navIcon" />
+            <span>{copy.previewStore.split(' ')[0]}</span>
+          </button>
+          <button type="button" className="navItem">
+            <span className="navIcon" />
+            <span>{copy.flyers}</span>
+          </button>
+          <button type="button" className="navItem">
+            <span className="navIcon" />
+            <span>{copy.orders}</span>
+          </button>
+          <button type="button" className="navItem">
+            <span className="navIcon" />
+            <span>{copy.more}</span>
+          </button>
+        </nav>
       </div>
 
       <style jsx>{`
         .page {
           min-height: 100vh;
-          background: #f0efeb;
-          padding: 18px 14px 28px;
+          background: #eef0f4;
+          padding: 18px 12px 28px;
           display: grid;
           place-items: start center;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        .deviceShell {
+        .appShell {
           width: min(100%, 430px);
-        }
-
-        .deviceFrame {
+          border-radius: 34px;
           background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.08);
-          border-radius: 34px;
+          box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
           padding: 14px 14px 92px;
-          box-shadow: 0 18px 46px rgba(15, 23, 42, 0.08);
           position: relative;
           overflow: hidden;
         }
 
-        .notch {
-          width: 128px;
+        .topNotch {
+          width: 122px;
           height: 8px;
           border-radius: 999px;
-          background: #111111;
+          background: #111827;
           margin: 2px auto 16px;
         }
 
-        .topAppBar {
+        .topBar {
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -2175,56 +2240,64 @@ export default function Page() {
           margin-bottom: 12px;
         }
 
-        .brandWordmark {
-          color: #111827;
-          font-size: 18px;
-          letter-spacing: 0.01em;
+        .brand {
+          min-width: 0;
           white-space: nowrap;
+          color: #111827;
+          font-size: 19px;
+          line-height: 1;
         }
 
-        .brandBold {
+        .brandStrong {
           font-weight: 900;
+          letter-spacing: 0.02em;
         }
 
-        .brandLight {
-          font-weight: 500;
+        .brandSoft {
           color: #6b7280;
+          font-weight: 500;
+          letter-spacing: 0.02em;
         }
 
-        .topActions {
+        .topBarActions {
           display: flex;
           gap: 8px;
           align-items: center;
+          flex-shrink: 0;
         }
 
-        .langMiniButton,
-        .saveMini {
+        .langButton,
+        .saveButton {
           min-height: 42px;
           border-radius: 10px;
           border: 1px solid rgba(15, 23, 42, 0.12);
-          background: #ffffff;
-          color: #111827;
+          padding: 0 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
           font-size: 15px;
           font-weight: 800;
-          padding: 0 14px;
+          background: #ffffff;
+          color: #111827;
         }
 
-        .saveMini {
+        .saveButton {
           background: #111827;
           color: #ffffff;
           border-color: #111827;
         }
 
-        .langCaret {
-          margin-left: 6px;
+        .saveButton:disabled {
+          opacity: 0.65;
         }
 
         .message {
-          border-radius: 16px;
+          margin-bottom: 12px;
+          border-radius: 14px;
           padding: 12px 14px;
           font-size: 14px;
           font-weight: 800;
-          margin-bottom: 12px;
         }
 
         .error {
@@ -2239,12 +2312,12 @@ export default function Page() {
           border: 1px solid rgba(22, 101, 52, 0.12);
         }
 
-        .heroSection {
+        .heroWrap {
           position: relative;
-          min-height: 206px;
-          border-radius: 0;
-          overflow: hidden;
           margin: 0 -14px;
+          min-height: 188px;
+          overflow: hidden;
+          background: #111827;
         }
 
         .heroImage,
@@ -2254,46 +2327,51 @@ export default function Page() {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          background: linear-gradient(135deg, #232323 0%, #404040 100%);
+        }
+
+        .heroFallback {
+          background: linear-gradient(135deg, #1f2937 0%, #475569 100%);
         }
 
         .heroShade {
           position: absolute;
           inset: 0;
-          background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.64) 100%);
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.62) 100%);
         }
 
-        .heroOverlayContent {
+        .heroContent {
           position: relative;
           z-index: 2;
-          min-height: 206px;
+          min-height: 188px;
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
-          padding: 12px 16px 14px;
+          padding: 14px 16px;
         }
 
         .heroIdentity {
           display: flex;
           align-items: center;
           gap: 10px;
-          margin-bottom: 10px;
         }
 
-        .heroLogo,
-        .heroLogoFallback {
+        .heroLogo {
           width: 58px;
           height: 58px;
           border-radius: 999px;
           object-fit: cover;
           background: #ffffff;
-          color: #111827;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+          flex-shrink: 0;
+        }
+
+        .heroLogoFallback {
           display: flex;
           align-items: center;
           justify-content: center;
+          color: #111827;
           font-size: 24px;
           font-weight: 900;
-          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
         }
 
         .heroName {
@@ -2301,65 +2379,69 @@ export default function Page() {
           font-size: 24px;
           line-height: 1;
           font-weight: 900;
-          text-shadow: 0 2px 12px rgba(0, 0, 0, 0.28);
+          letter-spacing: -0.02em;
+          text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
         }
 
         .heroMeta {
+          margin-top: 12px;
           display: flex;
           gap: 12px;
           flex-wrap: wrap;
           color: rgba(255, 255, 255, 0.96);
           font-size: 14px;
           font-weight: 700;
-          text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+          text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
         }
 
-        .introSection {
-          padding: 18px 2px 12px;
+        .introCard {
+          padding: 18px 2px 14px;
         }
 
-        .pageTitle {
+        .title {
           margin: 0;
           color: #111827;
           font-size: 26px;
-          line-height: 1.05;
+          line-height: 1.04;
           font-weight: 900;
           letter-spacing: -0.03em;
         }
 
-        .pageSub {
+        .subtitle {
           margin: 8px 0 0;
           color: #6b7280;
           font-size: 15px;
-          line-height: 1.5;
+          line-height: 1.45;
           font-weight: 600;
         }
 
-        .previewButton {
+        .previewStoreButton {
+          width: 100%;
           margin-top: 16px;
-          min-height: 50px;
+          min-height: 52px;
           border-radius: 10px;
-          background: linear-gradient(180deg, #1f2430 0%, #10131a 100%);
+          background: linear-gradient(180deg, #1e2430 0%, #10131a 100%);
+          border: 1px solid rgba(17, 24, 39, 0.18);
           color: #ffffff;
-          text-decoration: none;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          width: 100%;
+          text-decoration: none;
           font-size: 17px;
           font-weight: 900;
-          border: 1px solid rgba(17, 24, 39, 0.2);
         }
 
-        .previewButton:disabled {
+        .previewStoreButton:disabled {
           opacity: 0.55;
         }
 
-        .previewEye {
+        .previewIcon {
           width: 20px;
           height: 20px;
           display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .stack {
@@ -2367,40 +2449,47 @@ export default function Page() {
           gap: 12px;
         }
 
-        .summaryCard,
-        .editorCard {
+        .summaryWrap,
+        .panel {
           border-radius: 14px;
-          background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #ffffff;
           box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+          overflow: hidden;
         }
 
         .summaryCard {
           width: 100%;
+          border: none;
+          background: transparent;
           text-align: left;
           padding: 16px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
+          display: grid;
+          gap: 12px;
         }
 
-        .summaryTop {
+        .summaryRow {
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 10px;
         }
 
-        .summaryTitleWrap {
+        .summaryLeft {
           display: flex;
           align-items: center;
           gap: 10px;
           min-width: 0;
         }
 
-        .summaryIcon {
+        .iconBox {
           width: 22px;
           height: 22px;
           color: #111827;
           flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .summaryTitle {
@@ -2414,65 +2503,48 @@ export default function Page() {
         .summaryRight {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .summaryMetaLabel {
           color: #6b7280;
+          font-size: 14px;
+          font-weight: 700;
+          white-space: nowrap;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          max-width: 140px;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .summaryChevron {
-          width: 18px;
-          height: 18px;
-          display: inline-flex;
-        }
-
-        .miniEdit {
-          width: 18px;
-          height: 18px;
-          display: inline-flex;
+          width: 16px;
+          height: 16px;
           color: #6b7280;
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .summaryValue {
-          margin-top: 12px;
+        .summaryBody {
+          color: #374151;
+        }
+
+        .simpleSummary {
           display: grid;
           gap: 4px;
-          color: #374151;
           font-size: 14px;
           font-weight: 600;
         }
 
-        .summaryValue strong {
+        .simpleSummaryTitle {
           color: #111827;
           font-size: 17px;
           font-weight: 900;
-        }
-
-        .rowSummary {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          align-items: center;
-        }
-
-        .miniToggle {
-          display: inline-flex;
-          border: 1px solid rgba(15, 23, 42, 0.12);
-          border-radius: 10px;
-          overflow: hidden;
-          background: #f3f4f6;
-        }
-
-        .miniToggleBtn {
-          min-height: 34px;
-          padding: 0 14px;
-          font-size: 14px;
-          font-weight: 800;
-          background: transparent;
-          color: #374151;
-        }
-
-        .miniToggleBtnActive {
-          background: #111827;
-          color: #ffffff;
         }
 
         .menuSummary {
@@ -2482,46 +2554,48 @@ export default function Page() {
           align-items: start;
         }
 
-        .menuSummaryImageWrap {
+        .menuThumb {
+          aspect-ratio: 1.25 / 1;
           border-radius: 12px;
           overflow: hidden;
           background: #e5e7eb;
-          aspect-ratio: 1.25 / 1;
         }
 
-        .menuSummaryImage,
-        .menuSummaryFallback {
+        .menuThumbImage,
+        .menuThumbPlaceholder {
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
+        }
+
+        .menuThumbPlaceholder {
           background: linear-gradient(135deg, #e7ebf0 0%, #d8dee7 100%);
         }
 
-        .menuSummaryContent {
+        .menuSummaryText {
           display: grid;
           gap: 8px;
-          align-content: start;
         }
 
         .menuSummaryHeadline {
           color: #111827;
           font-size: 16px;
-          font-weight: 900;
           line-height: 1.2;
+          font-weight: 900;
         }
 
-        .miniList {
+        .menuMiniList {
           display: grid;
           gap: 6px;
         }
 
-        .miniListItem {
+        .menuMiniListItem {
           min-height: 42px;
-          padding: 0 10px;
           border-radius: 10px;
-          background: #ffffff;
           border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #ffffff;
+          padding: 0 10px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -2531,21 +2605,23 @@ export default function Page() {
           font-weight: 700;
         }
 
-        .miniListArrow {
+        .menuMiniArrow {
           width: 16px;
           height: 16px;
-          display: inline-flex;
+          color: #6b7280;
           flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
-        .editorCard {
+        .panel {
           padding: 14px;
           display: grid;
           gap: 12px;
         }
 
-        .field,
-        .fieldBlock {
+        .field {
           display: grid;
           gap: 8px;
         }
@@ -2558,16 +2634,16 @@ export default function Page() {
           letter-spacing: 0.12em;
         }
 
-        .summaryInline {
+        .miniInfoCard {
           border-radius: 12px;
           padding: 12px 14px;
-          background: #f9fafb;
+          background: #f8fafc;
           border: 1px solid rgba(15, 23, 42, 0.08);
           display: grid;
           gap: 4px;
         }
 
-        .summaryInline strong {
+        .miniInfoCard strong {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
@@ -2596,17 +2672,12 @@ export default function Page() {
         }
 
         .textarea {
-          min-height: 144px;
+          min-height: 140px;
           padding: 14px;
           resize: vertical;
         }
 
-        .uploadGrid {
-          display: grid;
-          gap: 12px;
-        }
-
-        .uploadPanel {
+        .uploadCard {
           border-radius: 14px;
           padding: 14px;
           border: 1px solid rgba(15, 23, 42, 0.1);
@@ -2615,60 +2686,65 @@ export default function Page() {
           gap: 12px;
         }
 
-        .uploadTitle {
+        .uploadCardTitle {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
         }
 
-        .uploadAction,
-        .primaryCta,
-        .secondaryCta,
-        .dangerCta,
-        .optionPreset,
+        .primaryAction,
+        .primaryWide,
+        .secondaryWide,
+        .dangerWide,
         .chip,
+        .presetChip,
         .miniDanger {
           min-height: 52px;
           border-radius: 12px;
-          font-size: 16px;
-          font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          font-size: 16px;
+          font-weight: 900;
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: #ffffff;
           color: #111827;
         }
 
-        .uploadAction,
-        .primaryCta {
+        .primaryAction,
+        .primaryWide {
           background: #111827;
-          color: #ffffff;
           border-color: #111827;
+          color: #ffffff;
         }
 
-        .dangerCta,
-        .miniDanger,
-        .wideMiniDanger {
+        .secondaryWide {
+          background: #f8fafc;
+        }
+
+        .dangerWide,
+        .miniDanger {
           background: #f7e3e3;
-          color: #a12e2e;
           border-color: transparent;
+          color: #a12e2e;
         }
 
-        .secondaryCta {
-          background: #f9fafb;
-        }
-
-        .wideMiniDanger {
+        .primaryWide,
+        .secondaryWide,
+        .dangerWide {
           width: 100%;
         }
 
         .uploadPreview,
         .logoPreview,
-        .uploadPlaceholder {
+        .uploadPreviewPlaceholder {
           width: 100%;
           height: 190px;
           border-radius: 14px;
+          display: block;
+        }
+
+        .uploadPreview {
           object-fit: cover;
         }
 
@@ -2679,18 +2755,40 @@ export default function Page() {
           border: 1px solid rgba(15, 23, 42, 0.08);
         }
 
-        .uploadPlaceholder {
-          display: flex;
-          align-items: center;
-          justify-content: center;
+        .uploadPreviewPlaceholder {
           background: #eef1f5;
           color: #6b7280;
           font-size: 16px;
           font-weight: 900;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .inlineToggle {
+          display: inline-flex;
+          border-radius: 10px;
+          overflow: hidden;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: #f3f4f6;
+        }
+
+        .inlineToggleButton {
+          min-height: 34px;
+          padding: 0 14px;
+          font-size: 14px;
+          font-weight: 800;
+          background: transparent;
+          color: #374151;
+        }
+
+        .inlineToggleButtonActive {
+          background: #111827;
+          color: #ffffff;
         }
 
         .chipRow,
-        .optionPresetGrid {
+        .presetGrid {
           display: flex;
           flex-wrap: wrap;
           gap: 10px;
@@ -2700,18 +2798,24 @@ export default function Page() {
           padding: 0 18px;
         }
 
-        .wideChip {
-          min-width: 128px;
-        }
-
         .chipActive {
           background: #111827;
           color: #ffffff;
           border-color: #111827;
         }
 
-        .categoryList,
-        .optionGroupList {
+        .wideChip {
+          min-width: 128px;
+        }
+
+        .presetChip {
+          min-width: calc(50% - 5px);
+          padding: 0 14px;
+        }
+
+        .categoryStack,
+        .itemList,
+        .optionGroupStack {
           display: grid;
           gap: 12px;
         }
@@ -2721,9 +2825,9 @@ export default function Page() {
           border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.1);
           padding: 12px;
+          background: #ffffff;
           display: grid;
           gap: 10px;
-          background: #ffffff;
         }
 
         .categoryCardActive {
@@ -2731,22 +2835,18 @@ export default function Page() {
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
         }
 
-        .categoryCardHeader {
-          display: flex;
-        }
-
-        .categorySelect {
+        .categoryHeader {
           width: 100%;
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          justify-content: space-between;
           gap: 10px;
           color: #111827;
           font-size: 18px;
           font-weight: 900;
         }
 
-        .categoryBadge {
+        .categoryCount {
           min-width: 36px;
           min-height: 36px;
           border-radius: 999px;
@@ -2758,17 +2858,12 @@ export default function Page() {
           font-weight: 900;
         }
 
-        .itemGrid {
-          display: grid;
-          gap: 10px;
-        }
-
         .itemCard {
           border-radius: 14px;
-          overflow: hidden;
           border: 1px solid rgba(15, 23, 42, 0.1);
           background: #ffffff;
           text-align: left;
+          overflow: hidden;
         }
 
         .itemCardActive {
@@ -2783,29 +2878,32 @@ export default function Page() {
         }
 
         .itemCardImage,
-        .itemCardFallback {
+        .itemCardImagePlaceholder {
           width: 100%;
           height: 100%;
-          object-fit: cover;
           display: block;
-          background: linear-gradient(135deg, #edf1f6 0%, #dfe5ed 100%);
+          object-fit: cover;
         }
 
-        .itemCardBody {
+        .itemCardImagePlaceholder {
+          background: linear-gradient(135deg, #e7ebf0 0%, #d8dee7 100%);
+        }
+
+        .itemCardInfo {
           padding: 10px 12px;
           display: flex;
+          align-items: center;
           justify-content: space-between;
           gap: 8px;
-          align-items: center;
         }
 
-        .itemCardBody strong {
+        .itemCardInfo strong {
           color: #111827;
           font-size: 16px;
           font-weight: 900;
         }
 
-        .itemCardBody span {
+        .itemCardInfo span {
           color: #111827;
           font-size: 15px;
           font-weight: 800;
@@ -2823,11 +2921,11 @@ export default function Page() {
           align-items: center;
         }
 
-        .flexInput {
+        .choiceNameInput {
           flex: 1 1 auto;
         }
 
-        .priceInput {
+        .choicePriceInput {
           width: 92px;
           flex: 0 0 auto;
         }
@@ -2869,6 +2967,7 @@ export default function Page() {
           gap: 6px;
           font-size: 11px;
           font-weight: 800;
+          min-height: 56px;
         }
 
         .navItemActive {
@@ -2881,6 +2980,22 @@ export default function Page() {
           height: 12px;
           border-radius: 3px;
           background: currentColor;
+          display: inline-block;
+        }
+
+        .iconBox :global(svg),
+        .summaryChevron :global(svg),
+        .summaryMetaLabel :global(svg),
+        .previewIcon :global(svg),
+        .menuMiniArrow :global(svg) {
+          width: 100%;
+          height: 100%;
+          display: block;
+        }
+
+        .summaryMetaLabel :global(svg) {
+          width: 18px;
+          height: 18px;
         }
       `}</style>
     </main>
