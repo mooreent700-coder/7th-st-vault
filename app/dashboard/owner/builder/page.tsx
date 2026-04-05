@@ -399,4 +399,4 @@ const CATEGORY_FOLDER_MAP: Record<string, string> = {
   sides: 'sides',
   single: 'singles',
   singles: 'singles',
-  wing:
+  wing: 'wings',
