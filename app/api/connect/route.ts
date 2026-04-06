@@ -1,0 +1,130 @@
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+export async function POST(req: Request) {
+  try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+    if (!stripeSecretKey) {
+      return NextResponse.json(
+        { error: 'Missing STRIPE_SECRET_KEY' },
+        { status: 500 }
+      );
+    }
+
+    if (!supabaseUrl) {
+      return NextResponse.json(
+        { error: 'Missing NEXT_PUBLIC_SUPABASE_URL' },
+        { status: 500 }
+      );
+    }
+
+    if (!supabaseServiceRoleKey) {
+      return NextResponse.json(
+        { error: 'Missing SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500 }
+      );
+    }
+
+    if (!siteUrl) {
+      return NextResponse.json(
+        { error: 'Missing NEXT_PUBLIC_SITE_URL' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const body = await req.json();
+    const restaurantId =
+      typeof body?.restaurantId === 'string' ? body.restaurantId.trim() : '';
+
+    if (!restaurantId) {
+      return NextResponse.json(
+        { error: 'Missing restaurantId' },
+        { status: 400 }
+      );
+    }
+
+    const { data: restaurant, error: restaurantError } = await supabase
+      .from('restaurants')
+      .select('id, name, slug, stripe_account_id')
+      .eq('id', restaurantId)
+      .single();
+
+    if (restaurantError || !restaurant) {
+      return NextResponse.json(
+        { error: 'Restaurant not found' },
+        { status: 404 }
+      );
+    }
+
+    let accountId: string | null = restaurant.stripe_account_id ?? null;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US',
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_type: 'individual',
+        metadata: {
+          restaurant_id: restaurant.id,
+          restaurant_slug: restaurant.slug ?? '',
+          restaurant_name: restaurant.name ?? '',
+        },
+      });
+
+      accountId = account.id;
+
+      const { error: updateError } = await supabase
+        .from('restaurants')
+        .update({
+          stripe_account_id: accountId,
+        })
+        .eq('id', restaurant.id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    const dashboardPath = '/dashboard/owner';
+    const refreshUrl = `${siteUrl}${dashboardPath}`;
+    const returnUrl = `${siteUrl}${dashboardPath}`;
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+      type: 'account_onboarding',
+    });
+
+    return NextResponse.json({
+      url: accountLink.url,
+      accountId,
+    });
+  } catch (error: any) {
+    console.error('STRIPE CONNECT ERROR:', error);
+
+    return NextResponse.json(
+      {
+        error: error?.message || 'Something went wrong',
+      },
+      { status: 500 }
+    );
+  }
+}

@@ -7,6 +7,15 @@ import { supabase } from '@/lib/supabase';
 
 type Lang = 'en' | 'es';
 
+function generateSlug(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
 const copy = {
   en: {
     brand: 'MenuFlow',
@@ -33,6 +42,7 @@ const copy = {
     already: 'Already have an account?',
     signIn: 'Sign in',
     signupFailed: 'Signup failed',
+    createStoreFailed: 'Failed to create store',
   },
   es: {
     brand: 'MenuFlow',
@@ -59,13 +69,13 @@ const copy = {
     already: '¿Ya tienes una cuenta?',
     signIn: 'Iniciar sesión',
     signupFailed: 'Error al crear cuenta',
+    createStoreFailed: 'No se pudo crear la tienda',
   },
 } as const;
 
 function SignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const selectedPlan = searchParams.get('plan') || 'starter';
 
   const [lang, setLang] = useState<Lang>('en');
@@ -77,18 +87,46 @@ function SignupPageContent() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const ensureRestaurantRow = async (userId: string) => {
+    const { data: existing, error: existingError } = await supabase
+      .from('restaurants')
+      .select('id')
+      .eq('owner_id', userId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existing?.id) return;
+
+    const slug = generateSlug(businessName) || generateSlug(fullName) || `store-${Date.now()}`;
+
+    const { error: insertError } = await supabase.from('restaurants').insert({
+      owner_id: userId,
+      owner_email: email,
+      name: businessName.trim(),
+      slug,
+      plan: selectedPlan,
+      phone: null,
+      address: null,
+      hours: null,
+      hero_url: null,
+      logo_url: null,
+    });
+
+    if (insertError) throw insertError;
+  };
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       const { error: signUpError } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
-            full_name: fullName,
-            business_name: businessName,
+            full_name: fullName.trim(),
+            business_name: businessName.trim(),
             plan: selectedPlan,
           },
         },
@@ -100,7 +138,7 @@ function SignupPageContent() {
       }
 
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
@@ -111,20 +149,19 @@ function SignupPageContent() {
 
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (user) {
-        await supabase.from('restaurants').upsert(
-          {
-            owner_id: user.id,
-            owner_email: email,
-            name: businessName,
-            plan: selectedPlan,
-          },
-          {
-            onConflict: 'owner_email',
-          }
-        );
+      if (userError || !user) {
+        alert(userError?.message || t.signupFailed);
+        return;
+      }
+
+      try {
+        await ensureRestaurantRow(user.id);
+      } catch (restaurantError: any) {
+        alert(restaurantError?.message || t.createStoreFailed);
+        return;
       }
 
       router.push('/dashboard/owner');
@@ -172,24 +209,18 @@ function SignupPageContent() {
                 {t.heroTitle}
               </h1>
 
-              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">
-                {t.heroText}
-              </p>
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">{t.heroText}</p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.builder}</p>
-                <p className="mt-2 text-sm text-slate-600">
-                  {t.builderText}
-                </p>
+                <p className="mt-2 text-sm text-slate-600">{t.builderText}</p>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.checkout}</p>
-                <p className="mt-2 text-sm text-slate-600">
-                  {t.checkoutText}
-                </p>
+                <p className="mt-2 text-sm text-slate-600">{t.checkoutText}</p>
               </div>
             </div>
           </div>
@@ -227,9 +258,7 @@ function SignupPageContent() {
             <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-200/70 sm:p-8">
               <div className="mb-8">
                 <h2 className="text-3xl font-black text-slate-950 sm:text-4xl">{t.title}</h2>
-                <p className="mt-2 text-sm text-slate-600 sm:text-base">
-                  {t.subtitle}
-                </p>
+                <p className="mt-2 text-sm text-slate-600 sm:text-base">{t.subtitle}</p>
                 <p className="mt-3 text-sm font-semibold text-slate-800">
                   {t.selected}{' '}
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
