@@ -612,10 +612,9 @@ export default function BuilderPage() {
     return () => {
       active = false;
     };
-  }, [router, copy.couldNotLoad, copy]);
-  
+  }, [router, copy.couldNotLoad]);
 
-    async function loadMenuBuilder(currentRestaurantId: string, active = true) {
+  async function loadMenuBuilder(currentRestaurantId: string, active = true) {
     const { data: categoryData, error: categoryError } = await supabase
       .from('menu_categories')
       .select('id, restaurant_id, name, sort_order')
@@ -981,8 +980,335 @@ export default function BuilderPage() {
     );
   }
 
+    function deleteOptionGroup(itemId: string, groupId: string) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? { ...item, option_groups: item.option_groups.filter((group) => group.id !== groupId) }
+            : item
+        ),
+      }))
+    );
+  }
 
->{error}</div> : null}
+  function addOptionChoice(itemId: string, groupId: string) {
+    const optionId = uid('choice');
+
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? { ...group, options: [...group.options, { id: optionId, name: copy.newChoice, price: '0' }] }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function updateOptionChoice(itemId: string, groupId: string, optionId: string, patch: Partial<BuilderOption>) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? {
+                        ...group,
+                        options: group.options.map((option) => (option.id === optionId ? { ...option, ...patch } : option)),
+                      }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function deleteOptionChoice(itemId: string, groupId: string, optionId: string) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? { ...group, options: group.options.filter((option) => option.id !== optionId) }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  async function handleSave() {
+    try {
+      if (!ownerId) return;
+
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const restaurantPayload = {
+        owner_id: ownerId,
+        name: name.trim() || null,
+        slug: slugify(name) || null,
+        phone: phone.trim() || null,
+        address: address.trim() || null,
+        hero_image: heroImage.trim() || null,
+        logo_image: logoImage.trim() || null,
+        storefront_theme: theme,
+        storefront_language: storefrontLanguage,
+        order_language: orderLanguage === 'es' ? 'ES' : 'EN',
+        pickup_enabled: pickupEnabled,
+        delivery_enabled: deliveryEnabled,
+        delivery_fee: Number(deliveryFee || 0),
+        delivery_radius: Number(deliveryRadius || 0),
+        delivery_minimum: Number(deliveryMinimum || 0),
+      };
+
+      let currentRestaurantId = restaurantId;
+
+      if (restaurantId) {
+        const { error: updateError } = await supabase.from('restaurants').update(restaurantPayload).eq('id', restaurantId);
+        if (updateError) throw updateError;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('restaurants')
+          .insert(restaurantPayload)
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        currentRestaurantId = inserted.id;
+        setRestaurantId(inserted.id);
+      }
+
+      if (!currentRestaurantId) throw new Error('Missing restaurant id.');
+
+      const { data: existingCategories, error: existingCategoriesError } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingCategoriesError) throw existingCategoriesError;
+
+      const { data: existingItems, error: existingItemsError } = await supabase
+        .from('menu_items')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingItemsError) throw existingItemsError;
+
+      const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
+      const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
+
+      if (existingItemIds.length) {
+        const { data: existingGroups, error: existingGroupsError } = await supabase
+          .from('menu_option_groups')
+          .select('id')
+          .in('item_id', existingItemIds);
+
+        if (existingGroupsError) throw existingGroupsError;
+
+        const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
+
+        if (existingGroupIds.length) {
+          const { error: deleteChoicesError } = await supabase
+            .from('menu_option_choices')
+            .delete()
+            .in('option_group_id', existingGroupIds);
+
+          if (deleteChoicesError) throw deleteChoicesError;
+        }
+
+        const { error: deleteGroupsError } = await supabase
+          .from('menu_option_groups')
+          .delete()
+          .in('item_id', existingItemIds);
+
+        if (deleteGroupsError) throw deleteGroupsError;
+
+        const { error: deleteItemsError } = await supabase.from('menu_items').delete().in('id', existingItemIds);
+        if (deleteItemsError) throw deleteItemsError;
+      }
+
+      if (existingCategoryIds.length) {
+        const { error: deleteCategoriesError } = await supabase
+          .from('menu_categories')
+          .delete()
+          .in('id', existingCategoryIds);
+
+        if (deleteCategoriesError) throw deleteCategoriesError;
+      }
+
+      const allCategories = categories.map((category, categoryIndex) => ({
+        id: category.id,
+        restaurant_id: currentRestaurantId,
+        name: category.name.trim() || `${copy.menu} ${categoryIndex + 1}`,
+        sort_order: categoryIndex,
+      }));
+
+      if (allCategories.length) {
+        const { error: categoryInsertError } = await supabase.from('menu_categories').insert(allCategories);
+        if (categoryInsertError) throw categoryInsertError;
+      }
+
+      const allItems = categories.flatMap((category, categoryIndex) =>
+        category.items.map((item, itemIndex) => ({
+          id: item.id,
+          restaurant_id: currentRestaurantId,
+          category_id: category.id,
+          name: item.name.trim() || copy.itemNameFallback,
+          base_price: Number(item.base_price || 0),
+          price: Number(item.base_price || 0),
+          description: item.description.trim() || null,
+          image_url: item.image_url || null,
+          availability: item.availability,
+          is_available: item.availability === 'available',
+          sort_order: itemIndex + categoryIndex * 100,
+        }))
+      );
+
+      if (allItems.length) {
+        const { error: itemInsertError } = await supabase.from('menu_items').insert(allItems);
+        if (itemInsertError) throw itemInsertError;
+      }
+
+      const allOptionGroups = categories.flatMap((category) =>
+        category.items.flatMap((item) =>
+          item.option_groups.map((group, groupIndex) => ({
+            id: group.id,
+            item_id: item.id,
+            name: group.name.trim() || copy.optionGroups,
+            is_required: group.required,
+            is_multiple: group.selection === 'multiple',
+            selection_mode: group.selection,
+            sort_order: groupIndex,
+          }))
+        )
+      );
+
+      if (allOptionGroups.length) {
+        const { error: groupInsertError } = await supabase.from('menu_option_groups').insert(allOptionGroups);
+        if (groupInsertError) throw groupInsertError;
+      }
+
+      const allChoices = categories.flatMap((category) =>
+        category.items.flatMap((item) =>
+          item.option_groups.flatMap((group) =>
+            group.options.map((option, optionIndex) => ({
+              id: option.id,
+              option_group_id: group.id,
+              name: option.name.trim() || copy.newChoice,
+              price: Number(option.price || 0),
+              price_delta: Number(option.price || 0),
+              sort_order: optionIndex,
+            }))
+          )
+        )
+      );
+
+      if (allChoices.length) {
+        const { error: choiceInsertError } = await supabase.from('menu_option_choices').insert(allChoices);
+        if (choiceInsertError) throw choiceInsertError;
+      }
+
+      setSuccess(copy.builderSaved);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : copy.couldNotSave;
+      setError(message || copy.couldNotSave);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function SectionCard({
+    section,
+    icon,
+    title,
+    right,
+    summary,
+  }: {
+    section: SectionKey;
+    icon: ReactNode;
+    title: string;
+    right?: ReactNode;
+    summary?: ReactNode;
+  }) {
+    return (
+      <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
+        <div className="sectionCardTop">
+          <div className="sectionCardLeft">
+            <MiniIcon>{icon}</MiniIcon>
+            <span className="sectionCardTitle">{title}</span>
+          </div>
+          <div className="sectionCardRight">
+            {right ? <span className="sectionCardMeta">{right}</span> : null}
+            <span className="sectionCardArrow">›</span>
+          </div>
+        </div>
+        {summary ? <div className="sectionCardSummary">{summary}</div> : null}
+      </button>
+    );
+  }
+
+  if (loading) {
+    return (
+      <main className="page">
+        <div className="shell">
+          <div className="notch" />
+          <div className="loadingCard">{copy.loading}</div>
+        </div>
+
+        <style jsx global>{`
+          .page { min-height: 100vh; background: #eef1f5; padding: 16px 12px 28px; display: grid; place-items: start center; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          .shell { width: min(100%, 430px); background: #ffffff; border: 1px solid rgba(15,23,42,.08); border-radius: 34px; box-shadow: 0 24px 50px rgba(15,23,42,.08); padding: 14px; }
+          .notch { width: 122px; height: 8px; border-radius: 999px; background: #0f172a; margin: 2px auto 16px; }
+          .loadingCard { border-radius: 18px; padding: 20px; background: #f8fafc; border: 1px solid rgba(15,23,42,.08); color: #111827; font-size: 18px; font-weight: 900; }
+        `}</style>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page">
+      <div className="shell">
+        <div className="notch" />
+
+        <div className="topBar">
+          <div className="brand">
+            <span className="brandStrong">MENUFLOW</span>
+            <span className="brandSoft"> {copy.builderWord}</span>
+          </div>
+          <div className="topActions">
+            <button type="button" className="langButton" onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}>
+              {builderLanguage.toUpperCase()}
+            </button>
+            <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
+              {saving ? copy.saving : copy.save}
+            </button>
+          </div>
+        </div>
+
+        {error ? <div className="message error">{error}</div> : null}
         {success ? <div className="message success">{success}</div> : null}
 
         <section className="hero">
@@ -1008,150 +1334,200 @@ export default function BuilderPage() {
 
         <div className="stack">
           <SectionCard section="store" icon="⌂" title={copy.storeSetup} right="✎" summary={<div className="simpleSummary"><strong>{name.trim() || 'Your Store'}</strong><span>{phone.trim() || '323-555-1234'}</span><span>{address.trim() || '123 Main St, Los Angeles, CA'}</span></div>} />
-          {expanded === 'store' ? <div className="panel">
-            <label className="field"><span className="label">{copy.storeName}</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <div className="infoCard"><span className="label">{copy.liveUrl}</span><strong>{slug ? `/store/${slug}` : '/store/your-store'}</strong></div>
-            <label className="field"><span className="label">{copy.phone}</span><input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-            <label className="field"><span className="label">{copy.address}</span><input className="input" value={address} onChange={(e) => setAddress(e.target.value)} /></label>
-          </div> : null}
+          {expanded === 'store' ? (
+            <div className="panel">
+              <label className="field">
+                <span className="label">{copy.storeName}</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <div className="infoCard">
+                <span className="label">{copy.liveUrl}</span>
+                <strong>{slug ? `/store/${slug}` : '/store/your-store'}</strong>
+              </div>
+              <label className="field">
+                <span className="label">{copy.phone}</span>
+                <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="label">{copy.address}</span>
+                <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
+              </label>
+            </div>
+          ) : null}
 
           <SectionCard section="branding" icon="▣" title={copy.branding} right={copy.heroAndLogoImages} />
-          {expanded === 'branding' ? <div className="panel">
-            <div className="uploadCard">
-              <div className="uploadTitle">{copy.uploadHeroImage}</div>
-              <label className="primaryButton">
-                {uploadingHero ? copy.saving : copy.uploadHeroImage}
-                <input type="file" accept="image/*" hidden onChange={(e) => { void handleHeroUpload(e.target.files?.[0] || null); }} />
-              </label>
-              <button type="button" className="secondaryWide" onClick={removeHeroImage}>{copy.removeImage}</button>
-              {heroImage ? <img src={heroImage} alt="Hero" className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.heroPreview}</div>}
-            </div>
+          {expanded === 'branding' ? (
+            <div className="panel">
+              <div className="uploadCard">
+                <div className="uploadTitle">{copy.uploadHeroImage}</div>
+                <label className="primaryButton">
+                  {uploadingHero ? copy.saving : copy.uploadHeroImage}
+                  <input type="file" accept="image/*" hidden onChange={(e) => void handleHeroUpload(e.target.files?.[0] || null)} />
+                </label>
+                <button type="button" className="secondaryWide" onClick={removeHeroImage}>{copy.removeImage}</button>
+                {heroImage ? <img src={heroImage} alt="Hero" className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.heroPreview}</div>}
+              </div>
 
-            <div className="uploadCard">
-              <div className="uploadTitle">{copy.uploadLogo}</div>
-              <label className="primaryButton">
-                {uploadingLogo ? copy.saving : copy.uploadLogo}
-                <input type="file" accept="image/*" hidden onChange={(e) => { void handleLogoUpload(e.target.files?.[0] || null); }} />
-              </label>
-              <button type="button" className="secondaryWide" onClick={removeLogoImage}>{copy.removeImage}</button>
-              {logoImage ? <img src={logoImage} alt="Logo" className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.logoPreview}</div>}
+              <div className="uploadCard">
+                <div className="uploadTitle">{copy.uploadLogo}</div>
+                <label className="primaryButton">
+                  {uploadingLogo ? copy.saving : copy.uploadLogo}
+                  <input type="file" accept="image/*" hidden onChange={(e) => void handleLogoUpload(e.target.files?.[0] || null)} />
+                </label>
+                <button type="button" className="secondaryWide" onClick={removeLogoImage}>{copy.removeImage}</button>
+                {logoImage ? <img src={logoImage} alt="Logo" className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.logoPreview}</div>}
+              </div>
             </div>
-          </div> : null}
+          ) : null}
 
           <SectionCard section="theme" icon="◐" title={copy.theme} right={theme === 'light' ? copy.light : copy.dark} />
-          {expanded === 'theme' ? <div className="panel">
-            <div className="chipRow">
-              <button type="button" className={theme === 'light' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('light')}>{copy.light}</button>
-              <button type="button" className={theme === 'dark' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('dark')}>{copy.dark}</button>
+          {expanded === 'theme' ? (
+            <div className="panel">
+              <div className="chipRow">
+                <button type="button" className={theme === 'light' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('light')}>{copy.light}</button>
+                <button type="button" className={theme === 'dark' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('dark')}>{copy.dark}</button>
+              </div>
+              <div className="chipRow">
+                <button type="button" className={storefrontLanguage === 'en' ? 'chip chipActive' : 'chip'} onClick={() => setStorefrontLanguage('en')}>EN</button>
+                <button type="button" className={storefrontLanguage === 'es' ? 'chip chipActive' : 'chip'} onClick={() => setStorefrontLanguage('es')}>ES</button>
+              </div>
+              <div className="chipRow">
+                <button type="button" className={pickupEnabled ? 'chip chipActive' : 'chip'} onClick={() => setPickupEnabled((v) => !v)}>{pickupEnabled ? copy.pickupOn : copy.pickupOff}</button>
+                <button type="button" className={deliveryEnabled ? 'chip chipActive' : 'chip'} onClick={() => setDeliveryEnabled((v) => !v)}>{deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}</button>
+              </div>
+              <label className="field">
+                <span className="label">{copy.deliveryFee}</span>
+                <input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} />
+              </label>
+              <label className="field">
+                <span className="label">{copy.deliveryRadius}</span>
+                <input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} />
+              </label>
+              <label className="field">
+                <span className="label">{copy.deliveryMinimum}</span>
+                <input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} />
+              </label>
             </div>
-            <div className="chipRow">
-              <button type="button" className={storefrontLanguage === 'en' ? 'chip chipActive' : 'chip'} onClick={() => setStorefrontLanguage('en')}>EN</button>
-              <button type="button" className={storefrontLanguage === 'es' ? 'chip chipActive' : 'chip'} onClick={() => setStorefrontLanguage('es')}>ES</button>
-            </div>
-            <div className="chipRow">
-              <button type="button" className={pickupEnabled ? 'chip chipActive' : 'chip'} onClick={() => setPickupEnabled((v) => !v)}>{pickupEnabled ? copy.pickupOn : copy.pickupOff}</button>
-              <button type="button" className={deliveryEnabled ? 'chip chipActive' : 'chip'} onClick={() => setDeliveryEnabled((v) => !v)}>{deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}</button>
-            </div>
-            <label className="field"><span className="label">{copy.deliveryFee}</span><input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} /></label>
-            <label className="field"><span className="label">{copy.deliveryRadius}</span><input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} /></label>
-            <label className="field"><span className="label">{copy.deliveryMinimum}</span><input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} /></label>
-          </div> : null}
+          ) : null}
 
           <SectionCard section="menu" icon="▦" title={copy.menu} right={copy.categoriesAndItems} />
-          {expanded === 'menu' ? <div className="panel">
-            <button type="button" className="primaryWide" onClick={addCategory}>{copy.addCategory}</button>
-            <div className="categoryStack">
-              {categories.map((category) => (
-                <div key={category.id} className="categoryCard">
-                  <button type="button" className="categoryHeader" onClick={() => selectCategory(category.id)}>
-                    <span>{category.name || 'Featured'}</span>
-                    <span className="categoryCount">{category.items.length}</span>
-                  </button>
-                  <input className="input compactInput" value={category.name} onChange={(e) => updateCategory(category.id, e.target.value)} />
-                  <button type="button" className="dangerWide" onClick={() => deleteCategory(category.id)}>{copy.delete}</button>
-                </div>
-              ))}
-            </div>
-
-            {selectedCategory ? <>
-              <button type="button" className="primaryWide" onClick={() => addItem(selectedCategory.id)}>{copy.addItem}</button>
-              <div className="itemList">
-                {selectedCategory.items.map((item) => (
-                  <button type="button" key={item.id} className="itemCard" onClick={() => selectItem(item.id)}>
-                    <div className="itemImageWrap">
-                      {item.image_url ? <img src={item.image_url} alt={item.name || copy.itemNameFallback} className="itemImage" /> : <div className="itemImagePlaceholder" />}
-                    </div>
-                    <div className="itemInfo">
-                      <strong>{item.name || copy.itemNameFallback}</strong>
-                      <span>{money(item.base_price)}</span>
-                    </div>
-                  </button>
+          {expanded === 'menu' ? (
+            <div className="panel">
+              <button type="button" className="primaryWide" onClick={addCategory}>{copy.addCategory}</button>
+              <div className="categoryStack">
+                {categories.map((category) => (
+                  <div key={category.id} className="categoryCard">
+                    <button type="button" className="categoryHeader" onClick={() => selectCategory(category.id)}>
+                      <span>{category.name || 'Featured'}</span>
+                      <span className="categoryCount">{category.items.length}</span>
+                    </button>
+                    <input className="input compactInput" value={category.name} onChange={(e) => updateCategory(category.id, e.target.value)} />
+                    <button type="button" className="dangerWide" onClick={() => deleteCategory(category.id)}>{copy.delete}</button>
+                  </div>
                 ))}
               </div>
-            </> : null}
-          </div> : null}
 
-          {selectedItem ? <>
-            <SectionCard section="item" icon="▣" title={copy.itemBuilder} />
-            {expanded === 'item' ? <div className="panel">
-              <button type="button" className="dangerWide" onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}>{copy.deleteItem}</button>
-              <div className="uploadCard">
-                <div className="uploadTitle">{copy.uploadItemImage}</div>
-                <label className="primaryButton">
-                  {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
-                  <input type="file" accept="image/*" hidden onChange={(e) => { void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null); }} />
-                </label>
-                <button type="button" className="secondaryWide" onClick={() => removeItemImage(selectedItem.id)}>{copy.removeImage}</button>
-                {selectedItem.image_url ? <img src={selectedItem.image_url} alt={selectedItem.name || copy.itemNameFallback} className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.itemPreview}</div>}
-              </div>
+              {selectedCategory ? (
+                <>
+                  <button type="button" className="primaryWide" onClick={() => addItem(selectedCategory.id)}>{copy.addItem}</button>
+                  <div className="itemList">
+                    {selectedCategory.items.map((item) => (
+                      <button type="button" key={item.id} className="itemCard" onClick={() => selectItem(item.id)}>
+                        <div className="itemImageWrap">
+                          {item.image_url ? <img src={item.image_url} alt={item.name || copy.itemNameFallback} className="itemImage" /> : <div className="itemImagePlaceholder" />}
+                        </div>
+                        <div className="itemInfo">
+                          <strong>{item.name || copy.itemNameFallback}</strong>
+                          <span>{money(item.base_price)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
 
-              <label className="field"><span className="label">{copy.itemName}</span><input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} /></label>
-              <label className="field"><span className="label">{copy.basePrice}</span><input className="input" value={selectedItem.base_price} onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })} /></label>
-              <label className="field"><span className="label">{copy.description}</span><textarea className="textarea" value={selectedItem.description} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} /></label>
-              <div className="chipRow">
-                <button type="button" className={selectedItem.availability === 'available' ? 'chip chipActive' : 'chip'} onClick={() => updateItem(selectedItem.id, { availability: 'available' })}>{copy.available}</button>
-                <button type="button" className={selectedItem.availability === 'sold_out' ? 'chip chipActive' : 'chip'} onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}>{copy.soldOut}</button>
-              </div>
-            </div> : null}
+          {selectedItem ? (
+            <>
+              <SectionCard section="item" icon="▣" title={copy.itemBuilder} />
+              {expanded === 'item' ? (
+                <div className="panel">
+                  <button type="button" className="dangerWide" onClick={() => deleteItem(selectedItem.category_id, selectedItem.id)}>{copy.deleteItem}</button>
+                  <div className="uploadCard">
+                    <div className="uploadTitle">{copy.uploadItemImage}</div>
+                    <label className="primaryButton">
+                      {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
+                      <input type="file" accept="image/*" hidden onChange={(e) => void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null)} />
+                    </label>
+                    <button type="button" className="secondaryWide" onClick={() => removeItemImage(selectedItem.id)}>{copy.removeImage}</button>
+                    {selectedItem.image_url ? <img src={selectedItem.image_url} alt={selectedItem.name || copy.itemNameFallback} className="uploadPreview" /> : <div className="uploadPreviewPlaceholder">{copy.itemPreview}</div>}
+                  </div>
 
-            <SectionCard section="options" icon="⋯" title={copy.optionGroups} />
-            {expanded === 'options' ? <div className="panel">
-              <div className="presetGrid">
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>{copy.protein}</button>
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'size')}>{copy.size}</button>
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>{copy.drink}</button>
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>{copy.extras}</button>
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>{copy.removals}</button>
-                <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>{copy.custom}</button>
-              </div>
+                  <label className="field">
+                    <span className="label">{copy.itemName}</span>
+                    <input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span className="label">{copy.basePrice}</span>
+                    <input className="input" value={selectedItem.base_price} onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })} />
+                  </label>
+                  <label className="field">
+                    <span className="label">{copy.description}</span>
+                    <textarea className="textarea" value={selectedItem.description} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} />
+                  </label>
+                  <div className="chipRow">
+                    <button type="button" className={selectedItem.availability === 'available' ? 'chip chipActive' : 'chip'} onClick={() => updateItem(selectedItem.id, { availability: 'available' })}>{copy.available}</button>
+                    <button type="button" className={selectedItem.availability === 'sold_out' ? 'chip chipActive' : 'chip'} onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}>{copy.soldOut}</button>
+                  </div>
+                </div>
+              ) : null}
 
-              {selectedItem.option_groups.length ? <div className="optionStack">
-                {selectedItem.option_groups.map((group) => (
-                  <div key={group.id} className="optionCard">
-                    <input className="input compactInput" value={group.name} onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })} />
-                    <div className="chipRow">
-                      <button type="button" className={group.required ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}>{group.required ? copy.required : copy.optional}</button>
-                      <button type="button" className={group.selection === 'single' ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}>{copy.singleChoice}</button>
-                      <button type="button" className={group.selection === 'multiple' ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}>{copy.multipleChoice}</button>
-                    </div>
+              <SectionCard section="options" icon="⋯" title={copy.optionGroups} />
+              {expanded === 'options' ? (
+                <div className="panel">
+                  <div className="presetGrid">
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>{copy.protein}</button>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'size')}>{copy.size}</button>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>{copy.drink}</button>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>{copy.extras}</button>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>{copy.removals}</button>
+                    <button type="button" className="presetButton" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>{copy.custom}</button>
+                  </div>
 
-                    <div className="choiceStack">
-                      {group.options.map((option) => (
-                        <div key={option.id} className="choiceRow">
-                          <input className="input compactInput choiceName" value={option.name} onChange={(e) => updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })} />
-                          <input className="input compactInput choicePrice" value={option.price} onChange={(e) => updateOptionChoice(selectedItem.id, group.id, option.id, { price: sanitizeNumberInput(e.target.value) })} />
-                          <button type="button" className="miniDanger" onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}>{copy.delete}</button>
+                  {selectedItem.option_groups.length ? (
+                    <div className="optionStack">
+                      {selectedItem.option_groups.map((group) => (
+                        <div key={group.id} className="optionCard">
+                          <input className="input compactInput" value={group.name} onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })} />
+                          <div className="chipRow">
+                            <button type="button" className={group.required ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}>{group.required ? copy.required : copy.optional}</button>
+                            <button type="button" className={group.selection === 'single' ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}>{copy.singleChoice}</button>
+                            <button type="button" className={group.selection === 'multiple' ? 'chip chipActive' : 'chip'} onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}>{copy.multipleChoice}</button>
+                          </div>
+
+                          <div className="choiceStack">
+                            {group.options.map((option) => (
+                              <div key={option.id} className="choiceRow">
+                                <input className="input compactInput choiceName" value={option.name} onChange={(e) => updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })} />
+                                <input className="input compactInput choicePrice" value={option.price} onChange={(e) => updateOptionChoice(selectedItem.id, group.id, option.id, { price: sanitizeNumberInput(e.target.value) })} />
+                                <button type="button" className="miniDanger" onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}>{copy.delete}</button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <button type="button" className="secondaryWide" onClick={() => addOptionChoice(selectedItem.id, group.id)}>{copy.addChoice}</button>
+                          <button type="button" className="dangerWide" onClick={() => deleteOptionGroup(selectedItem.id, group.id)}>{copy.delete}</button>
                         </div>
                       ))}
                     </div>
-
-                    <button type="button" className="secondaryWide" onClick={() => addOptionChoice(selectedItem.id, group.id)}>{copy.addChoice}</button>
-                    <button type="button" className="dangerWide" onClick={() => deleteOptionGroup(selectedItem.id, group.id)}>{copy.delete}</button>
-                  </div>
-                ))}
-              </div> : <div className="emptyState">{copy.noOptionGroups}</div>}
-            </div> : null}
-          </> : null}
+                  ) : (
+                    <div className="emptyState">{copy.noOptionGroups}</div>
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </div>
 
         <nav className="bottomNav">
@@ -1239,4 +1615,3 @@ export default function BuilderPage() {
     </main>
   );
 }
- 

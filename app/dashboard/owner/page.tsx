@@ -1,1 +1,5 @@
-404: Not Found
+import { redirect } from 'next/navigation';
+
+export default function OwnerDashboardPage() {
+  redirect('/dashboard/owner/builder');
+}
