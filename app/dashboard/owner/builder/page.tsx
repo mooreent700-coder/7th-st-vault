@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import slugify from 'slugify';
 
 type ThemeMode = 'light' | 'dark';
 type LanguageMode = 'en' | 'es';
