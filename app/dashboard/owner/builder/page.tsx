@@ -1083,7 +1083,7 @@ export default function BuilderPage() {
     const restaurantPayload = {
       owner_id: ownerId,
       name: name.trim() || null,
-      slug: slugify(name) || null,
+      slug: name ? slugify(name, { lower: true, strict: true }) : null,
       phone: phone.trim() || null,
       address: address.trim() || null,
       hero_image: heroImage.trim() || null,
@@ -1106,7 +1106,10 @@ export default function BuilderPage() {
         .update(restaurantPayload)
         .eq('id', restaurantId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+  console.log('UPDATE ERROR:', updateError);
+  throw updateError;
+}
     } else {
       const { data: inserted, error: insertError } = await supabase
         .from('restaurants')
@@ -1114,7 +1117,10 @@ export default function BuilderPage() {
         .select('id')
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+  console.log('INSERT ERROR:', insertError);
+  throw insertError;
+}
 
       currentRestaurantId = inserted.id;
       setRestaurantId(inserted.id);
