@@ -367,7 +367,6 @@ function slugify(value: string) {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 }
-
 function sanitizeNumberInput(value: string) {
   return value.replace(/[^0-9.]/g, '');
 }
@@ -383,6 +382,17 @@ function money(value: string | number | null | undefined) {
   if (!Number.isFinite(num)) return '$0';
   return `$${num.toFixed(2).replace(/\.00$/, '')}`;
 }
+function getPlanFee(plan: 'starter' | 'growth' | 'premium') {
+  if (plan === 'starter') {
+    return { percent: '10%', monthly: '$19/mo' };
+  }
+
+  if (plan === 'growth') {
+    return { percent: '5%', monthly: '$39/mo' };
+  }
+
+  return { percent: '3%', monthly: '$99/mo' };
+}
 
 function getPresetOptions(type: BuilderOptionGroup['presetType']) {
   if (type === 'protein') {
@@ -392,6 +402,7 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'Shrimp', price: '2' },
     ];
   }
+
   if (type === 'size') {
     return [
       { name: 'Small', price: '0' },
@@ -399,6 +410,7 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'Large', price: '4' },
     ];
   }
+
   if (type === 'drink') {
     return [
       { name: 'Coke', price: '0' },
@@ -406,6 +418,7 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'Water', price: '0' },
     ];
   }
+
   if (type === 'extras') {
     return [
       { name: 'Extra Cheese', price: '1' },
@@ -413,6 +426,7 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'Avocado', price: '2' },
     ];
   }
+
   if (type === 'removals') {
     return [
       { name: 'No Onion', price: '0' },
@@ -420,6 +434,7 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'No Sauce', price: '0' },
     ];
   }
+
   return [{ name: 'Option 1', price: '0' }];
 }
 
@@ -461,7 +476,6 @@ function getEmptyStarter(copy: CopyBlock): BuilderCategory[] {
 function MiniIcon({ children }: { children: ReactNode }) {
   return <span className="miniIcon">{children}</span>;
 }
-
 export default function BuilderPage() {
   const router = useRouter();
 
@@ -485,6 +499,7 @@ export default function BuilderPage() {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [phone, setPhone] = useState('');
+  const [stripeConnected, setStripeConnected] = useState(true);
   const [address, setAddress] = useState('');
   const [heroImage, setHeroImage] = useState('');
   const [logoImage, setLogoImage] = useState('');
@@ -1060,1102 +1075,835 @@ export default function BuilderPage() {
   }
 
   async function handleSave() {
-    try {
-      if (!ownerId) return;
-
-      setSaving(true);
-      setError('');
-      setSuccess('');
-
-      const restaurantPayload = {
-        owner_id: ownerId,
-        name: name.trim() || null,
-        slug: slugify(name) || null,
-        phone: phone.trim() || null,
-        address: address.trim() || null,
-        hero_image: heroImage.trim() || null,
-        logo_image: logoImage.trim() || null,
-        storefront_theme: theme,
-        storefront_language: storefrontLanguage,
-        order_language: orderLanguage === 'es' ? 'ES' : 'EN',
-        pickup_enabled: pickupEnabled,
-        delivery_enabled: deliveryEnabled,
-        delivery_fee: Number(deliveryFee || 0),
-        delivery_radius: Number(deliveryRadius || 0),
-        delivery_minimum: Number(deliveryMinimum || 0),
-      };
-
-      let currentRestaurantId = restaurantId;
-
-      if (restaurantId) {
-        const { error: updateError } = await supabase.from('restaurants').update(restaurantPayload).eq('id', restaurantId);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('restaurants')
-          .insert(restaurantPayload)
-          .select('id')
-          .single();
-
-        if (insertError) throw insertError;
-        currentRestaurantId = inserted.id;
-        setRestaurantId(inserted.id);
-      }
-
-      if (!currentRestaurantId) throw new Error('Missing restaurant id.');
-
-      const { data: existingCategories, error: existingCategoriesError } = await supabase
-        .from('menu_categories')
-        .select('id')
-        .eq('restaurant_id', currentRestaurantId);
-
-      if (existingCategoriesError) throw existingCategoriesError;
-
-      const { data: existingItems, error: existingItemsError } = await supabase
-        .from('menu_items')
-        .select('id')
-        .eq('restaurant_id', currentRestaurantId);
-
-      if (existingItemsError) throw existingItemsError;
-
-      const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
-      const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
-
-            if (existingItemIds.length) {
-        const { data: existingGroups, error: existingGroupsError } = await supabase
-          .from('menu_option_groups')
-          .select('id')
-          .in('item_id', existingItemIds);
-
-        if (existingGroupsError) throw existingGroupsError;
-
-        const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
-
-        if (existingGroupIds.length) {
-          const { error: deleteChoicesError } = await supabase
-            .from('menu_option_choices')
-            .delete()
-            .in('option_group_id', existingGroupIds);
-
-          if (deleteChoicesError) throw deleteChoicesError;
-        }
-
-        const { error: deleteGroupsError } = await supabase
-          .from('menu_option_groups')
-          .delete()
-          .in('item_id', existingItemIds);
-
-        if (deleteGroupsError) throw deleteGroupsError;
-
-        const { error: deleteItemsError } = await supabase
-          .from('menu_items')
-          .delete()
-          .in('id', existingItemIds);
-
-        if (deleteItemsError) throw deleteItemsError;
-      }
-
-      if (existingCategoryIds.length) {
-        const { error: deleteCategoriesError } = await supabase
-          .from('menu_categories')
-          .delete()
-          .in('id', existingCategoryIds);
-
-        if (deleteCategoriesError) throw deleteCategoriesError;
-      }
-
-      const allCategories = categories.map((category, categoryIndex) => ({
-        id: category.id,
-        restaurant_id: currentRestaurantId,
-        name: category.name.trim() || `Category ${categoryIndex + 1}`,
-        sort_order: categoryIndex,
-      }));
-
-      if (allCategories.length) {
-        const { error: categoryInsertError } = await supabase
-          .from('menu_categories')
-          .insert(allCategories);
-
-        if (categoryInsertError) throw categoryInsertError;
-      }
-
-      const allItems = categories.flatMap((category, categoryIndex) =>
-        category.items.map((item, itemIndex) => ({
-          id: item.id,
-          restaurant_id: currentRestaurantId,
-          category_id: category.id,
-          name: item.name.trim() || 'Item',
-          base_price: Number(item.base_price || 0),
-          price: Number(item.base_price || 0),
-          description: item.description.trim() || null,
-          image_url: item.image_url || null,
-          availability: item.availability,
-          is_available: item.availability === 'available',
-          sort_order: itemIndex + categoryIndex * 100,
-        }))
-      );
-
-      if (allItems.length) {
-        const { error: itemInsertError } = await supabase
-          .from('menu_items')
-          .insert(allItems);
-
-        if (itemInsertError) throw itemInsertError;
-      }
-
-      const allOptionGroups = categories.flatMap((category) =>
-        category.items.flatMap((item) =>
-          item.option_groups.map((group, groupIndex) => ({
-            id: group.id,
-            item_id: item.id,
-            name: group.name.trim() || 'Options',
-            is_required: group.required,
-            is_multiple: group.selection === 'multiple',
-            selection_mode: group.selection,
-            sort_order: groupIndex,
-          }))
-        )
-      );
-
-      if (allOptionGroups.length) {
-        const { error: groupInsertError } = await supabase
-          .from('menu_option_groups')
-          .insert(allOptionGroups);
-
-        if (groupInsertError) throw groupInsertError;
-      }
-
-      const allChoices = categories.flatMap((category) =>
-        category.items.flatMap((item) =>
-          item.option_groups.flatMap((group) =>
-            group.options.map((option, optionIndex) => ({
-              id: option.id,
-              option_group_id: group.id,
-              name: option.name.trim() || 'Choice',
-              price: Number(option.price || 0),
-              price_delta: Number(option.price || 0),
-              sort_order: optionIndex,
-            }))
-          )
-        )
-      );
-
-      if (allChoices.length) {
-        const { error: choiceInsertError } = await supabase
-          .from('menu_option_choices')
-          .insert(allChoices);
-
-        if (choiceInsertError) throw choiceInsertError;
-      }
-
-      setSuccess(copy.builderSaved);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : copy.couldNotSave;
-      setError(message || copy.couldNotSave);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function handleGoLive() {
-    setError('');
-    setSuccess('');
-
-    if (!stripeConnected) {
-      setError(copy.stripeNeeded);
+  try {
+    if (!ownerId) {
+      setError('User not authenticated.');
       return;
     }
 
-    setSuccess('Store ready to go live.');
-  }
+    setSaving(true);
+    setError('');
+    setSuccess('');
 
-  const qrValue =
-    typeof window !== 'undefined' && slug
-      ? `${window.location.origin}/store/${slug}`
-      : `/store/${slug || 'your-store'}`;
+    const restaurantPayload = {
+      owner_id: ownerId,
+      name: name.trim() || null,
+      slug: slugify(name) || null,
+      phone: phone.trim() || null,
+      address: address.trim() || null,
+      hero_image: heroImage.trim() || null,
+      logo_image: logoImage.trim() || null,
+      storefront_theme: theme,
+      storefront_language: storefrontLanguage,
+      order_language: orderLanguage === 'es' ? 'ES' : 'EN',
+      pickup_enabled: pickupEnabled,
+      delivery_enabled: deliveryEnabled,
+      delivery_fee: Number(deliveryFee || 0),
+      delivery_radius: Number(deliveryRadius || 0),
+      delivery_minimum: Number(deliveryMinimum || 0),
+    };
 
-  const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrValue)}`;
+    let currentRestaurantId = restaurantId;
 
-  const currentFee = getPlanFee(plan);
+    if (restaurantId) {
+      const { error: updateError } = await supabase
+        .from('restaurants')
+        .update(restaurantPayload)
+        .eq('id', restaurantId);
 
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="shell">
-          <div className="notch" />
-          <div className="loadingCard">{copy.loading}</div>
-        </div>
+      if (updateError) throw updateError;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from('restaurants')
+        .insert(restaurantPayload)
+        .select('id')
+        .single();
 
-        <style jsx>{`
-          .page {
-            min-height: 100vh;
-            background: #eef1f5;
-            padding: 16px 12px 28px;
-            display: grid;
-            place-items: start center;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          }
-          .shell {
-            width: min(100%, 430px);
-            background: #ffffff;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 34px;
-            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
-            padding: 14px;
-          }
-          .notch {
-            width: 122px;
-            height: 8px;
-            border-radius: 999px;
-            background: #0f172a;
-            margin: 2px auto 16px;
-          }
-          .loadingCard {
-            border-radius: 18px;
-            padding: 20px;
-            background: #f8fafc;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            color: #111827;
-            font-size: 18px;
-            font-weight: 900;
-          }
-        `}</style>
-      </main>
+      if (insertError) throw insertError;
+
+      currentRestaurantId = inserted.id;
+      setRestaurantId(inserted.id);
+    }
+
+    if (!currentRestaurantId) {
+      throw new Error('Missing restaurant id.');
+    }
+
+    const { data: existingCategories, error: existingCategoriesError } = await supabase
+      .from('menu_categories')
+      .select('id')
+      .eq('restaurant_id', currentRestaurantId);
+
+    if (existingCategoriesError) throw existingCategoriesError;
+
+    const { data: existingItems, error: existingItemsError } = await supabase
+      .from('menu_items')
+      .select('id')
+      .eq('restaurant_id', currentRestaurantId);
+
+    if (existingItemsError) throw existingItemsError;
+
+    const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
+    const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
+
+    if (existingItemIds.length) {
+      const { data: existingGroups, error: existingGroupsError } = await supabase
+        .from('menu_option_groups')
+        .select('id')
+        .in('item_id', existingItemIds);
+
+      if (existingGroupsError) throw existingGroupsError;
+
+      const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
+
+      if (existingGroupIds.length) {
+        const { error: deleteChoicesError } = await supabase
+          .from('menu_option_choices')
+          .delete()
+          .in('option_group_id', existingGroupIds);
+
+        if (deleteChoicesError) throw deleteChoicesError;
+      }
+
+      const { error: deleteGroupsError } = await supabase
+        .from('menu_option_groups')
+        .delete()
+        .in('item_id', existingItemIds);
+
+      if (deleteGroupsError) throw deleteGroupsError;
+
+      const { error: deleteItemsError } = await supabase
+        .from('menu_items')
+        .delete()
+        .in('id', existingItemIds);
+
+      if (deleteItemsError) throw deleteItemsError;
+    }
+
+    if (existingCategoryIds.length) {
+      const { error: deleteCategoriesError } = await supabase
+        .from('menu_categories')
+        .delete()
+        .in('id', existingCategoryIds);
+
+      if (deleteCategoriesError) throw deleteCategoriesError;
+    }
+
+    const allCategories = categories.map((category, categoryIndex) => ({
+      id: category.id,
+      restaurant_id: currentRestaurantId,
+      name: category.name.trim() || `${copy.menu} ${categoryIndex + 1}`,
+      sort_order: categoryIndex,
+    }));
+
+    if (allCategories.length) {
+      const { error: categoryInsertError } = await supabase
+        .from('menu_categories')
+        .insert(allCategories);
+
+      if (categoryInsertError) throw categoryInsertError;
+    }
+
+    const allItems = categories.flatMap((category, categoryIndex) =>
+      category.items.map((item, itemIndex) => ({
+        id: item.id,
+        restaurant_id: currentRestaurantId,
+        category_id: category.id,
+        name: item.name.trim() || copy.itemNameFallback,
+        base_price: Number(item.base_price || 0),
+        price: Number(item.base_price || 0),
+        description: item.description.trim() || null,
+        image_url: item.image_url || null,
+        availability: item.availability,
+        is_available: item.availability === 'available',
+        sort_order: itemIndex + categoryIndex * 100,
+      }))
     );
-  }
 
+    if (allItems.length) {
+      const { error: itemInsertError } = await supabase
+        .from('menu_items')
+        .insert(allItems);
+
+      if (itemInsertError) throw itemInsertError;
+    }
+
+    const allOptionGroups = categories.flatMap((category) =>
+      category.items.flatMap((item) =>
+        item.option_groups.map((group, groupIndex) => ({
+          id: group.id,
+          item_id: item.id,
+          name: group.name.trim() || copy.optionGroups,
+          is_required: group.required,
+          is_multiple: group.selection === 'multiple',
+          selection_mode: group.selection,
+          sort_order: groupIndex,
+        }))
+      )
+    );
+
+    if (allOptionGroups.length) {
+      const { error: groupInsertError } = await supabase
+        .from('menu_option_groups')
+        .insert(allOptionGroups);
+
+      if (groupInsertError) throw groupInsertError;
+    }
+
+    const allChoices = categories.flatMap((category) =>
+      category.items.flatMap((item) =>
+        item.option_groups.flatMap((group) =>
+          group.options.map((option, optionIndex) => ({
+            id: option.id,
+            option_group_id: group.id,
+            name: option.name.trim() || copy.newChoice,
+            price: Number(option.price || 0),
+            price_delta: Number(option.price || 0),
+            sort_order: optionIndex,
+          }))
+        )
+      )
+    );
+
+    if (allChoices.length) {
+      const { error: choiceInsertError } = await supabase
+        .from('menu_option_choices')
+        .insert(allChoices);
+
+      if (choiceInsertError) throw choiceInsertError;
+    }
+
+    setSuccess(copy.builderSaved);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : copy.couldNotSave;
+    setError(message || copy.couldNotSave);
+  } finally {
+    setSaving(false);
+  }
+}
+
+function SectionCard({
+  section,
+  icon,
+  title,
+  right,
+  summary,
+}: {
+  section: SectionKey;
+  icon: ReactNode;
+  title: string;
+  right?: ReactNode;
+  summary?: ReactNode;
+}) {
+  return (
+    <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
+      <div className="sectionCardTop">
+        <div className="sectionCardLeft">
+          <MiniIcon>{icon}</MiniIcon>
+          <span className="sectionCardTitle">{title}</span>
+        </div>
+        <div className="sectionCardRight">
+          {right ? <span className="sectionCardMeta">{right}</span> : null}
+          <span className="sectionCardArrow">›</span>
+        </div>
+      </div>
+      {summary ? <div className="sectionCardSummary">{summary}</div> : null}
+    </button>
+  );
+}
+
+if (loading) {
   return (
     <main className="page">
       <div className="shell">
         <div className="notch" />
+        <div className="loadingCard">{copy.loading}</div>
+      </div>
 
-        <div className="topBar">
-          <div className="brand">
-            <span className="brandStrong">MENUFLOW</span>
-            <span className="brandSoft"> BUILDER</span>
-          </div>
+      <style jsx global>{`
+        .page {
+          min-height: 100vh;
+          background: #eef1f5;
+          padding: 16px 12px 28px;
+          display: grid;
+          place-items: start center;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .shell {
+          width: min(100%, 430px);
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 34px;
+          box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+          padding: 14px;
+        }
+        .notch {
+          width: 122px;
+          height: 8px;
+          border-radius: 999px;
+          background: #0f172a;
+          margin: 2px auto 16px;
+        }
+        .loadingCard {
+          border-radius: 18px;
+          padding: 20px;
+          background: #f8fafc;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+      `}</style>
+    </main>
+  );
+}
 
-          <div className="topActions">
-            <button
-              type="button"
-              className="langButton"
-              onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
-            >
-              {builderLanguage.toUpperCase()}
-            </button>
+return (
+  <main className="page">
+    <div className="shell">
+      <div className="notch" />
 
-            <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
-              {saving ? copy.saving : copy.save}
-            </button>
-          </div>
+      <div className="topBar">
+        <div className="brand">
+          <span className="brandStrong">MENUFLOW</span>
+          <span className="brandSoft"> {copy.builderWord}</span>
         </div>
+        <div className="topActions">
+          <button
+            type="button"
+            className="langButton"
+            onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
+          >
+            {builderLanguage.toUpperCase()}
+          </button>
+          <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
+            {saving ? copy.saving : copy.save}
+          </button>
+        </div>
+      </div>
 
-        {error ? <div className="message error">{error}</div> : null}
-        {success ? <div className="message success">{success}</div> : null}
+      {error ? <div className="message error">{error}</div> : null}
+      {success ? <div className="message success">{success}</div> : null}
 
-        <section className="hero">
-          {heroImage ? <img src={heroImage} alt="Hero" className="heroImage" /> : <div className="heroImage heroFallback" />}
-          <div className="heroOverlay" />
+      <section className="heroCard">
+        <div className="heroWrap">
+          {heroImage ? (
+            <img src={heroImage} alt={copy.heroPreview} className="heroImage" />
+          ) : (
+            <div className="heroFallback" />
+          )}
 
-          <div className="heroContent">
+          <div className="heroOverlay">
             <div className="heroIdentity">
               {logoImage ? (
-                <img src={logoImage} alt="Logo" className="heroLogo" />
+                <img src={logoImage} alt={copy.logoPreview} className="heroLogo" />
               ) : (
-                <div className="heroLogo heroLogoFallback">{(name.trim() || 'M').charAt(0).toUpperCase()}</div>
+                <div className="heroLogoFallback">{(name || 'M').charAt(0).toUpperCase()}</div>
               )}
 
-              <div>
-                <div className="heroName">{name.trim() || 'Your Store'}</div>
-                <div className="heroStatus">
-                  {stripeConnected ? copy.stripeConnected : copy.stripeNeeded}
+              <div className="heroText">
+                <div className="heroName">{name || 'Your Store'}</div>
+                <div className="heroMetaRow">
+                  <span>{address || '123 Main St'}</span>
+                  <span>{phone || '323 555 1212'}</span>
                 </div>
               </div>
             </div>
-
-            <div className="heroMeta">
-              <span>{address.trim() || '123 Main St, Los Angeles, CA'}</span>
-              <span>{phone.trim() || '323-555-1234'}</span>
-            </div>
           </div>
-        </section>
-
-        <section className="intro">
-          <h1 className="title">{copy.title}</h1>
-          <p className="subtitle">{copy.subtitle}</p>
-
-          <div className="topButtons">
-            {previewLink ? (
-              <Link href={previewLink} target="_blank" className="previewButton">
-                {copy.previewStore}
-              </Link>
-            ) : (
-              <button type="button" className="previewButton" disabled>
-                {copy.previewStore}
-              </button>
-            )}
-
-            <button type="button" className="goLiveButton" onClick={handleGoLive}>
-              {copy.goLive}
-            </button>
-          </div>
-        </section>
-
-        <div className="sectionTabs">
-          <BuilderSectionButton active={tab === 'store'} onClick={() => setTab('store')} icon="⌂" label={copy.storeSetup} />
-          <BuilderSectionButton active={tab === 'branding'} onClick={() => setTab('branding')} icon="▣" label={copy.branding} />
-          <BuilderSectionButton active={tab === 'settings'} onClick={() => setTab('settings')} icon="◐" label={copy.settings} />
-          <BuilderSectionButton active={tab === 'menu'} onClick={() => setTab('menu')} icon="▦" label={copy.menuBuilder} />
-          <BuilderSectionButton active={tab === 'flyers'} onClick={() => setTab('flyers')} icon="✦" label={copy.flyers} />
         </div>
+      </section>
 
-        {tab === 'store' ? (
-          <section className="card">
-            <div className="cardHeader">
-              <div className="cardTitleWrap">
-                <MiniIcon>⌂</MiniIcon>
-                <h2 className="cardTitle">{copy.storeSetup}</h2>
-              </div>
+      <section className="introCard">
+        <h1 className="title">{copy.title}</h1>
+        <p className="subtitle">{copy.subtitle}</p>
+
+        <Link href={previewLink || '#'} className={`previewButton ${!previewLink ? 'isDisabled' : ''}`}>
+          {copy.previewStore}
+        </Link>
+      </section>
+
+      <div className="sectionStack">
+        <SectionCard
+          section="store"
+          icon="⌂"
+          title={copy.storeSetup}
+          summary={
+            <div className="summaryLines">
+              <strong>{name || copy.storeName}</strong>
+              <span>{phone || copy.phone}</span>
+              <span>{address || copy.address}</span>
+            </div>
+          }
+        />
+
+        {expanded === 'store' ? (
+          <section className="panelCard">
+            <div className="field">
+              <label className="label">{copy.storeName}</label>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
 
-            <div className="fieldGrid">
-              <label className="field">
-                <span className="label">{copy.storeName}</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
-              </label>
-
-              <div className="infoCard">
-                <span className="label">{copy.liveUrl}</span>
-                <strong>{slug ? `/store/${slug}` : '/store/your-store'}</strong>
-              </div>
-
-              <label className="field">
-                <span className="label">{copy.phone}</span>
-                <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </label>
-
-              <label className="field">
-                <span className="label">{copy.address}</span>
-                <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
-              </label>
-            </div>
-          </section>
-        ) : null}
-
-        {tab === 'branding' ? (
-          <section className="card">
-            <div className="cardHeader">
-              <div className="cardTitleWrap">
-                <MiniIcon>▣</MiniIcon>
-                <h2 className="cardTitle">{copy.branding}</h2>
-              </div>
+            <div className="field">
+              <label className="label">{copy.liveUrl}</label>
+              <div className="urlPill">{previewLink || '/store/your-store'}</div>
             </div>
 
-            <div className="fieldGrid">
-              <div className="uploadCard">
-                <div className="uploadTitle">{copy.uploadHeroImage}</div>
-                <label className="primaryButton">
-                  {uploadingHero ? copy.saving : copy.uploadHeroImage}
-                  <input
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    onChange={(e) => void handleHeroUpload(e.target.files?.[0] || null)}
-                  />
-                </label>
-                <button type="button" className="secondaryButton" onClick={() => setHeroImage('')}>
-                  {copy.removeImage}
-                </button>
-                {heroImage ? (
-                  <img src={heroImage} alt="Hero" className="uploadPreview" />
-                ) : (
-                  <div className="uploadPreviewPlaceholder">{copy.uploadHeroImage}</div>
-                )}
-              </div>
+            <div className="field">
+              <label className="label">{copy.phone}</label>
+              <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
 
-              <div className="uploadCard">
-                <div className="uploadTitle">{copy.uploadLogo}</div>
-                <label className="primaryButton">
-                  {uploadingLogo ? copy.saving : copy.uploadLogo}
-                  <input
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    onChange={(e) => void handleLogoUpload(e.target.files?.[0] || null)}
-                  />
-                </label>
-                <button type="button" className="secondaryButton" onClick={() => setLogoImage('')}>
-                  {copy.removeImage}
-                </button>
-                {logoImage ? (
-                  <img src={logoImage} alt="Logo" className="uploadPreview" />
-                ) : (
-                  <div className="uploadPreviewPlaceholder">{copy.uploadLogo}</div>
-                )}
-              </div>
+            <div className="field">
+              <label className="label">{copy.address}</label>
+              <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
           </section>
         ) : null}
 
-        {tab === 'settings' ? (
-          <section className="card">
-            <div className="cardHeader">
-              <div className="cardTitleWrap">
-                <MiniIcon>◐</MiniIcon>
-                <h2 className="cardTitle">{copy.settings}</h2>
-              </div>
+        <SectionCard
+          section="branding"
+          icon="▣"
+          title={copy.branding}
+          right={copy.heroAndLogoImages}
+        />
+
+        {expanded === 'branding' ? (
+          <section className="panelCard">
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadHeroImage}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingHero ? copy.saving : copy.uploadHeroImage}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleHeroUpload(e.target.files?.[0] || null)}
+                />
+              </label>
+              <button type="button" className="secondaryButton fullWidth" onClick={removeHeroImage}>
+                {copy.removeImage}
+              </button>
+              {heroImage ? (
+                <img src={heroImage} alt={copy.heroPreview} className="uploadPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.heroPreview}</div>
+              )}
             </div>
 
-            <div className="fieldGrid">
-              <div className="field">
-                <span className="label">{copy.theme}</span>
-                <div className="chipRow">
-                  <button type="button" className={theme === 'light' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('light')}>
-                    {copy.light}
-                  </button>
-                  <button type="button" className={theme === 'dark' ? 'chip chipActive' : 'chip'} onClick={() => setTheme('dark')}>
-                    {copy.dark}
-                  </button>
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">{copy.storefrontLanguage}</span>
-                <div className="chipRow">
-                  <button
-                    type="button"
-                    className={storefrontLanguage === 'en' ? 'chip chipActive' : 'chip'}
-                    onClick={() => setStorefrontLanguage('en')}
-                  >
-                    {copy.english}
-                  </button>
-                  <button
-                    type="button"
-                    className={storefrontLanguage === 'es' ? 'chip chipActive' : 'chip'}
-                    onClick={() => setStorefrontLanguage('es')}
-                  >
-                    {copy.spanish}
-                  </button>
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">{copy.orderLanguage}</span>
-                <div className="chipRow">
-                  <button
-                    type="button"
-                    className={orderLanguage === 'en' ? 'chip chipActive' : 'chip'}
-                    onClick={() => setOrderLanguage('en')}
-                  >
-                    {copy.english}
-                  </button>
-                  <button
-                    type="button"
-                    className={orderLanguage === 'es' ? 'chip chipActive' : 'chip'}
-                    onClick={() => setOrderLanguage('es')}
-                  >
-                    {copy.spanish}
-                  </button>
-                </div>
-              </div>
-
-              <div className="field">
-                <span className="label">{copy.pickup} / {copy.delivery}</span>
-                <div className="chipRow">
-                  <button type="button" className={pickupEnabled ? 'chip chipActive' : 'chip'} onClick={() => setPickupEnabled((v) => !v)}>
-                    {copy.pickup}
-                  </button>
-                  <button type="button" className={deliveryEnabled ? 'chip chipActive' : 'chip'} onClick={() => setDeliveryEnabled((v) => !v)}>
-                    {copy.delivery}
-                  </button>
-                </div>
-              </div>
-
-              <label className="field">
-                <span className="label">{copy.deliveryFee}</span>
-                <input className="input" value={deliveryFee} onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))} />
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadLogo}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingLogo ? copy.saving : copy.uploadLogo}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleLogoUpload(e.target.files?.[0] || null)}
+                />
               </label>
-
-              <label className="field">
-                <span className="label">{copy.deliveryRadius}</span>
-                <input className="input" value={deliveryRadius} onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))} />
-              </label>
-
-              <label className="field">
-                <span className="label">{copy.deliveryMinimum}</span>
-                <input className="input" value={deliveryMinimum} onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))} />
-              </label>
-
-              <div className="field">
-                <span className="label">{copy.plan}</span>
-                <div className="planStack">
-                  <button type="button" className={plan === 'starter' ? 'planCard planCardActive' : 'planCard'} onClick={() => setPlan('starter')}>
-                    <strong>{copy.starter}</strong>
-                    <span>{copy.starterMeta}</span>
-                  </button>
-                  <button type="button" className={plan === 'growth' ? 'planCard planCardActive' : 'planCard'} onClick={() => setPlan('growth')}>
-                    <strong>{copy.growth}</strong>
-                    <span>{copy.growthMeta}</span>
-                  </button>
-                  <button type="button" className={plan === 'premium' ? 'planCard planCardActive' : 'planCard'} onClick={() => setPlan('premium')}>
-                    <strong>{copy.premium}</strong>
-                    <span>{copy.premiumMeta}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="infoCard">
-                <span className="label">{copy.placeholderLimitTitle}</span>
-                <strong>{plan === 'starter' ? copy.placeholderLimitStarter : copy.placeholderLimitUnlimited}</strong>
-              </div>
-
-              <div className="infoCard">
-                <span className="label">{copy.placeholderUsed}</span>
-                <strong>{placeholderCount}{plan === 'starter' ? '/6' : ''}</strong>
-              </div>
-
-              <div className="infoCard">
-                <span className="label">MenuFlow Fee</span>
-                <strong>{currentFee.percent} per order • {currentFee.monthly}</strong>
-              </div>
+              <button type="button" className="secondaryButton fullWidth" onClick={removeLogoImage}>
+                {copy.removeImage}
+              </button>
+              {logoImage ? (
+                <img src={logoImage} alt={copy.logoPreview} className="uploadPreview logoPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.logoPreview}</div>
+              )}
             </div>
           </section>
         ) : null}
 
-        {tab === 'menu' ? (
-          <section className="card">
-            <div className="cardHeader spaceBetween">
-              <div className="cardTitleWrap">
-                <MiniIcon>▦</MiniIcon>
-                <h2 className="cardTitle">{copy.menuBuilder}</h2>
-              </div>
-              <button type="button" className="primaryButton" onClick={addCategory}>
-                {copy.addCategory}
+        <SectionCard
+          section="theme"
+          icon="◐"
+          title={copy.theme}
+          right={theme === 'dark' ? copy.dark : copy.light}
+        />
+
+        {expanded === 'theme' ? (
+          <section className="panelCard">
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${theme === 'light' ? 'chipActive' : ''}`}
+                onClick={() => setTheme('light')}
+              >
+                {copy.light}
+              </button>
+              <button
+                type="button"
+                className={`chip ${theme === 'dark' ? 'chipActive' : ''}`}
+                onClick={() => setTheme('dark')}
+              >
+                {copy.dark}
               </button>
             </div>
 
-            <div className="categoryStack">
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${storefrontLanguage === 'en' ? 'chipActive' : ''}`}
+                onClick={() => setStorefrontLanguage('en')}
+              >
+                {copy.english}
+              </button>
+              <button
+                type="button"
+                className={`chip ${storefrontLanguage === 'es' ? 'chipActive' : ''}`}
+                onClick={() => setStorefrontLanguage('es')}
+              >
+                {copy.spanish}
+              </button>
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${orderLanguage === 'en' ? 'chipActive' : ''}`}
+                onClick={() => setOrderLanguage('en')}
+              >
+                {copy.english}
+              </button>
+              <button
+                type="button"
+                className={`chip ${orderLanguage === 'es' ? 'chipActive' : ''}`}
+                onClick={() => setOrderLanguage('es')}
+              >
+                {copy.spanish}
+              </button>
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${pickupEnabled ? 'chipActive' : ''}`}
+                onClick={() => setPickupEnabled((value) => !value)}
+              >
+                {pickupEnabled ? copy.pickupOn : copy.pickupOff}
+              </button>
+              <button
+                type="button"
+                className={`chip ${deliveryEnabled ? 'chipActive' : ''}`}
+                onClick={() => setDeliveryEnabled((value) => !value)}
+              >
+                {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
+              </button>
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryFee}</label>
+              <input
+                className="input"
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryRadius}</label>
+              <input
+                className="input"
+                value={deliveryRadius}
+                onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryMinimum}</label>
+              <input
+                className="input"
+                value={deliveryMinimum}
+                onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <SectionCard
+          section="menu"
+          icon="▦"
+          title={copy.menu}
+          right={copy.categoriesAndItems}
+        />
+
+        {expanded === 'menu' ? (
+          <section className="panelCard">
+            <button type="button" className="primaryButton fullWidth" onClick={addCategory}>
+              {copy.addCategory}
+            </button>
+
+            <div className="categoryList">
               {categories.map((category) => (
                 <div key={category.id} className="categoryCard">
-                  <div className="categoryTop">
+                  <div className="field">
+                    <label className="label">{copy.categoryName}</label>
                     <input
-                      className="input compactInput"
+                      className="input"
                       value={category.name}
-                      onChange={(e) =>
-                        setCategories((current) =>
-                          current.map((entry) =>
-                            entry.id === category.id ? { ...entry, name: e.target.value } : entry
-                          )
-                        )
-                      }
-                      placeholder={copy.categoryName}
+                      onChange={(e) => updateCategory(category.id, e.target.value)}
                     />
-                    <button
-                      type="button"
-                      className="dangerButton"
-                      onClick={() =>
-                        setCategories((current) => current.filter((entry) => entry.id !== category.id))
-                      }
-                    >
-                      {copy.deleteCategory}
-                    </button>
                   </div>
 
-                  <button type="button" className="primaryWide" onClick={() => addItem(category.id)}>
+                  <button type="button" className="secondaryButton fullWidth" onClick={() => addItem(category.id)}>
                     {copy.addItem}
                   </button>
 
-                  <div className="itemStack">
-                    {category.items.map((item) => (
-                      <div key={item.id} className="itemCard">
-                        <div className="itemPreviewWrap">
-                          <img
-                            src={item.image_url || getFallbackImage(category.name, item.id)}
-                            alt={item.name || copy.itemName}
-                            className="itemPreview"
-                          />
-                        </div>
-
-                        <label className="field">
-                          <span className="label">{copy.itemName}</span>
-                          <input
-                            className="input compactInput"
-                            value={item.name}
-                            onChange={(e) =>
-                              setCategories((current) =>
-                                current.map((entry) => ({
-                                  ...entry,
-                                  items: entry.items.map((entryItem) =>
-                                    entryItem.id === item.id ? { ...entryItem, name: e.target.value } : entryItem
-                                  ),
-                                }))
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label className="field">
-                          <span className="label">{copy.basePrice}</span>
-                          <input
-                            className="input compactInput"
-                            value={item.base_price}
-                            onChange={(e) =>
-                              setCategories((current) =>
-                                current.map((entry) => ({
-                                  ...entry,
-                                  items: entry.items.map((entryItem) =>
-                                    entryItem.id === item.id
-                                      ? { ...entryItem, base_price: sanitizeNumberInput(e.target.value) }
-                                      : entryItem
-                                  ),
-                                }))
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label className="field">
-                          <span className="label">{copy.description}</span>
-                          <textarea
-                            className="textarea"
-                            value={item.description}
-                            onChange={(e) =>
-                              setCategories((current) =>
-                                current.map((entry) => ({
-                                  ...entry,
-                                  items: entry.items.map((entryItem) =>
-                                    entryItem.id === item.id ? { ...entryItem, description: e.target.value } : entryItem
-                                  ),
-                                }))
-                              )
-                            }
-                          />
-                        </label>
-
-                        <div className="field">
-                          <span className="label">{copy.availability}</span>
-                          <div className="chipRow">
-                            <button
-                              type="button"
-                              className={item.availability === 'available' ? 'chip chipActive' : 'chip'}
-                              onClick={() =>
-                                setCategories((current) =>
-                                  current.map((entry) => ({
-                                    ...entry,
-                                    items: entry.items.map((entryItem) =>
-                                      entryItem.id === item.id ? { ...entryItem, availability: 'available' } : entryItem
-                                    ),
-                                  }))
-                                )
-                              }
-                            >
-                              {copy.available}
-                            </button>
-                            <button
-                              type="button"
-                              className={item.availability === 'sold_out' ? 'chip chipActive' : 'chip'}
-                              onClick={() =>
-                                setCategories((current) =>
-                                  current.map((entry) => ({
-                                    ...entry,
-                                    items: entry.items.map((entryItem) =>
-                                      entryItem.id === item.id ? { ...entryItem, availability: 'sold_out' } : entryItem
-                                    ),
-                                  }))
-                                )
-                              }
-                            >
-                              {copy.soldOut}
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="imageButtons">
-                          <label className="primaryButton">
-                            {uploadingItemId === item.id ? copy.saving : copy.uploadItemImage}
-                            <input
-                              type="file"
-                              hidden
-                              accept="image/*"
-                              onChange={(e) => void handleItemUpload(item.id, e.target.files?.[0] || null)}
-                            />
-                          </label>
-
-                          <button type="button" className="secondaryButton" onClick={() => usePlaceholderForItem(item.id)}>
-                            {copy.usePlaceholder}
-                          </button>
-                        </div>
-
-                        <div className="optionArea">
-                          <div className="optionAreaTop">
-                            <strong>{copy.optionGroups}</strong>
-                            <button type="button" className="secondaryButton" onClick={() => addOptionGroup(item.id)}>
-                              {copy.addOptionGroup}
-                            </button>
-                          </div>
-
-                          {item.option_groups.map((group) => (
-                            <div key={group.id} className="optionGroupCard">
-                              <input
-                                className="input compactInput"
-                                value={group.name}
-                                onChange={(e) =>
-                                  setCategories((current) =>
-                                    current.map((entry) => ({
-                                      ...entry,
-                                      items: entry.items.map((entryItem) =>
-                                        entryItem.id === item.id
-                                          ? {
-                                              ...entryItem,
-                                              option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                entryGroup.id === group.id ? { ...entryGroup, name: e.target.value } : entryGroup
-                                              ),
-                                            }
-                                          : entryItem
-                                      ),
-                                    }))
-                                  )
-                                }
-                                placeholder={copy.optionGroupName}
-                              />
-
-                              <div className="chipRow">
-                                <button
-                                  type="button"
-                                  className={group.required ? 'chip chipActive' : 'chip'}
-                                  onClick={() =>
-                                    setCategories((current) =>
-                                      current.map((entry) => ({
-                                        ...entry,
-                                        items: entry.items.map((entryItem) =>
-                                          entryItem.id === item.id
-                                            ? {
-                                                ...entryItem,
-                                                option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                  entryGroup.id === group.id
-                                                    ? { ...entryGroup, required: !entryGroup.required }
-                                                    : entryGroup
-                                                ),
-                                              }
-                                            : entryItem
-                                        ),
-                                      }))
-                                    )
-                                  }
-                                >
-                                  {group.required ? copy.required : copy.optional}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={group.selection === 'single' ? 'chip chipActive' : 'chip'}
-                                  onClick={() =>
-                                    setCategories((current) =>
-                                      current.map((entry) => ({
-                                        ...entry,
-                                        items: entry.items.map((entryItem) =>
-                                          entryItem.id === item.id
-                                            ? {
-                                                ...entryItem,
-                                                option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                  entryGroup.id === group.id
-                                                    ? { ...entryGroup, selection: 'single' }
-                                                    : entryGroup
-                                                ),
-                                              }
-                                            : entryItem
-                                        ),
-                                      }))
-                                    )
-                                  }
-                                >
-                                  {copy.single}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className={group.selection === 'multiple' ? 'chip chipActive' : 'chip'}
-                                  onClick={() =>
-                                    setCategories((current) =>
-                                      current.map((entry) => ({
-                                        ...entry,
-                                        items: entry.items.map((entryItem) =>
-                                          entryItem.id === item.id
-                                            ? {
-                                                ...entryItem,
-                                                option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                  entryGroup.id === group.id
-                                                    ? { ...entryGroup, selection: 'multiple' }
-                                                    : entryGroup
-                                                ),
-                                              }
-                                            : entryItem
-                                        ),
-                                      }))
-                                    )
-                                  }
-                                >
-                                  {copy.multiple}
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="dangerButton"
-                                  onClick={() =>
-                                    setCategories((current) =>
-                                      current.map((entry) => ({
-                                        ...entry,
-                                        items: entry.items.map((entryItem) =>
-                                          entryItem.id === item.id
-                                            ? {
-                                                ...entryItem,
-                                                option_groups: entryItem.option_groups.filter((entryGroup) => entryGroup.id !== group.id),
-                                              }
-                                            : entryItem
-                                        ),
-                                      }))
-                                    )
-                                  }
-                                >
-                                  {copy.delete}
-                                </button>
-                              </div>
-
-                              <div className="choiceStack">
-                                {group.options.map((choice) => (
-                                  <div key={choice.id} className="choiceRow">
-                                    <input
-                                      className="input compactInput choiceName"
-                                      value={choice.name}
-                                      onChange={(e) =>
-                                        setCategories((current) =>
-                                          current.map((entry) => ({
-                                            ...entry,
-                                            items: entry.items.map((entryItem) =>
-                                              entryItem.id === item.id
-                                                ? {
-                                                    ...entryItem,
-                                                    option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                      entryGroup.id === group.id
-                                                        ? {
-                                                            ...entryGroup,
-                                                            options: entryGroup.options.map((entryChoice) =>
-                                                              entryChoice.id === choice.id
-                                                                ? { ...entryChoice, name: e.target.value }
-                                                                : entryChoice
-                                                            ),
-                                                          }
-                                                        : entryGroup
-                                                    ),
-                                                  }
-                                                : entryItem
-                                            ),
-                                          }))
-                                        )
-                                      }
-                                      placeholder={copy.choiceName}
-                                    />
-
-                                    <input
-                                      className="input compactInput choicePrice"
-                                      value={choice.price}
-                                      onChange={(e) =>
-                                        setCategories((current) =>
-                                          current.map((entry) => ({
-                                            ...entry,
-                                            items: entry.items.map((entryItem) =>
-                                              entryItem.id === item.id
-                                                ? {
-                                                    ...entryItem,
-                                                    option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                      entryGroup.id === group.id
-                                                        ? {
-                                                            ...entryGroup,
-                                                            options: entryGroup.options.map((entryChoice) =>
-                                                              entryChoice.id === choice.id
-                                                                ? { ...entryChoice, price: sanitizeNumberInput(e.target.value) }
-                                                                : entryChoice
-                                                            ),
-                                                          }
-                                                        : entryGroup
-                                                    ),
-                                                  }
-                                                : entryItem
-                                            ),
-                                          }))
-                                        )
-                                      }
-                                      placeholder={copy.choicePrice}
-                                    />
-
-                                    <button
-                                      type="button"
-                                      className="dangerButton"
-                                      onClick={() =>
-                                        setCategories((current) =>
-                                          current.map((entry) => ({
-                                            ...entry,
-                                            items: entry.items.map((entryItem) =>
-                                              entryItem.id === item.id
-                                                ? {
-                                                    ...entryItem,
-                                                    option_groups: entryItem.option_groups.map((entryGroup) =>
-                                                      entryGroup.id === group.id
-                                                        ? {
-                                                            ...entryGroup,
-                                                            options: entryGroup.options.filter((entryChoice) => entryChoice.id !== choice.id),
-                                                          }
-                                                        : entryGroup
-                                                    ),
-                                                  }
-                                                : entryItem
-                                            ),
-                                          }))
-                                        )
-                                      }
-                                    >
-                                      {copy.delete}
-                                    </button>
-                                  </div>
-                                ))}
-
-                                <button type="button" className="secondaryButton" onClick={() => addChoice(item.id, group.id)}>
-                                  {copy.addChoice}
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        <button
-                          type="button"
-                          className="dangerWide"
-                          onClick={() =>
-                            setCategories((current) =>
-                              current.map((entry) => ({
-                                ...entry,
-                                items: entry.items.filter((entryItem) => entryItem.id !== item.id),
-                              }))
-                            )
-                          }
-                        >
-                          {copy.delete}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  {category.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`itemListButton ${selectedItemId === item.id ? 'itemListButtonActive' : ''}`}
+                      onClick={() => selectItem(item.id)}
+                    >
+                      <span>{item.name || copy.itemNameFallback}</span>
+                      <strong>{money(item.base_price)}</strong>
+                    </button>
+                  ))}
                 </div>
               ))}
             </div>
           </section>
         ) : null}
 
-        {tab === 'flyers' ? (
-          <section className="card">
-            <div className="cardHeader">
-              <div className="cardTitleWrap">
-                <MiniIcon>✦</MiniIcon>
-                <h2 className="cardTitle">{copy.flyersTitle}</h2>
-              </div>
-            </div>
+        <SectionCard section="item" icon="□" title={copy.itemBuilder} />
 
-            <p className="flyerSub">{copy.flyersSubtitle}</p>
-
-            <div className="freeFlyerCard">
-              <div className="freeFlyerLeft">
-                <div className="freeFlyerLabel">{copy.freeFlyer}</div>
-                <p>{copy.freeFlyerText}</p>
-                <button type="button" className="primaryButton">
-                  {copy.downloadFlyer}
-                </button>
-              </div>
-
-              <div className="qrPreview">
-                <img src={qrImage} alt="QR Code" className="qrImage" />
-              </div>
-            </div>
-
-            <div className="customFlyersHeader">
-              <h3>{copy.customFlyers}</h3>
-              <p>{copy.customFlyersText}</p>
-            </div>
-
-            <div className="flyerPackageStack">
+        {expanded === 'item' && selectedItem ? (
+          <section className="panelCard">
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadItemImage}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null)}
+                />
+              </label>
               <button
                 type="button"
-                className={selectedFlyerPackage === '100' ? 'flyerPackageCard flyerPackageCardActive' : 'flyerPackageCard'}
-                onClick={() => setSelectedFlyerPackage('100')}
+                className="secondaryButton fullWidth"
+                onClick={() => removeItemImage(selectedItem.id)}
               >
-                <strong>{copy.package100}</strong>
-                <span>{copy.package100Text}</span>
+                {copy.removeImage}
               </button>
 
-              <button
-                type="button"
-                className={selectedFlyerPackage === '250' ? 'flyerPackageCard flyerPackageCardActive' : 'flyerPackageCard'}
-                onClick={() => setSelectedFlyerPackage('250')}
-              >
-                <strong>{copy.package250}</strong>
-                <span>{copy.package250Text}</span>
-              </button>
+              {selectedItem.image_url ? (
+                <img src={selectedItem.image_url} alt={copy.itemPreview} className="uploadPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.itemPreview}</div>
+              )}
+            </div>
 
+            <div className="field">
+              <label className="label">{copy.itemName}</label>
+              <input
+                className="input"
+                value={selectedItem.name}
+                onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.basePrice}</label>
+              <input
+                className="input"
+                value={selectedItem.base_price}
+                onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.description}</label>
+              <textarea
+                className="textarea"
+                value={selectedItem.description}
+                onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
+              />
+            </div>
+
+            <div className="chipRow">
               <button
                 type="button"
-                className={selectedFlyerPackage === '500' ? 'flyerPackageCard flyerPackageCardBest flyerPackageCardActive' : 'flyerPackageCard flyerPackageCardBest'}
-                onClick={() => setSelectedFlyerPackage('500')}
+                className={`chip ${selectedItem.availability === 'available' ? 'chipActive' : ''}`}
+                onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
               >
-                <div className="bestValueTag">{copy.bestValue}</div>
-                <strong>{copy.package500}</strong>
-                <span>{copy.package500Text}</span>
+                {copy.available}
+              </button>
+              <button
+                type="button"
+                className={`chip ${selectedItem.availability === 'sold_out' ? 'chipActive' : ''}`}
+                onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
+              >
+                {copy.soldOut}
               </button>
             </div>
 
-            <div className="benefitsCard">
-              <h3>{copy.benefitsTitle}</h3>
-              <div className="benefitList">
-                <span>✔ {copy.benefit1}</span>
-                <span>✔ {copy.benefit2}</span>
-                <span>✔ {copy.benefit3}</span>
-                <span>✔ {copy.benefit4}</span>
-                <span>✔ {copy.benefit5}</span>
+            {selectedCategory ? (
+              <button
+                type="button"
+                className="dangerWide"
+                onClick={() => deleteItem(selectedCategory.id, selectedItem.id)}
+              >
+                {copy.deleteItem}
+              </button>
+            ) : null}
+          </section>
+        ) : null}
+
+        <SectionCard section="options" icon="⋯" title={copy.optionGroups} />
+
+        {expanded === 'options' && selectedItem ? (
+          <section className="panelCard">
+            <div className="chipRow">
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
+                {copy.protein}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
+                {copy.size}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
+                {copy.drink}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
+                {copy.extras}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
+                {copy.removals}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
+                {copy.custom}
+              </button>
+            </div>
+
+            {selectedItem.option_groups.length ? (
+              <div className="optionGroupList">
+                {selectedItem.option_groups.map((group) => (
+                  <div key={group.id} className="optionGroupCard">
+                    <div className="field">
+                      <label className="label">{copy.optionGroups}</label>
+                      <input
+                        className="input"
+                        value={group.name}
+                        onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="chipRow">
+                      <button
+                        type="button"
+                        className={`chip ${group.required ? 'chipActive' : ''}`}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { required: !group.required })
+                        }
+                      >
+                        {group.required ? copy.required : copy.optional}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`chip ${group.selection === 'single' ? 'chipActive' : ''}`}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })
+                        }
+                      >
+                        {copy.singleChoice}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`chip ${group.selection === 'multiple' ? 'chipActive' : ''}`}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })
+                        }
+                      >
+                        {copy.multipleChoice}
+                      </button>
+                    </div>
+
+                    <div className="choiceList">
+                      {group.options.map((option) => (
+                        <div key={option.id} className="choiceRow">
+                          <input
+                            className="input choiceName"
+                            value={option.name}
+                            onChange={(e) =>
+                              updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
+                            }
+                          />
+                          <input
+                            className="input choicePrice"
+                            value={option.price}
+                            onChange={(e) =>
+                              updateOptionChoice(selectedItem.id, group.id, option.id, {
+                                price: sanitizeNumberInput(e.target.value),
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="dangerButton"
+                            onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
+                          >
+                            {copy.delete}
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        className="secondaryButton fullWidth"
+                        onClick={() => addOptionChoice(selectedItem.id, group.id)}
+                      >
+                        {copy.addChoice}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="dangerWide"
+                      onClick={() => deleteOptionGroup(selectedItem.id, group.id)}
+                    >
+                      {copy.delete}
+                    </button>
+                  </div>
+                ))}
               </div>
-            </div>
-
-            <button type="button" className="orderFlyersButton">
-              {copy.selectPackage}
-            </button>
+            ) : (
+              <div className="emptyState">{copy.noOptionGroups}</div>
+            )}
           </section>
         ) : null}
 
         <nav className="bottomNav">
-          <button type="button" className="navItem" onClick={() => router.push('/dashboard/owner')}>
+          <button type="button" className="navItem">
             <span className="navDot" />
             <span>{copy.dashboard}</span>
           </button>
-          <button type="button" className="navItem navItemActive" onClick={() => setTab('store')}>
+          <button type="button" className="navItem navItemActive">
             <span className="navDot" />
             <span>{copy.builder}</span>
           </button>
-          <button type="button" className="navItem" onClick={() => previewLink && router.push(previewLink)}>
+          <button type="button" className="navItem">
             <span className="navDot" />
             <span>{copy.preview}</span>
           </button>
-          <button type="button" className="navItem" onClick={() => setTab('flyers')}>
+          <button type="button" className="navItem">
             <span className="navDot" />
             <span>{copy.flyers}</span>
           </button>
-          <button type="button" className="navItem" onClick={() => router.push('/dashboard/owner/orders')}>
+          <button type="button" className="navItem">
             <span className="navDot" />
             <span>{copy.orders}</span>
           </button>
-          <button type="button" className="navItem" onClick={() => router.push('/dashboard/owner/settings')}>
+          <button type="button" className="navItem">
             <span className="navDot" />
             <span>{copy.more}</span>
           </button>
         </nav>
       </div>
 
-      <style jsx>{`
+      <style jsx global>{`
         .page {
           min-height: 100vh;
           background: #eef1f5;
@@ -2173,7 +1921,6 @@ export default function BuilderPage() {
           box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
           padding: 14px 14px 96px;
           position: relative;
-          overflow: hidden;
         }
 
         .notch {
@@ -2186,18 +1933,17 @@ export default function BuilderPage() {
 
         .topBar {
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          justify-content: space-between;
           gap: 10px;
           margin-bottom: 12px;
         }
 
         .brand {
-          white-space: nowrap;
-          min-width: 0;
           color: #111827;
-          font-size: 19px;
+          font-size: 18px;
           line-height: 1;
+          white-space: nowrap;
         }
 
         .brandStrong {
@@ -2207,7 +1953,7 @@ export default function BuilderPage() {
 
         .brandSoft {
           color: #6b7280;
-          font-weight: 500;
+          font-weight: 700;
           letter-spacing: 0.02em;
         }
 
@@ -2215,51 +1961,36 @@ export default function BuilderPage() {
           display: flex;
           align-items: center;
           gap: 8px;
-          flex-shrink: 0;
         }
 
         .langButton,
         .saveButton,
         .primaryButton,
         .secondaryButton,
-        .primaryWide,
         .dangerButton,
-        .dangerWide,
         .chip,
-        .builderSectionTab,
-        .planCard,
-        .flyerPackageCard,
-        .orderFlyersButton,
-        .goLiveButton,
-        .previewButton {
-          min-height: 42px;
-          border-radius: 12px;
+        .previewButton,
+        .itemListButton {
+          min-height: 44px;
+          border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.12);
-          padding: 0 14px;
           background: #ffffff;
           color: #111827;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
+          padding: 0 14px;
           font-size: 15px;
           font-weight: 800;
+          text-decoration: none;
         }
 
         .saveButton,
         .primaryButton,
-        .primaryWide,
-        .goLiveButton,
-        .orderFlyersButton {
+        .previewButton {
           background: #0f172a;
           border-color: #0f172a;
           color: #ffffff;
-        }
-
-        .primaryWide,
-        .dangerWide,
-        .orderFlyersButton {
-          width: 100%;
         }
 
         .secondaryButton {
@@ -2268,9 +1999,14 @@ export default function BuilderPage() {
 
         .dangerButton,
         .dangerWide {
-          background: #f7e3e3;
+          background: #f7e2e2;
           border-color: transparent;
-          color: #a12e2e;
+          color: #9f2f2f;
+        }
+
+        .fullWidth,
+        .dangerWide {
+          width: 100%;
         }
 
         .message {
@@ -2293,55 +2029,60 @@ export default function BuilderPage() {
           border: 1px solid rgba(22, 101, 52, 0.12);
         }
 
-        .hero {
-          position: relative;
-          min-height: 188px;
-          overflow: hidden;
+        .heroCard {
           margin: 0 -14px;
+          overflow: hidden;
+        }
+
+        .heroWrap {
+          position: relative;
+          min-height: 190px;
           background: #111827;
         }
 
-        .heroImage {
+        .heroImage,
+        .heroFallback {
           position: absolute;
           inset: 0;
           width: 100%;
           height: 100%;
+        }
+
+        .heroImage {
           object-fit: cover;
         }
 
         .heroFallback {
-          background: linear-gradient(135deg, #1f2937 0%, #475569 100%);
+          background: linear-gradient(135deg, #111827 0%, #334155 100%);
         }
 
         .heroOverlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.64) 100%);
-        }
-
-        .heroContent {
           position: relative;
-          z-index: 2;
-          min-height: 188px;
+          min-height: 190px;
           display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
-          padding: 14px 16px;
+          align-items: flex-end;
+          padding: 16px;
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.64) 100%);
         }
 
         .heroIdentity {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
+          width: 100%;
+        }
+
+        .heroLogo,
+        .heroLogoFallback {
+          width: 60px;
+          height: 60px;
+          border-radius: 999px;
+          flex-shrink: 0;
+          background: #ffffff;
         }
 
         .heroLogo {
-          width: 58px;
-          height: 58px;
-          border-radius: 999px;
-          background: #ffffff;
           object-fit: cover;
-          flex-shrink: 0;
         }
 
         .heroLogoFallback {
@@ -2353,192 +2094,200 @@ export default function BuilderPage() {
           font-weight: 900;
         }
 
+        .heroText {
+          min-width: 0;
+        }
+
         .heroName {
           color: #ffffff;
-          font-size: 24px;
+          font-size: 22px;
           font-weight: 900;
         }
 
-        .heroStatus {
-          margin-top: 4px;
-          color: rgba(255, 255, 255, 0.9);
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .heroMeta {
-          margin-top: 12px;
+        .heroMetaRow {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
-          color: rgba(255, 255, 255, 0.96);
+          margin-top: 6px;
+          color: rgba(255, 255, 255, 0.94);
           font-size: 14px;
           font-weight: 700;
         }
 
-        .intro {
+        .introCard {
           padding: 18px 2px 14px;
+          display: grid;
+          gap: 8px;
         }
 
         .title {
           margin: 0;
           color: #111827;
-          font-size: 26px;
+          font-size: 28px;
           font-weight: 900;
         }
 
         .subtitle {
-          margin: 8px 0 0;
+          margin: 0;
           color: #6b7280;
           font-size: 15px;
           font-weight: 600;
         }
 
-        .topButtons {
-          margin-top: 16px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .sectionTabs {
-          display: grid;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          gap: 8px;
-          margin-bottom: 14px;
-        }
-
-        .builderSectionTab {
-          min-height: 58px;
-          flex-direction: column;
-          padding: 8px 6px;
-          font-size: 12px;
-          border-radius: 14px;
-        }
-
-        .builderSectionTabActive {
-          background: #0f172a;
-          color: #ffffff;
-          border-color: #0f172a;
-        }
-
-        .miniIcon {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          background: #f3f4f6;
-          color: inherit;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 15px;
-          font-weight: 900;
-          flex-shrink: 0;
-        }
-
-        .builderSectionTabActive .miniIcon {
-          background: rgba(255, 255, 255, 0.14);
-        }
-
-        .card {
+        .previewButton {
+          margin-top: 10px;
           width: 100%;
-          border-radius: 16px;
+        }
+
+        .isDisabled {
+          pointer-events: none;
+          opacity: 0.5;
+        }
+
+        .sectionStack {
+          display: grid;
+          gap: 12px;
+        }
+
+        .sectionCard,
+        .panelCard,
+        .categoryCard,
+        .optionGroupCard {
+          width: 100%;
+          border-radius: 18px;
           border: 1px solid rgba(15, 23, 42, 0.1);
           background: #ffffff;
-          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+        }
+
+        .sectionCard {
           padding: 14px;
-          display: grid;
-          gap: 14px;
+          text-align: left;
         }
 
-        .cardHeader {
+        .sectionCardTop {
           display: flex;
           align-items: center;
-          gap: 10px;
-        }
-
-        .spaceBetween {
           justify-content: space-between;
+          gap: 10px;
         }
 
-        .cardTitleWrap {
+        .sectionCardLeft,
+        .sectionCardRight {
           display: flex;
           align-items: center;
           gap: 10px;
-          min-width: 0;
         }
 
-        .cardTitle {
-          margin: 0;
+        .sectionCardTitle {
           color: #111827;
           font-size: 18px;
           font-weight: 900;
         }
 
-        .fieldGrid,
-        .categoryStack,
-        .itemStack,
-        .planStack,
-        .flyerPackageStack,
-        .choiceStack {
+        .sectionCardMeta,
+        .sectionCardArrow,
+        .sectionCardSummary {
+          color: #6b7280;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .sectionCardSummary {
+          margin-top: 10px;
+        }
+
+        .summaryLines {
+          display: grid;
+          gap: 4px;
+        }
+
+        .summaryLines strong {
+          color: #111827;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .panelCard,
+        .categoryCard,
+        .optionGroupCard {
+          padding: 14px;
           display: grid;
           gap: 12px;
         }
 
-        .field {
+        .field,
+        .uploadBlock,
+        .categoryList,
+        .optionGroupList,
+        .choiceList {
           display: grid;
-          gap: 8px;
+          gap: 10px;
         }
 
         .label {
           color: #6b7280;
           font-size: 11px;
           font-weight: 900;
-          text-transform: uppercase;
           letter-spacing: 0.12em;
-        }
-
-        .infoCard {
-          border-radius: 12px;
-          padding: 12px 14px;
-          background: #f8fafc;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-          display: grid;
-          gap: 4px;
-        }
-
-        .infoCard strong {
-          color: #111827;
-          font-size: 16px;
-          font-weight: 900;
-          word-break: break-word;
+          text-transform: uppercase;
         }
 
         .input,
-        .textarea {
+        .textarea,
+        .urlPill {
           width: 100%;
-          border-radius: 12px;
+          border-radius: 14px;
           border: 1px solid rgba(15, 23, 42, 0.12);
           background: #ffffff;
           color: #111827;
           font-size: 16px;
           font-weight: 700;
-          outline: none;
-        }
-
-        .input {
           min-height: 52px;
           padding: 0 14px;
-        }
-
-        .compactInput {
-          min-height: 46px;
         }
 
         .textarea {
           min-height: 120px;
           padding: 14px;
           resize: vertical;
+        }
+
+        .urlPill {
+          display: flex;
+          align-items: center;
+          background: #f8fafc;
+          word-break: break-word;
+        }
+
+        .uploadTitle {
+          color: #111827;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .uploadPreview,
+        .imagePlaceholder {
+          width: 100%;
+          border-radius: 16px;
+          min-height: 180px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #eef1f5;
+          color: #6b7280;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .uploadPreview {
+          object-fit: cover;
+        }
+
+        .logoPreview {
+          max-height: 240px;
+          object-fit: contain;
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
         }
 
         .chipRow {
@@ -2548,92 +2297,32 @@ export default function BuilderPage() {
         }
 
         .chip {
-          padding: 0 18px;
+          background: #ffffff;
         }
 
         .chipActive {
           background: #0f172a;
-          border-color: #0f172a;
           color: #ffffff;
+          border-color: #0f172a;
         }
 
-        .uploadCard,
-        .categoryCard,
-        .itemCard,
-        .optionGroupCard,
-        .freeFlyerCard,
-        .benefitsCard {
-          border-radius: 14px;
-          padding: 14px;
-          border: 1px solid rgba(15, 23, 42, 0.1);
-          background: #ffffff;
-          display: grid;
-          gap: 12px;
-        }
-
-        .uploadTitle,
-        .flyerSub,
-        .customFlyersHeader p {
-          color: #111827;
-          font-size: 15px;
-          font-weight: 700;
-          margin: 0;
-        }
-
-        .uploadPreview,
-        .uploadPreviewPlaceholder,
-        .itemPreview,
-        .qrImage {
+        .itemListButton {
+          justify-content: space-between;
           width: 100%;
-          border-radius: 14px;
-          display: block;
+          background: #ffffff;
+          color: #111827;
         }
 
-        .uploadPreview,
-        .uploadPreviewPlaceholder {
-          height: 180px;
-          object-fit: cover;
+        .itemListButtonActive {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
         }
 
-        .uploadPreviewPlaceholder {
-          background: #eef1f5;
-          color: #6b7280;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-        }
-
-        .categoryTop,
-        .optionAreaTop,
         .choiceRow {
           display: flex;
           gap: 10px;
           align-items: center;
-        }
-
-        .itemPreviewWrap {
-          width: 100%;
-          aspect-ratio: 1.35 / 1;
-          background: #eef1f5;
-          border-radius: 14px;
-          overflow: hidden;
-        }
-
-        .itemPreview {
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .imageButtons {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .optionArea {
-          display: grid;
-          gap: 12px;
         }
 
         .choiceName {
@@ -2641,87 +2330,32 @@ export default function BuilderPage() {
         }
 
         .choicePrice {
-          width: 110px;
-          flex: 0 0 auto;
+          width: 96px;
         }
 
-        .freeFlyerCard {
-          grid-template-columns: 1.1fr 0.9fr;
+        .emptyState {
+          border-radius: 14px;
+          border: 1px dashed rgba(15, 23, 42, 0.14);
+          padding: 24px;
+          text-align: center;
+          color: #6b7280;
+          font-size: 16px;
+          font-weight: 800;
+          background: #fafafa;
+        }
+
+        .miniIcon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #f3f4f6;
+          color: #111827;
+          display: inline-flex;
           align-items: center;
-        }
-
-        .freeFlyerLabel,
-        .customFlyersHeader h3,
-        .benefitsCard h3 {
-          margin: 0;
-          color: #111827;
-          font-size: 20px;
+          justify-content: center;
+          font-size: 16px;
           font-weight: 900;
-        }
-
-        .freeFlyerLeft p {
-          margin: 0;
-          color: #6b7280;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .qrPreview {
-          border-radius: 16px;
-          background: #f8fafc;
-          padding: 12px;
-          border: 1px solid rgba(15, 23, 42, 0.08);
-        }
-
-        .flyerPackageCard {
-          width: 100%;
-          text-align: left;
-          justify-content: flex-start;
-          min-height: 84px;
-          padding: 14px;
-          flex-direction: column;
-          align-items: flex-start;
-        }
-
-        .flyerPackageCard strong {
-          font-size: 18px;
-        }
-
-        .flyerPackageCard span {
-          color: #6b7280;
-          font-size: 14px;
-          font-weight: 700;
-        }
-
-        .flyerPackageCardActive {
-          border-color: #0f172a;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-        }
-
-        .flyerPackageCardBest {
-          position: relative;
-          background: linear-gradient(180deg, #fff8e8 0%, #ffffff 100%);
-          border-color: rgba(194, 141, 24, 0.28);
-        }
-
-        .bestValueTag {
-          position: absolute;
-          top: -10px;
-          right: 14px;
-          background: #0f172a;
-          color: #ffffff;
-          font-size: 11px;
-          font-weight: 900;
-          border-radius: 999px;
-          padding: 6px 10px;
-        }
-
-        .benefitList {
-          display: grid;
-          gap: 8px;
-          color: #111827;
-          font-size: 15px;
-          font-weight: 700;
+          flex-shrink: 0;
         }
 
         .bottomNav {
@@ -2738,7 +2372,6 @@ export default function BuilderPage() {
           gap: 4px;
           padding: 8px 6px;
           box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
-          backdrop-filter: blur(12px);
         }
 
         .navItem {
@@ -2752,6 +2385,7 @@ export default function BuilderPage() {
           font-size: 11px;
           font-weight: 800;
           background: transparent;
+          border: 0;
         }
 
         .navItemActive {
@@ -2767,6 +2401,7 @@ export default function BuilderPage() {
           display: inline-block;
         }
       `}</style>
-    </main>
-  );
+    </div>
+  </main>
+);
 }
