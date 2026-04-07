@@ -10,6 +10,14 @@ type LanguageMode = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
 type BuilderPlan = 'starter' | 'growth' | 'premium';
 type SectionKey = 'store' | 'branding' | 'theme' | 'menu' | 'item' | 'options' | 'flyers';
+type HoursKey =
+  | 'hours_monday'
+  | 'hours_tuesday'
+  | 'hours_wednesday'
+  | 'hours_thursday'
+  | 'hours_friday'
+  | 'hours_saturday'
+  | 'hours_sunday';
 
 type RestaurantRow = {
   id: string;
@@ -33,6 +41,13 @@ type RestaurantRow = {
   stripe_connected?: boolean | null;
   stripe_charges_enabled?: boolean | null;
   stripe_payouts_enabled?: boolean | null;
+  hours_monday?: string | null;
+  hours_tuesday?: string | null;
+  hours_wednesday?: string | null;
+  hours_thursday?: string | null;
+  hours_friday?: string | null;
+  hours_saturday?: string | null;
+  hours_sunday?: string | null;
 };
 
 type CategoryRow = {
@@ -86,7 +101,15 @@ type BuilderOptionGroup = {
   name: string;
   required: boolean;
   selection: 'single' | 'multiple';
-  presetType: 'protein' | 'size' | 'drink' | 'extras' | 'removals' | 'custom';
+  presetType:
+    | 'protein'
+    | 'size'
+    | 'drink'
+    | 'extras'
+    | 'removals'
+    | 'custom'
+    | 'toppings'
+    | 'sauces';
   options: BuilderOptionChoice[];
 };
 
@@ -108,12 +131,41 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
+type PlaceholderCategory =
+  | 'drinks'
+  | 'tacos'
+  | 'burgers'
+  | 'pizza'
+  | 'wings'
+  | 'plates'
+  | 'desserts'
+  | 'seafood'
+  | 'breakfast'
+  | 'hotdogs'
+  | 'sandwiches'
+  | 'chicken'
+  | 'bbq'
+  | 'snacks'
+  | 'catering'
+  | 'mexican';
+
 type PlaceholderImage = {
   id: string;
-  category: 'tacos' | 'burgers' | 'pizza' | 'wings' | 'plates' | 'desserts' | 'drinks' | 'seafood';
+  category: PlaceholderCategory;
   name: string;
   url: string;
 };
+
+type FlyerStyleKey =
+  | 'hibachi'
+  | 'dessert'
+  | 'hotdog'
+  | 'seafood'
+  | 'tacos'
+  | 'snacks'
+  | 'generic';
+
+type FlyerPack = '100' | '250' | '500';
 
 type CopyBlock = {
   builderWord: string;
@@ -128,6 +180,14 @@ type CopyBlock = {
   phone: string;
   address: string;
   liveUrl: string;
+  hours: string;
+  monday: string;
+  tuesday: string;
+  wednesday: string;
+  thursday: string;
+  friday: string;
+  saturday: string;
+  sunday: string;
   branding: string;
   heroAndLogoImages: string;
   uploadHeroImage: string;
@@ -168,6 +228,8 @@ type CopyBlock = {
   extras: string;
   removals: string;
   custom: string;
+  toppings: string;
+  sauces: string;
   required: string;
   optional: string;
   singleChoice: string;
@@ -204,6 +266,16 @@ type CopyBlock = {
   placeholderGallery: string;
   placeholdersUsed: string;
   starterLimitReached: string;
+  flyerStyle: string;
+  flyerBusinessName: string;
+  flyerHeadline: string;
+  flyerSubheadline: string;
+  flyerPromoLine: string;
+  flyerInstagram: string;
+  flyerHours: string;
+  flyerPreviewOnly: string;
+  flyerQrUnlock: string;
+  freeQrLive: string;
 };
 
 const COPY: Record<LanguageMode, CopyBlock> = {
@@ -213,13 +285,21 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     saving: 'Saving...',
     save: 'Save',
     title: 'Build Your Store',
-    subtitle: 'Upload branding, build your menu, go live.',
+    subtitle: 'Upload branding, build your menu, flyers, and go live.',
     previewStore: 'Preview Store',
     storeSetup: 'Store Setup',
     storeName: 'Store Name',
     phone: 'Phone',
     address: 'Address',
     liveUrl: 'Live URL',
+    hours: 'Hours of Operation',
+    monday: 'Monday',
+    tuesday: 'Tuesday',
+    wednesday: 'Wednesday',
+    thursday: 'Thursday',
+    friday: 'Friday',
+    saturday: 'Saturday',
+    sunday: 'Sunday',
     branding: 'Branding',
     heroAndLogoImages: 'Hero & Logo Images',
     uploadHeroImage: 'Upload Hero Image',
@@ -260,6 +340,8 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     extras: 'Extras',
     removals: 'Removals',
     custom: 'Custom',
+    toppings: 'Toppings',
+    sauces: 'Sauces',
     required: 'Required',
     optional: 'Optional',
     singleChoice: 'Single',
@@ -296,6 +378,16 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     placeholderGallery: 'Placeholder Food Images',
     placeholdersUsed: 'Placeholders used',
     starterLimitReached: 'Starter plan includes up to 6 placeholder images.',
+    flyerStyle: 'Flyer Style',
+    flyerBusinessName: 'Business Name',
+    flyerHeadline: 'Headline',
+    flyerSubheadline: 'Subheadline',
+    flyerPromoLine: 'Promo Line',
+    flyerInstagram: 'Instagram',
+    flyerHours: 'Hours',
+    flyerPreviewOnly: 'Preview Only',
+    flyerQrUnlock: 'QR becomes live after flyer purchase.',
+    freeQrLive: 'Free white flyer QR is live with signup.',
   },
   es: {
     builderWord: 'BUILDER',
@@ -303,13 +395,21 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     saving: 'Guardando...',
     save: 'Guardar',
     title: 'Construye Tu Tienda',
-    subtitle: 'Sube tu marca, arma tu menú y sal en vivo.',
+    subtitle: 'Sube tu marca, arma tu menú, flyers y sal en vivo.',
     previewStore: 'Vista Previa',
     storeSetup: 'Configuración',
     storeName: 'Nombre del Negocio',
     phone: 'Teléfono',
     address: 'Dirección',
     liveUrl: 'URL En Vivo',
+    hours: 'Horario',
+    monday: 'Lunes',
+    tuesday: 'Martes',
+    wednesday: 'Miércoles',
+    thursday: 'Jueves',
+    friday: 'Viernes',
+    saturday: 'Sábado',
+    sunday: 'Domingo',
     branding: 'Branding',
     heroAndLogoImages: 'Hero y Logo',
     uploadHeroImage: 'Subir Hero',
@@ -350,6 +450,8 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     extras: 'Extras',
     removals: 'Quitar',
     custom: 'Personalizado',
+    toppings: 'Toppings',
+    sauces: 'Salsas',
     required: 'Requerido',
     optional: 'Opcional',
     singleChoice: 'Una',
@@ -386,58 +488,83 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     placeholderGallery: 'Imágenes Placeholder',
     placeholdersUsed: 'Placeholders usados',
     starterLimitReached: 'Starter incluye hasta 6 imágenes placeholder.',
+    flyerStyle: 'Estilo de Flyer',
+    flyerBusinessName: 'Nombre del Negocio',
+    flyerHeadline: 'Título',
+    flyerSubheadline: 'Subtítulo',
+    flyerPromoLine: 'Línea Promo',
+    flyerInstagram: 'Instagram',
+    flyerHours: 'Horario',
+    flyerPreviewOnly: 'Solo Vista Previa',
+    flyerQrUnlock: 'El QR se activa después de la compra del flyer.',
+    freeQrLive: 'El flyer blanco gratis tiene QR activo al registrarte.',
   },
 };
 
 const PLACEHOLDER_IMAGES: PlaceholderImage[] = [
-  {
-    id: 'ph_tacos_1',
-    category: 'tacos',
-    name: 'Street Tacos',
-    url: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_burger_1',
-    category: 'burgers',
-    name: 'Burger Combo',
-    url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_pizza_1',
-    category: 'pizza',
-    name: 'Pizza Slice',
-    url: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_wings_1',
-    category: 'wings',
-    name: 'Hot Wings',
-    url: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_plates_1',
-    category: 'plates',
-    name: 'Plate Lunch',
-    url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_desserts_1',
-    category: 'desserts',
-    name: 'Dessert',
-    url: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_drinks_1',
-    category: 'drinks',
-    name: 'Drink',
-    url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80',
-  },
-  {
-    id: 'ph_seafood_1',
-    category: 'seafood',
-    name: 'Seafood Plate',
-    url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80',
-  },
+  { id: 'ph_drink_1', category: 'drinks', name: 'Coke', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_drink_2', category: 'drinks', name: 'Sprite', url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_drink_3', category: 'drinks', name: 'Water', url: 'https://images.unsplash.com/photo-1564419439288-bd5042d1f9c4?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_drink_4', category: 'drinks', name: 'Horchata', url: 'https://images.unsplash.com/photo-1551024709-8f23befc6cf7?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_drink_5', category: 'drinks', name: 'Jamaica', url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_taco_1', category: 'tacos', name: 'Street Tacos', url: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_taco_2', category: 'tacos', name: 'Birria Tacos', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_taco_3', category: 'tacos', name: 'Shrimp Tacos', url: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_burger_1', category: 'burgers', name: 'Burger Combo', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_burger_2', category: 'burgers', name: 'Cheese Burger', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_burger_3', category: 'burgers', name: 'Loaded Burger', url: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_pizza_1', category: 'pizza', name: 'Pizza Slice', url: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_pizza_2', category: 'pizza', name: 'Whole Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_wings_1', category: 'wings', name: 'Hot Wings', url: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_wings_2', category: 'wings', name: 'Wing Combo', url: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_plate_1', category: 'plates', name: 'Plate Lunch', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_plate_2', category: 'plates', name: 'Dinner Plate', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_dessert_1', category: 'desserts', name: 'Cake', url: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_dessert_2', category: 'desserts', name: 'Cookies', url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_dessert_3', category: 'desserts', name: 'Ice Cream', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_seafood_1', category: 'seafood', name: 'Seafood Plate', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_seafood_2', category: 'seafood', name: 'Shrimp Tray', url: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_breakfast_1', category: 'breakfast', name: 'Breakfast Plate', url: 'https://images.unsplash.com/photo-1533089860892-a9c7f0a88666?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_breakfast_2', category: 'breakfast', name: 'Pancakes', url: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_hotdog_1', category: 'hotdogs', name: 'Hot Dog', url: 'https://images.unsplash.com/photo-1612392062798-968bf07a7f02?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_hotdog_2', category: 'hotdogs', name: 'Loaded Dog', url: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_sandwich_1', category: 'sandwiches', name: 'Sandwich', url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_sandwich_2', category: 'sandwiches', name: 'Club Sandwich', url: 'https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_chicken_1', category: 'chicken', name: 'Fried Chicken', url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_chicken_2', category: 'chicken', name: 'Chicken Plate', url: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_bbq_1', category: 'bbq', name: 'BBQ Plate', url: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_bbq_2', category: 'bbq', name: 'Ribs', url: 'https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_snack_1', category: 'snacks', name: 'Snack Cup', url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_snack_2', category: 'snacks', name: 'Loaded Snack', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_catering_1', category: 'catering', name: 'Catering Tray', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_catering_2', category: 'catering', name: 'Party Tray', url: 'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'ph_mexican_1', category: 'mexican', name: 'Mexican Plate', url: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'ph_mexican_2', category: 'mexican', name: 'Burrito Plate', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
+];
+
+const DAY_FIELDS: { key: HoursKey; labelKey: keyof CopyBlock }[] = [
+  { key: 'hours_monday', labelKey: 'monday' },
+  { key: 'hours_tuesday', labelKey: 'tuesday' },
+  { key: 'hours_wednesday', labelKey: 'wednesday' },
+  { key: 'hours_thursday', labelKey: 'thursday' },
+  { key: 'hours_friday', labelKey: 'friday' },
+  { key: 'hours_saturday', labelKey: 'saturday' },
+  { key: 'hours_sunday', labelKey: 'sunday' },
 ];
 
 function safeArray<T>(value: T[] | null | undefined): T[] {
@@ -510,8 +637,11 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
   if (type === 'drink') {
     return [
       { name: 'Coke', price: '0' },
+      { name: 'Pepsi', price: '0' },
       { name: 'Sprite', price: '0' },
       { name: 'Water', price: '0' },
+      { name: 'Horchata', price: '1' },
+      { name: 'Jamaica', price: '1' },
     ];
   }
 
@@ -528,6 +658,22 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
       { name: 'No Onion', price: '0' },
       { name: 'No Tomato', price: '0' },
       { name: 'No Sauce', price: '0' },
+    ];
+  }
+
+  if (type === 'toppings') {
+    return [
+      { name: 'Cheese', price: '1' },
+      { name: 'Jalapeños', price: '1' },
+      { name: 'Bacon', price: '2' },
+    ];
+  }
+
+  if (type === 'sauces') {
+    return [
+      { name: 'Ranch', price: '0' },
+      { name: 'BBQ', price: '0' },
+      { name: 'Hot Sauce', price: '0' },
     ];
   }
 
@@ -574,6 +720,16 @@ export default function BuilderPage() {
   const [deliveryRadius, setDeliveryRadius] = useState('5');
   const [deliveryMinimum, setDeliveryMinimum] = useState('0');
 
+  const [hours, setHours] = useState<Record<HoursKey, string>>({
+    hours_monday: '',
+    hours_tuesday: '',
+    hours_wednesday: '',
+    hours_thursday: '',
+    hours_friday: '',
+    hours_saturday: '',
+    hours_sunday: '',
+  });
+
   const [plan, setPlan] = useState<BuilderPlan>('starter');
   const [stripeConnected, setStripeConnected] = useState(false);
 
@@ -589,6 +745,17 @@ export default function BuilderPage() {
   const [success, setSuccess] = useState('');
 
   const [placeholderUsedCount, setPlaceholderUsedCount] = useState(0);
+  const [selectedPlaceholderCategory, setSelectedPlaceholderCategory] = useState<PlaceholderCategory>('drinks');
+
+  const [flyerStyle, setFlyerStyle] = useState<FlyerStyleKey>('generic');
+  const [flyerPack, setFlyerPack] = useState<FlyerPack>('500');
+  const [flyerBusinessName, setFlyerBusinessName] = useState('');
+  const [flyerHeadline, setFlyerHeadline] = useState('');
+  const [flyerSubheadline, setFlyerSubheadline] = useState('');
+  const [flyerPromoLine, setFlyerPromoLine] = useState('');
+  const [flyerInstagram, setFlyerInstagram] = useState('');
+  const [flyerHours, setFlyerHours] = useState('');
+  const [flyerPaid, setFlyerPaid] = useState(false);
 
   const previewLink = useMemo(() => {
     const slug = slugifyValue(name || '');
@@ -613,6 +780,29 @@ export default function BuilderPage() {
     }
     return null;
   }, [categories, selectedItemId]);
+
+  const filteredPlaceholderImages = useMemo(
+    () => PLACEHOLDER_IMAGES.filter((item) => item.category === selectedPlaceholderCategory),
+    [selectedPlaceholderCategory]
+  );
+
+  const freeFlyerQrUrl = useMemo(() => {
+    const target =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${previewLink || '/store/your-store'}`
+        : previewLink || '/store/your-store';
+
+    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(target)}`;
+  }, [previewLink]);
+
+  const customFlyerPreviewQrUrl = useMemo(() => {
+    const target =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/flyer-preview-only`
+        : '/flyer-preview-only';
+
+    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(target)}`;
+  }, []);
 
   useEffect(() => {
     const loadBuilder = async () => {
@@ -657,6 +847,16 @@ export default function BuilderPage() {
               (restaurant.stripe_account_id && restaurant.stripe_charges_enabled && restaurant.stripe_payouts_enabled)
           )
         );
+
+        setHours({
+          hours_monday: restaurant.hours_monday || '',
+          hours_tuesday: restaurant.hours_tuesday || '',
+          hours_wednesday: restaurant.hours_wednesday || '',
+          hours_thursday: restaurant.hours_thursday || '',
+          hours_friday: restaurant.hours_friday || '',
+          hours_saturday: restaurant.hours_saturday || '',
+          hours_sunday: restaurant.hours_sunday || '',
+        });
 
         const { data: categoryRows } = await supabase
           .from('menu_categories')
@@ -785,6 +985,10 @@ export default function BuilderPage() {
     setExpanded((current) => (current === section ? null : section));
   }
 
+  function updateHours(day: HoursKey, value: string) {
+    setHours((current) => ({ ...current, [day]: value }));
+  }
+
   function updateCategory(categoryId: string, nextName: string) {
     setCategories((current) =>
       current.map((category) =>
@@ -885,7 +1089,7 @@ export default function BuilderPage() {
       id: groupId,
       name: presetType === 'custom' ? copy.optionGroups : copy[presetType],
       required: false,
-      selection: presetType === 'extras' ? 'multiple' : 'single',
+      selection: presetType === 'extras' || presetType === 'toppings' ? 'multiple' : 'single',
       presetType,
       options: getPresetOptions(presetType).map((option) => ({
         id: uid('choice'),
@@ -1157,10 +1361,18 @@ export default function BuilderPage() {
         delivery_minimum: Number(deliveryMinimum || 0),
         plan,
         stripe_connected: stripeConnected,
+        hours_monday: hours.hours_monday.trim() || null,
+        hours_tuesday: hours.hours_tuesday.trim() || null,
+        hours_wednesday: hours.hours_wednesday.trim() || null,
+        hours_thursday: hours.hours_thursday.trim() || null,
+        hours_friday: hours.hours_friday.trim() || null,
+        hours_saturday: hours.hours_saturday.trim() || null,
+        hours_sunday: hours.hours_sunday.trim() || null,
       };
-          let currentRestaurantId = restaurantId;
 
-      if (restaurantId) {
+      let currentRestaurantId = restaurantId;
+
+            if (restaurantId) {
         const { error: updateError } = await supabase
           .from('restaurants')
           .update(restaurantPayload)
@@ -1343,9 +1555,7 @@ export default function BuilderPage() {
     }
 
     await handleSave();
-    if (!error) {
-      setSuccess(copy.goLiveReady);
-    }
+    setSuccess(copy.goLiveReady);
   }
 
   function SectionCard({
@@ -1453,11 +1663,7 @@ export default function BuilderPage() {
 
         <section className="heroCard">
           <div className="heroWrap">
-            {heroImage ? (
-              <img src={heroImage} alt={copy.heroPreview} className="heroImage" />
-            ) : (
-              <div className="heroFallback" />
-            )}
+            {heroImage ? <img src={heroImage} alt={copy.heroPreview} className="heroImage" /> : <div className="heroFallback" />}
 
             <div className="heroOverlay">
               <div className="heroIdentity">
@@ -1522,6 +1728,20 @@ export default function BuilderPage() {
               <div className="field">
                 <label className="label">{copy.address}</label>
                 <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
+              </div>
+
+              <div className="hoursGrid">
+                {DAY_FIELDS.map((day) => (
+                  <div key={day.key} className="field">
+                    <label className="label">{copy[day.labelKey]}</label>
+                    <input
+                      className="input"
+                      value={hours[day.key]}
+                      onChange={(e) => updateHours(day.key, e.target.value)}
+                      placeholder="9am - 6pm / Closed"
+                    />
+                  </div>
+                ))}
               </div>
             </section>
           ) : null}
@@ -1682,6 +1902,35 @@ export default function BuilderPage() {
                   onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))}
                 />
               </div>
+
+              <div className="planRow">
+                <button
+                  type="button"
+                  className={`planCard ${plan === 'starter' ? 'planCardActive' : ''}`}
+                  onClick={() => setPlan('starter')}
+                >
+                  <strong>{copy.starterPlan}</strong>
+                  <span>{copy.firstMonthFree} • 10% {copy.perOrder}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`planCard ${plan === 'growth' ? 'planCardActive' : ''}`}
+                  onClick={() => setPlan('growth')}
+                >
+                  <strong>{copy.growthPlan}</strong>
+                  <span>$39/mo • 5% {copy.perOrder}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`planCard ${plan === 'premium' ? 'planCardActive' : ''}`}
+                  onClick={() => setPlan('premium')}
+                >
+                  <strong>{copy.premiumPlan}</strong>
+                  <span>$99/mo • 3% {copy.perOrder}</span>
+                </button>
+              </div>
             </section>
           ) : null}
 
@@ -1790,11 +2039,42 @@ export default function BuilderPage() {
 
               <div className="field">
                 <label className="label">{copy.placeholderGallery}</label>
+                <div className="placeholderCategoryRow">
+                  {[
+                    'drinks',
+                    'tacos',
+                    'burgers',
+                    'pizza',
+                    'wings',
+                    'plates',
+                    'desserts',
+                    'seafood',
+                    'breakfast',
+                    'hotdogs',
+                    'sandwiches',
+                    'chicken',
+                    'bbq',
+                    'snacks',
+                    'catering',
+                    'mexican',
+                  ].map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`chip ${selectedPlaceholderCategory === category ? 'chipActive' : ''}`}
+                      onClick={() => setSelectedPlaceholderCategory(category as PlaceholderCategory)}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="placeholderMeta">
                   {copy.placeholdersUsed}: {placeholderUsedCount}
                 </div>
+
                 <div className="placeholderGrid">
-                  {PLACEHOLDER_IMAGES.map((placeholder) => (
+                  {filteredPlaceholderImages.map((placeholder) => (
                     <button
                       key={placeholder.id}
                       type="button"
@@ -1806,9 +2086,8 @@ export default function BuilderPage() {
                     </button>
                   ))}
                 </div>
-                {plan === 'starter' ? (
-                  <div className="limitNote">{copy.starterLimitReached}</div>
-                ) : null}
+
+                {plan === 'starter' ? <div className="limitNote">{copy.starterLimitReached}</div> : null}
               </div>
 
               <div className="chipRow">
@@ -1860,6 +2139,12 @@ export default function BuilderPage() {
                 <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
                   {copy.removals}
                 </button>
+                <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'toppings')}>
+                  {copy.toppings}
+                </button>
+                <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'sauces')}>
+                  {copy.sauces}
+                </button>
                 <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
                   {copy.custom}
                 </button>
@@ -1882,9 +2167,7 @@ export default function BuilderPage() {
                         <button
                           type="button"
                           className={`chip ${group.required ? 'chipActive' : ''}`}
-                          onClick={() =>
-                            updateOptionGroup(selectedItem.id, group.id, { required: !group.required })
-                          }
+                          onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
                         >
                           {group.required ? copy.required : copy.optional}
                         </button>
@@ -1892,9 +2175,7 @@ export default function BuilderPage() {
                         <button
                           type="button"
                           className={`chip ${group.selection === 'single' ? 'chipActive' : ''}`}
-                          onClick={() =>
-                            updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })
-                          }
+                          onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
                         >
                           {copy.singleChoice}
                         </button>
@@ -1902,9 +2183,7 @@ export default function BuilderPage() {
                         <button
                           type="button"
                           className={`chip ${group.selection === 'multiple' ? 'chipActive' : ''}`}
-                          onClick={() =>
-                            updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })
-                          }
+                          onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
                         >
                           {copy.multipleChoice}
                         </button>
@@ -1972,7 +2251,7 @@ export default function BuilderPage() {
             summary={
               <div className="summaryLines">
                 <strong>{copy.freeFlyer}</strong>
-                <span>{previewLink || '/store/your-store'}</span>
+                <span>{copy.freeQrLive}</span>
               </div>
             }
           />
@@ -1981,40 +2260,110 @@ export default function BuilderPage() {
             <section className="panelCard">
               <div className="flyerBox">
                 <div className="flyerTitle">{copy.freeFlyer}</div>
-                <div className="flyerSub">{copy.included}</div>
+                <div className="flyerSub">{copy.freeQrLive}</div>
                 <div className="qrCard">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
-                      typeof window !== 'undefined'
-                        ? `${window.location.origin}${previewLink || '/store/your-store'}`
-                        : previewLink || '/store/your-store'
-                    )}`}
-                    alt="QR code"
-                    className="qrImage"
-                  />
+                  <img src={freeFlyerQrUrl} alt="QR code" className="qrImage" />
                 </div>
               </div>
 
               <div className="flyerBox">
                 <div className="flyerTitle">{copy.customFlyers}</div>
-                <div className="flyerSub">{copy.chooseFlyerPack}</div>
+                <div className="flyerSub">{copy.flyerQrUnlock}</div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerStyle}</label>
+                  <div className="flyerStyleGrid">
+                    {(['generic', 'hibachi', 'dessert', 'hotdog', 'seafood', 'tacos', 'snacks'] as FlyerStyleKey[]).map((style) => (
+                      <button
+                        key={style}
+                        type="button"
+                        className={`chip ${flyerStyle === style ? 'chipActive' : ''}`}
+                        onClick={() => setFlyerStyle(style)}
+                      >
+                        {style}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerBusinessName}</label>
+                  <input className="input" value={flyerBusinessName} onChange={(e) => setFlyerBusinessName(e.target.value)} />
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerHeadline}</label>
+                  <input className="input" value={flyerHeadline} onChange={(e) => setFlyerHeadline(e.target.value)} />
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerSubheadline}</label>
+                  <input className="input" value={flyerSubheadline} onChange={(e) => setFlyerSubheadline(e.target.value)} />
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerPromoLine}</label>
+                  <input className="input" value={flyerPromoLine} onChange={(e) => setFlyerPromoLine(e.target.value)} />
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerInstagram}</label>
+                  <input className="input" value={flyerInstagram} onChange={(e) => setFlyerInstagram(e.target.value)} />
+                </div>
+
+                <div className="field">
+                  <label className="label">{copy.flyerHours}</label>
+                  <input className="input" value={flyerHours} onChange={(e) => setFlyerHours(e.target.value)} />
+                </div>
+
+                <div className="customFlyerPreview">
+                  <div className={`customFlyerCanvas flyerStyle-${flyerStyle}`}>
+                    <div className="customFlyerHeader">
+                      <div className="customFlyerBusiness">{flyerBusinessName || name || 'Business Name'}</div>
+                      <div className="customFlyerHeadline">{flyerHeadline || 'SCAN TO ORDER'}</div>
+                      <div className="customFlyerSubheadline">{flyerSubheadline || flyerPromoLine || 'Fresh food. Fast pickup.'}</div>
+                    </div>
+
+                    <div className="customFlyerQrWrap">
+                      <img
+                        src={flyerPaid ? freeFlyerQrUrl : customFlyerPreviewQrUrl}
+                        alt="Custom flyer QR"
+                        className={`customFlyerQr ${flyerPaid ? '' : 'qrPreviewOnly'}`}
+                      />
+                      {!flyerPaid ? <div className="previewWatermark">{copy.flyerPreviewOnly}</div> : null}
+                    </div>
+
+                    <div className="customFlyerFooter">
+                      <div>{address || '123 Main St'}</div>
+                      <div>{phone || '323-555-1212'}</div>
+                      <div>{flyerInstagram || '@yourbusiness'}</div>
+                      <div>{flyerHours || 'Mon-Sun 10am-8pm'}</div>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="pricingGrid">
-                  <div className="priceCard">
+                  <button type="button" className={`priceCard ${flyerPack === '100' ? 'priceCardActive' : ''}`} onClick={() => setFlyerPack('100')}>
                     <strong>100</strong>
                     <span>$120</span>
-                  </div>
+                  </button>
 
-                  <div className="priceCard">
+                  <button type="button" className={`priceCard ${flyerPack === '250' ? 'priceCardActive' : ''}`} onClick={() => setFlyerPack('250')}>
                     <strong>250</strong>
                     <span>$250</span>
-                  </div>
+                  </button>
 
-                  <div className="priceCard bestValueCard">
+                  <button type="button" className={`priceCard bestValueCard ${flyerPack === '500' ? 'priceCardActive' : ''}`} onClick={() => setFlyerPack('500')}>
                     <em>{copy.bestValue}</em>
                     <strong>500</strong>
                     <span>$450</span>
-                  </div>
+                  </button>
+                </div>
+
+                <div className="goLiveActions">
+                  <button type="button" className="secondaryButton" onClick={() => setFlyerPaid(true)}>
+                    Unlock Custom Flyer QR
+                  </button>
                 </div>
               </div>
 
@@ -2135,7 +2484,8 @@ export default function BuilderPage() {
           .dangerButton,
           .chip,
           .previewButton,
-          .itemListButton {
+          .itemListButton,
+          .priceCard {
             min-height: 44px;
             border-radius: 14px;
             border: 1px solid rgba(15, 23, 42, 0.12);
@@ -2393,6 +2743,11 @@ export default function BuilderPage() {
             gap: 10px;
           }
 
+          .hoursGrid {
+            display: grid;
+            gap: 10px;
+          }
+
           .label {
             color: #6b7280;
             font-size: 11px;
@@ -2470,7 +2825,10 @@ export default function BuilderPage() {
             border: 1px solid rgba(15, 23, 42, 0.08);
           }
 
-          .chipRow {
+          .chipRow,
+          .placeholderCategoryRow,
+          .flyerStyleGrid,
+          .goLiveActions {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -2480,7 +2838,9 @@ export default function BuilderPage() {
             background: #ffffff;
           }
 
-          .chipActive {
+          .chipActive,
+          .planCardActive,
+          .priceCardActive {
             background: #0f172a;
             color: #ffffff;
             border-color: #0f172a;
@@ -2568,6 +2928,34 @@ export default function BuilderPage() {
             text-align: left;
           }
 
+          .planRow {
+            display: grid;
+            gap: 10px;
+          }
+
+          .planCard {
+            min-height: 70px;
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            background: #ffffff;
+            color: #111827;
+            padding: 12px;
+            display: grid;
+            gap: 4px;
+            text-align: left;
+          }
+
+          .planCard strong {
+            font-size: 16px;
+            font-weight: 900;
+          }
+
+          .planCard span {
+            font-size: 13px;
+            font-weight: 700;
+            color: inherit;
+          }
+
           .qrCard {
             border-radius: 18px;
             background: #ffffff;
@@ -2577,7 +2965,8 @@ export default function BuilderPage() {
             place-items: center;
           }
 
-          .qrImage {
+          .qrImage,
+          .customFlyerQr {
             width: 220px;
             max-width: 100%;
             border-radius: 12px;
@@ -2591,24 +2980,21 @@ export default function BuilderPage() {
           }
 
           .priceCard {
-            border-radius: 16px;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            background: #f8fafc;
-            padding: 12px;
             display: grid;
             gap: 6px;
             justify-items: center;
+            padding: 12px;
           }
 
           .priceCard strong {
-            color: #111827;
+            color: inherit;
             font-size: 18px;
             font-weight: 900;
           }
 
           .priceCard span,
           .bestValueCard em {
-            color: #6b7280;
+            color: inherit;
             font-size: 13px;
             font-weight: 800;
           }
@@ -2618,10 +3004,84 @@ export default function BuilderPage() {
             border-color: rgba(249, 115, 22, 0.18);
           }
 
-          .goLiveActions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+          .customFlyerPreview {
+            width: 100%;
+          }
+
+          .customFlyerCanvas {
+            border-radius: 18px;
+            padding: 18px;
+            min-height: 420px;
+            display: grid;
+            gap: 18px;
+            align-content: start;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
+            color: #ffffff;
+            position: relative;
+            overflow: hidden;
+          }
+
+          .flyerStyle-hibachi { background: linear-gradient(180deg, #0f172a 0%, #7c2d12 100%); }
+          .flyerStyle-dessert { background: linear-gradient(180deg, #7c2d12 0%, #f59e0b 100%); }
+          .flyerStyle-hotdog { background: linear-gradient(180deg, #7f1d1d 0%, #b45309 100%); }
+          .flyerStyle-seafood { background: linear-gradient(180deg, #0c4a6e 0%, #1d4ed8 100%); }
+          .flyerStyle-tacos { background: linear-gradient(180deg, #14532d 0%, #ca8a04 100%); }
+          .flyerStyle-snacks { background: linear-gradient(180deg, #6d28d9 0%, #db2777 100%); }
+
+          .customFlyerHeader {
+            display: grid;
+            gap: 6px;
+            text-align: center;
+          }
+
+          .customFlyerBusiness {
+            font-size: 28px;
+            font-weight: 900;
+            line-height: 1.05;
+          }
+
+          .customFlyerHeadline {
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1;
+          }
+
+          .customFlyerSubheadline {
+            font-size: 15px;
+            font-weight: 700;
+            opacity: 0.95;
+          }
+
+          .customFlyerQrWrap {
+            position: relative;
+            display: grid;
+            place-items: center;
+          }
+
+          .previewWatermark {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            font-weight: 900;
+            color: rgba(255,255,255,0.92);
+            background: rgba(0,0,0,0.25);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          .qrPreviewOnly {
+            filter: blur(1.4px) opacity(0.75);
+          }
+
+          .customFlyerFooter {
+            display: grid;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 800;
+            text-align: center;
           }
 
           .bottomNav {
@@ -2669,7 +3129,8 @@ export default function BuilderPage() {
           }
 
           @media (max-width: 390px) {
-            .pricingGrid {
+            .pricingGrid,
+            .placeholderGrid {
               grid-template-columns: 1fr;
             }
           }
@@ -2678,3 +3139,5 @@ export default function BuilderPage() {
     </main>
   );
 }
+
+     
