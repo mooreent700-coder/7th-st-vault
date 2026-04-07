@@ -19,6 +19,39 @@ type HoursKey =
   | 'hours_saturday'
   | 'hours_sunday';
 
+type PlaceholderCategory =
+  | 'drinks'
+  | 'aguas_frescas'
+  | 'coffee'
+  | 'tacos'
+  | 'mexican'
+  | 'seafood'
+  | 'burgers'
+  | 'wings'
+  | 'pizza'
+  | 'breakfast'
+  | 'snacks'
+  | 'desserts'
+  | 'bbq'
+  | 'soul_food'
+  | 'pollo'
+  | 'hotdogs'
+  | 'sandwiches'
+  | 'catering';
+
+type FlyerStyleKey =
+  | 'generic'
+  | 'tacos'
+  | 'seafood'
+  | 'bbq'
+  | 'soul_food'
+  | 'pollo'
+  | 'burgers'
+  | 'snacks'
+  | 'coffee';
+
+type FlyerPack = '100' | '250' | '500';
+
 type RestaurantRow = {
   id: string;
   owner_id?: string | null;
@@ -102,14 +135,16 @@ type BuilderOptionGroup = {
   required: boolean;
   selection: 'single' | 'multiple';
   presetType:
+    | 'combo'
     | 'protein'
     | 'size'
     | 'drink'
+    | 'sides'
     | 'extras'
     | 'removals'
-    | 'custom'
     | 'toppings'
-    | 'sauces';
+    | 'sauces'
+    | 'custom';
   options: BuilderOptionChoice[];
 };
 
@@ -131,41 +166,12 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
-type PlaceholderCategory =
-  | 'drinks'
-  | 'tacos'
-  | 'burgers'
-  | 'pizza'
-  | 'wings'
-  | 'plates'
-  | 'desserts'
-  | 'seafood'
-  | 'breakfast'
-  | 'hotdogs'
-  | 'sandwiches'
-  | 'chicken'
-  | 'bbq'
-  | 'snacks'
-  | 'catering'
-  | 'mexican';
-
 type PlaceholderImage = {
   id: string;
   category: PlaceholderCategory;
   name: string;
   url: string;
 };
-
-type FlyerStyleKey =
-  | 'hibachi'
-  | 'dessert'
-  | 'hotdog'
-  | 'seafood'
-  | 'tacos'
-  | 'snacks'
-  | 'generic';
-
-type FlyerPack = '100' | '250' | '500';
 
 type CopyBlock = {
   builderWord: string;
@@ -188,6 +194,10 @@ type CopyBlock = {
   friday: string;
   saturday: string;
   sunday: string;
+  open: string;
+  closed: string;
+  openTime: string;
+  closeTime: string;
   branding: string;
   heroAndLogoImages: string;
   uploadHeroImage: string;
@@ -222,14 +232,16 @@ type CopyBlock = {
   soldOut: string;
   deleteItem: string;
   optionGroups: string;
+  combo: string;
   protein: string;
   size: string;
   drink: string;
+  sides: string;
   extras: string;
   removals: string;
-  custom: string;
   toppings: string;
   sauces: string;
+  custom: string;
   required: string;
   optional: string;
   singleChoice: string;
@@ -276,6 +288,7 @@ type CopyBlock = {
   flyerPreviewOnly: string;
   flyerQrUnlock: string;
   freeQrLive: string;
+  selectCategory: string;
 };
 
 const COPY: Record<LanguageMode, CopyBlock> = {
@@ -300,6 +313,10 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     friday: 'Friday',
     saturday: 'Saturday',
     sunday: 'Sunday',
+    open: 'Open',
+    closed: 'Closed',
+    openTime: 'Open Time',
+    closeTime: 'Close Time',
     branding: 'Branding',
     heroAndLogoImages: 'Hero & Logo Images',
     uploadHeroImage: 'Upload Hero Image',
@@ -334,14 +351,16 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     soldOut: 'Sold Out',
     deleteItem: 'Delete Item',
     optionGroups: 'Option Groups',
+    combo: 'Combo',
     protein: 'Protein',
     size: 'Size',
     drink: 'Drink',
+    sides: 'Sides',
     extras: 'Extras',
     removals: 'Removals',
-    custom: 'Custom',
     toppings: 'Toppings',
     sauces: 'Sauces',
+    custom: 'Custom',
     required: 'Required',
     optional: 'Optional',
     singleChoice: 'Single',
@@ -388,6 +407,7 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     flyerPreviewOnly: 'Preview Only',
     flyerQrUnlock: 'QR becomes live after flyer purchase.',
     freeQrLive: 'Free white flyer QR is live with signup.',
+    selectCategory: 'Select Category',
   },
   es: {
     builderWord: 'BUILDER',
@@ -410,6 +430,10 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     friday: 'Viernes',
     saturday: 'Sábado',
     sunday: 'Domingo',
+    open: 'Abierto',
+    closed: 'Cerrado',
+    openTime: 'Hora Apertura',
+    closeTime: 'Hora Cierre',
     branding: 'Branding',
     heroAndLogoImages: 'Hero y Logo',
     uploadHeroImage: 'Subir Hero',
@@ -444,14 +468,16 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     soldOut: 'Agotado',
     deleteItem: 'Eliminar Producto',
     optionGroups: 'Grupos de Opciones',
+    combo: 'Combo',
     protein: 'Proteína',
     size: 'Tamaño',
     drink: 'Bebida',
+    sides: 'Acompañamientos',
     extras: 'Extras',
     removals: 'Quitar',
-    custom: 'Personalizado',
     toppings: 'Toppings',
     sauces: 'Salsas',
+    custom: 'Personalizado',
     required: 'Requerido',
     optional: 'Opcional',
     singleChoice: 'Una',
@@ -498,63 +524,70 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     flyerPreviewOnly: 'Solo Vista Previa',
     flyerQrUnlock: 'El QR se activa después de la compra del flyer.',
     freeQrLive: 'El flyer blanco gratis tiene QR activo al registrarte.',
+    selectCategory: 'Elegir Categoría',
   },
 };
 
 const PLACEHOLDER_IMAGES: PlaceholderImage[] = [
-  { id: 'ph_drink_1', category: 'drinks', name: 'Coke', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_drink_2', category: 'drinks', name: 'Sprite', url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_drink_3', category: 'drinks', name: 'Water', url: 'https://images.unsplash.com/photo-1564419439288-bd5042d1f9c4?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_drink_4', category: 'drinks', name: 'Horchata', url: 'https://images.unsplash.com/photo-1551024709-8f23befc6cf7?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_drink_5', category: 'drinks', name: 'Jamaica', url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'drink_1', category: 'drinks', name: 'Coke', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'drink_2', category: 'drinks', name: 'Pepsi', url: 'https://images.unsplash.com/photo-1581006852262-e4307cf6283a?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'drink_3', category: 'drinks', name: 'Sprite', url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'drink_4', category: 'drinks', name: 'Water', url: 'https://images.unsplash.com/photo-1564419439288-bd5042d1f9c4?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_taco_1', category: 'tacos', name: 'Street Tacos', url: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_taco_2', category: 'tacos', name: 'Birria Tacos', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_taco_3', category: 'tacos', name: 'Shrimp Tacos', url: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'agua_1', category: 'aguas_frescas', name: 'Horchata', url: 'https://images.unsplash.com/photo-1551024709-8f23befc6cf7?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'agua_2', category: 'aguas_frescas', name: 'Jamaica', url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'agua_3', category: 'aguas_frescas', name: 'Tamarindo', url: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_burger_1', category: 'burgers', name: 'Burger Combo', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_burger_2', category: 'burgers', name: 'Cheese Burger', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_burger_3', category: 'burgers', name: 'Loaded Burger', url: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'coffee_1', category: 'coffee', name: 'Iced Coffee', url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'coffee_2', category: 'coffee', name: 'Cold Brew', url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'coffee_3', category: 'coffee', name: 'Frappe', url: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'coffee_4', category: 'coffee', name: 'Latte', url: 'https://images.unsplash.com/photo-1579888071069-c107a6f79d82?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_pizza_1', category: 'pizza', name: 'Pizza Slice', url: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_pizza_2', category: 'pizza', name: 'Whole Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'taco_1', category: 'tacos', name: 'Street Tacos', url: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'taco_2', category: 'tacos', name: 'Birria Tacos', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'taco_3', category: 'tacos', name: 'Shrimp Tacos', url: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_wings_1', category: 'wings', name: 'Hot Wings', url: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_wings_2', category: 'wings', name: 'Wing Combo', url: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'mex_1', category: 'mexican', name: 'Mexican Plate', url: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'mex_2', category: 'mexican', name: 'Burrito Plate', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_plate_1', category: 'plates', name: 'Plate Lunch', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_plate_2', category: 'plates', name: 'Dinner Plate', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'sea_1', category: 'seafood', name: 'Seafood Plate', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'sea_2', category: 'seafood', name: 'Shrimp Tray', url: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_dessert_1', category: 'desserts', name: 'Cake', url: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_dessert_2', category: 'desserts', name: 'Cookies', url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_dessert_3', category: 'desserts', name: 'Ice Cream', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'burger_1', category: 'burgers', name: 'Burger Combo', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'burger_2', category: 'burgers', name: 'Loaded Burger', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_seafood_1', category: 'seafood', name: 'Seafood Plate', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_seafood_2', category: 'seafood', name: 'Shrimp Tray', url: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'wing_1', category: 'wings', name: 'Wing Combo', url: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'wing_2', category: 'wings', name: 'Hot Wings', url: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_breakfast_1', category: 'breakfast', name: 'Breakfast Plate', url: 'https://images.unsplash.com/photo-1533089860892-a9c7f0a88666?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_breakfast_2', category: 'breakfast', name: 'Pancakes', url: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'pizza_1', category: 'pizza', name: 'Pizza Slice', url: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'pizza_2', category: 'pizza', name: 'Whole Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_hotdog_1', category: 'hotdogs', name: 'Hot Dog', url: 'https://images.unsplash.com/photo-1612392062798-968bf07a7f02?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_hotdog_2', category: 'hotdogs', name: 'Loaded Dog', url: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'breakfast_1', category: 'breakfast', name: 'Breakfast Plate', url: 'https://images.unsplash.com/photo-1533089860892-a9c7f0a88666?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'breakfast_2', category: 'breakfast', name: 'Pancakes', url: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_sandwich_1', category: 'sandwiches', name: 'Sandwich', url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_sandwich_2', category: 'sandwiches', name: 'Club Sandwich', url: 'https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'snack_1', category: 'snacks', name: 'Snack Cup', url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'snack_2', category: 'snacks', name: 'Loaded Snack', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_chicken_1', category: 'chicken', name: 'Fried Chicken', url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_chicken_2', category: 'chicken', name: 'Chicken Plate', url: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'dessert_1', category: 'desserts', name: 'Cake', url: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'dessert_2', category: 'desserts', name: 'Ice Cream', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_bbq_1', category: 'bbq', name: 'BBQ Plate', url: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_bbq_2', category: 'bbq', name: 'Ribs', url: 'https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'bbq_1', category: 'bbq', name: 'BBQ Plate', url: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'bbq_2', category: 'bbq', name: 'Ribs', url: 'https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_snack_1', category: 'snacks', name: 'Snack Cup', url: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_snack_2', category: 'snacks', name: 'Loaded Snack', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'soul_1', category: 'soul_food', name: 'Soul Food Plate', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'soul_2', category: 'soul_food', name: 'Fried Chicken Plate', url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_catering_1', category: 'catering', name: 'Catering Tray', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_catering_2', category: 'catering', name: 'Party Tray', url: 'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'pollo_1', category: 'pollo', name: 'Pollo Plate', url: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'pollo_2', category: 'pollo', name: 'Grilled Chicken', url: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=1200&q=80' },
 
-  { id: 'ph_mexican_1', category: 'mexican', name: 'Mexican Plate', url: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'ph_mexican_2', category: 'mexican', name: 'Burrito Plate', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'hotdog_1', category: 'hotdogs', name: 'Hot Dog', url: 'https://images.unsplash.com/photo-1612392062798-968bf07a7f02?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'hotdog_2', category: 'hotdogs', name: 'Loaded Dog', url: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'sandwich_1', category: 'sandwiches', name: 'Sandwich', url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'sandwich_2', category: 'sandwiches', name: 'Club Sandwich', url: 'https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=1200&q=80' },
+
+  { id: 'catering_1', category: 'catering', name: 'Catering Tray', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'catering_2', category: 'catering', name: 'Party Tray', url: 'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80' },
 ];
 
 const DAY_FIELDS: { key: HoursKey; labelKey: keyof CopyBlock }[] = [
@@ -566,6 +599,122 @@ const DAY_FIELDS: { key: HoursKey; labelKey: keyof CopyBlock }[] = [
   { key: 'hours_saturday', labelKey: 'saturday' },
   { key: 'hours_sunday', labelKey: 'sunday' },
 ];
+
+const TIME_OPTIONS = [
+  'Closed',
+  '5:00 AM',
+  '5:30 AM',
+  '6:00 AM',
+  '6:30 AM',
+  '7:00 AM',
+  '7:30 AM',
+  '8:00 AM',
+  '8:30 AM',
+  '9:00 AM',
+  '9:30 AM',
+  '10:00 AM',
+  '10:30 AM',
+  '11:00 AM',
+  '11:30 AM',
+  '12:00 PM',
+  '12:30 PM',
+  '1:00 PM',
+  '1:30 PM',
+  '2:00 PM',
+  '2:30 PM',
+  '3:00 PM',
+  '3:30 PM',
+  '4:00 PM',
+  '4:30 PM',
+  '5:00 PM',
+  '5:30 PM',
+  '6:00 PM',
+  '6:30 PM',
+  '7:00 PM',
+  '7:30 PM',
+  '8:00 PM',
+  '8:30 PM',
+  '9:00 PM',
+  '9:30 PM',
+  '10:00 PM',
+  '10:30 PM',
+  '11:00 PM',
+];
+
+const CATEGORY_PRESET_OPTIONS: Record<PlaceholderCategory, { itemNames: string[]; comboChoices: string[] }> = {
+  drinks: {
+    itemNames: ['Drink Combo', 'Soda Combo', 'Bottle Drink', 'Large Drink'],
+    comboChoices: ['Drink only', 'Drink + chips', 'Drink + snack'],
+  },
+  aguas_frescas: {
+    itemNames: ['Agua Fresca', 'Large Agua Fresca', 'Aguas Combo'],
+    comboChoices: ['Horchata', 'Jamaica', 'Tamarindo'],
+  },
+  coffee: {
+    itemNames: ['Coffee Combo', 'Iced Coffee', 'Cold Brew', 'Frappe'],
+    comboChoices: ['Drink only', 'Drink + pastry', 'Drink + snack'],
+  },
+  tacos: {
+    itemNames: ['Taco Combo', 'Taco Plate', 'Street Taco Meal'],
+    comboChoices: ['Combo', 'Taco only', '2 tacos + drink', 'Plate + drink'],
+  },
+  mexican: {
+    itemNames: ['Mexican Plate', 'Burrito Combo', 'Quesadilla Combo'],
+    comboChoices: ['Plate', 'Plate + drink', 'Family combo'],
+  },
+  seafood: {
+    itemNames: ['Seafood Combo', 'Shrimp Plate', 'Fish Plate'],
+    comboChoices: ['Plate', 'Plate + drink', 'Family tray'],
+  },
+  burgers: {
+    itemNames: ['Burger Combo', 'Cheese Burger Combo', 'Loaded Burger Combo'],
+    comboChoices: ['Combo', 'Burger only', 'Burger + fries', 'Burger + drink'],
+  },
+  wings: {
+    itemNames: ['Wing Combo', 'Wing Plate', 'Wing Meal'],
+    comboChoices: ['Combo', 'Wings only', 'Wings + fries', 'Wings + drink'],
+  },
+  pizza: {
+    itemNames: ['Pizza Combo', 'Slice Combo', 'Whole Pizza Meal'],
+    comboChoices: ['Slice only', 'Slice + drink', 'Whole pizza'],
+  },
+  breakfast: {
+    itemNames: ['Breakfast Combo', 'Pancake Combo', 'Breakfast Burrito Combo'],
+    comboChoices: ['Combo', 'Item only', 'Plate + drink'],
+  },
+  snacks: {
+    itemNames: ['Snack Combo', 'Loaded Snack', 'Fruit Snack Combo'],
+    comboChoices: ['Snack only', 'Snack + drink', 'Large snack'],
+  },
+  desserts: {
+    itemNames: ['Dessert Combo', 'Cake Slice', 'Ice Cream Cup'],
+    comboChoices: ['Dessert only', 'Dessert + drink', 'Dessert duo'],
+  },
+  bbq: {
+    itemNames: ['BBQ Combo', 'Rib Plate', 'Brisket Plate'],
+    comboChoices: ['Plate', 'Plate + drink', 'Family BBQ'],
+  },
+  soul_food: {
+    itemNames: ['Soul Food Plate', 'Fried Chicken Combo', 'Homestyle Combo'],
+    comboChoices: ['Plate', 'Meat only', 'Plate + extra side', 'Large plate'],
+  },
+  pollo: {
+    itemNames: ['Pollo Combo', 'Half Chicken Plate', 'Family Chicken Meal'],
+    comboChoices: ['Whole chicken', 'Half chicken', 'Plate + drink', 'Family meal'],
+  },
+  hotdogs: {
+    itemNames: ['Hot Dog Combo', 'Loaded Dog Combo'],
+    comboChoices: ['Combo', 'Hot dog only', 'Hot dog + fries', 'Dog + drink'],
+  },
+  sandwiches: {
+    itemNames: ['Sandwich Combo', 'Club Sandwich Combo'],
+    comboChoices: ['Combo', 'Sandwich only', 'Sandwich + chips', 'Sandwich + drink'],
+  },
+  catering: {
+    itemNames: ['Catering Tray', 'Party Tray', 'Family Combo Tray'],
+    comboChoices: ['Half tray', 'Full tray', 'Tray + drinks'],
+  },
+};
 
 function safeArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -600,24 +749,30 @@ function money(value: string | number | null | undefined) {
   return `$${num.toFixed(2).replace(/\.00$/, '')}`;
 }
 
-function getPlanFee(plan: 'starter' | 'growth' | 'premium') {
+function getPlanFee(plan: BuilderPlan) {
   if (plan === 'starter') {
     return { percent: '10%', monthly: '$19/mo' };
   }
-
   if (plan === 'growth') {
     return { percent: '5%', monthly: '$39/mo' };
   }
-
   return { percent: '3%', monthly: '$99/mo' };
 }
 
 function getPlaceholderLimit(plan: BuilderPlan) {
-  if (plan === 'starter') return 6;
-  return Number.POSITIVE_INFINITY;
+  return plan === 'starter' ? 6 : Number.POSITIVE_INFINITY;
 }
 
 function getPresetOptions(type: BuilderOptionGroup['presetType']) {
+  if (type === 'combo') {
+    return [
+      { name: 'Combo', price: '0' },
+      { name: 'Item only', price: '-2' },
+      { name: 'Item + side', price: '-1' },
+      { name: 'Large combo', price: '2' },
+    ];
+  }
+
   if (type === 'protein') {
     return [
       { name: 'Chicken', price: '0' },
@@ -637,11 +792,21 @@ function getPresetOptions(type: BuilderOptionGroup['presetType']) {
   if (type === 'drink') {
     return [
       { name: 'Coke', price: '0' },
-      { name: 'Pepsi', price: '0' },
       { name: 'Sprite', price: '0' },
       { name: 'Water', price: '0' },
       { name: 'Horchata', price: '1' },
       { name: 'Jamaica', price: '1' },
+      { name: 'Coffee', price: '1' },
+    ];
+  }
+
+  if (type === 'sides') {
+    return [
+      { name: 'Fries', price: '0' },
+      { name: 'Rice', price: '0' },
+      { name: 'Beans', price: '0' },
+      { name: 'Mac & Cheese', price: '2' },
+      { name: 'Collard Greens', price: '2' },
     ];
   }
 
@@ -690,6 +855,12 @@ function normalizeSelectionMode(group: OptionGroupRow): 'single' | 'multiple' {
   return 'single';
 }
 
+function buildHoursDisplay(openValue: string, closeValue: string) {
+  if (!openValue || openValue === 'Closed') return 'Closed';
+  if (!closeValue || closeValue === 'Closed') return `${openValue}`;
+  return `${openValue} - ${closeValue}`;
+}
+
 function MiniIcon({ children }: { children: ReactNode }) {
   return <span className="miniIcon">{children}</span>;
 }
@@ -720,14 +891,24 @@ export default function BuilderPage() {
   const [deliveryRadius, setDeliveryRadius] = useState('5');
   const [deliveryMinimum, setDeliveryMinimum] = useState('0');
 
-  const [hours, setHours] = useState<Record<HoursKey, string>>({
-    hours_monday: '',
-    hours_tuesday: '',
-    hours_wednesday: '',
-    hours_thursday: '',
-    hours_friday: '',
-    hours_saturday: '',
-    hours_sunday: '',
+  const [hoursOpen, setHoursOpen] = useState<Record<HoursKey, string>>({
+    hours_monday: 'Closed',
+    hours_tuesday: 'Closed',
+    hours_wednesday: 'Closed',
+    hours_thursday: 'Closed',
+    hours_friday: 'Closed',
+    hours_saturday: 'Closed',
+    hours_sunday: 'Closed',
+  });
+
+  const [hoursClose, setHoursClose] = useState<Record<HoursKey, string>>({
+    hours_monday: 'Closed',
+    hours_tuesday: 'Closed',
+    hours_wednesday: 'Closed',
+    hours_thursday: 'Closed',
+    hours_friday: 'Closed',
+    hours_saturday: 'Closed',
+    hours_sunday: 'Closed',
   });
 
   const [plan, setPlan] = useState<BuilderPlan>('starter');
@@ -848,15 +1029,41 @@ export default function BuilderPage() {
           )
         );
 
-        setHours({
-          hours_monday: restaurant.hours_monday || '',
-          hours_tuesday: restaurant.hours_tuesday || '',
-          hours_wednesday: restaurant.hours_wednesday || '',
-          hours_thursday: restaurant.hours_thursday || '',
-          hours_friday: restaurant.hours_friday || '',
-          hours_saturday: restaurant.hours_saturday || '',
-          hours_sunday: restaurant.hours_sunday || '',
+        const savedHoursOpen: Record<HoursKey, string> = {
+          hours_monday: 'Closed',
+          hours_tuesday: 'Closed',
+          hours_wednesday: 'Closed',
+          hours_thursday: 'Closed',
+          hours_friday: 'Closed',
+          hours_saturday: 'Closed',
+          hours_sunday: 'Closed',
+        };
+
+        const savedHoursClose: Record<HoursKey, string> = {
+          hours_monday: 'Closed',
+          hours_tuesday: 'Closed',
+          hours_wednesday: 'Closed',
+          hours_thursday: 'Closed',
+          hours_friday: 'Closed',
+          hours_saturday: 'Closed',
+          hours_sunday: 'Closed',
+        };
+
+        DAY_FIELDS.forEach(({ key }) => {
+          const rawValue = restaurant[key] || '';
+          if (!rawValue || rawValue === 'Closed') {
+            savedHoursOpen[key] = 'Closed';
+            savedHoursClose[key] = 'Closed';
+            return;
+          }
+
+          const parts = rawValue.split(' - ');
+          savedHoursOpen[key] = parts[0] || 'Closed';
+          savedHoursClose[key] = parts[1] || 'Closed';
         });
+
+        setHoursOpen(savedHoursOpen);
+        setHoursClose(savedHoursClose);
 
         const { data: categoryRows } = await supabase
           .from('menu_categories')
@@ -962,12 +1169,24 @@ export default function BuilderPage() {
               {
                 id: itemId,
                 category_id: categoryId,
-                name: '',
+                name: 'Combo Item',
                 base_price: '12',
                 description: '',
                 image_url: '',
                 availability: 'available',
-                option_groups: [],
+                option_groups: [
+                  {
+                    id: uid('group'),
+                    name: copy.combo,
+                    required: true,
+                    selection: 'single',
+                    presetType: 'combo',
+                    options: [
+                      { id: uid('choice'), name: 'Combo', price: '0' },
+                      { id: uid('choice'), name: 'Item only', price: '-2' },
+                    ],
+                  },
+                ],
               },
             ],
           },
@@ -985,8 +1204,15 @@ export default function BuilderPage() {
     setExpanded((current) => (current === section ? null : section));
   }
 
-  function updateHours(day: HoursKey, value: string) {
-    setHours((current) => ({ ...current, [day]: value }));
+  function updateHoursOpen(day: HoursKey, value: string) {
+    setHoursOpen((current) => ({ ...current, [day]: value }));
+    if (value === 'Closed') {
+      setHoursClose((current) => ({ ...current, [day]: 'Closed' }));
+    }
+  }
+
+  function updateHoursClose(day: HoursKey, value: string) {
+    setHoursClose((current) => ({ ...current, [day]: value }));
   }
 
   function updateCategory(categoryId: string, nextName: string) {
@@ -1011,12 +1237,24 @@ export default function BuilderPage() {
           {
             id: itemId,
             category_id: categoryId,
-            name: '',
+            name: 'Combo Item',
             base_price: '0',
             description: '',
             image_url: '',
             availability: 'available',
-            option_groups: [],
+            option_groups: [
+              {
+                id: uid('group'),
+                name: copy.combo,
+                required: true,
+                selection: 'single',
+                presetType: 'combo',
+                options: [
+                  { id: uid('choice'), name: 'Combo', price: '0' },
+                  { id: uid('choice'), name: 'Item only', price: '-2' },
+                ],
+              },
+            ],
           },
         ],
       },
@@ -1039,12 +1277,24 @@ export default function BuilderPage() {
                 {
                   id: newItemId,
                   category_id: categoryId,
-                  name: '',
+                  name: 'Combo Item',
                   base_price: '0',
                   description: '',
                   image_url: '',
                   availability: 'available',
-                  option_groups: [],
+                  option_groups: [
+                    {
+                      id: uid('group'),
+                      name: copy.combo,
+                      required: true,
+                      selection: 'single',
+                      presetType: 'combo',
+                      options: [
+                        { id: uid('choice'), name: 'Combo', price: '0' },
+                        { id: uid('choice'), name: 'Item only', price: '-2' },
+                      ],
+                    },
+                  ],
                 },
               ],
             }
@@ -1054,6 +1304,44 @@ export default function BuilderPage() {
 
     setSelectedItemId(newItemId);
     setExpanded('item');
+  }
+
+  function applyCategoryPreset(category: PlaceholderCategory) {
+    if (!selectedItemId) return;
+
+    const preset = CATEGORY_PRESET_OPTIONS[category];
+    const chosenImage = PLACEHOLDER_IMAGES.find((item) => item.category === category)?.url || '';
+
+    setSelectedPlaceholderCategory(category);
+
+    setCategories((current) =>
+      current.map((entryCategory) => ({
+        ...entryCategory,
+        items: entryCategory.items.map((item) => {
+          if (item.id !== selectedItemId) return item;
+
+          const comboGroup: BuilderOptionGroup = {
+            id: uid('group'),
+            name: copy.combo,
+            required: true,
+            selection: 'single',
+            presetType: 'combo',
+            options: preset.comboChoices.map((name) => ({
+              id: uid('choice'),
+              name,
+              price: name.toLowerCase().includes('only') ? '-2' : '0',
+            })),
+          };
+
+          return {
+            ...item,
+            name: preset.itemNames[0] || item.name,
+            image_url: chosenImage || item.image_url,
+            option_groups: [comboGroup, ...item.option_groups.filter((group) => group.presetType !== 'combo')],
+          };
+        }),
+      }))
+    );
   }
 
   function selectItem(itemId: string) {
@@ -1088,7 +1376,7 @@ export default function BuilderPage() {
     const nextGroup: BuilderOptionGroup = {
       id: groupId,
       name: presetType === 'custom' ? copy.optionGroups : copy[presetType],
-      required: false,
+      required: presetType === 'combo',
       selection: presetType === 'extras' || presetType === 'toppings' ? 'multiple' : 'single',
       presetType,
       options: getPresetOptions(presetType).map((option) => ({
@@ -1361,13 +1649,13 @@ export default function BuilderPage() {
         delivery_minimum: Number(deliveryMinimum || 0),
         plan,
         stripe_connected: stripeConnected,
-        hours_monday: hours.hours_monday.trim() || null,
-        hours_tuesday: hours.hours_tuesday.trim() || null,
-        hours_wednesday: hours.hours_wednesday.trim() || null,
-        hours_thursday: hours.hours_thursday.trim() || null,
-        hours_friday: hours.hours_friday.trim() || null,
-        hours_saturday: hours.hours_saturday.trim() || null,
-        hours_sunday: hours.hours_sunday.trim() || null,
+        hours_monday: buildHoursDisplay(hoursOpen.hours_monday, hoursClose.hours_monday),
+        hours_tuesday: buildHoursDisplay(hoursOpen.hours_tuesday, hoursClose.hours_tuesday),
+        hours_wednesday: buildHoursDisplay(hoursOpen.hours_wednesday, hoursClose.hours_wednesday),
+        hours_thursday: buildHoursDisplay(hoursOpen.hours_thursday, hoursClose.hours_thursday),
+        hours_friday: buildHoursDisplay(hoursOpen.hours_friday, hoursClose.hours_friday),
+        hours_saturday: buildHoursDisplay(hoursOpen.hours_saturday, hoursClose.hours_saturday),
+        hours_sunday: buildHoursDisplay(hoursOpen.hours_sunday, hoursClose.hours_sunday),
       };
 
       let currentRestaurantId = restaurantId;
@@ -1732,14 +2020,33 @@ export default function BuilderPage() {
 
               <div className="hoursGrid">
                 {DAY_FIELDS.map((day) => (
-                  <div key={day.key} className="field">
-                    <label className="label">{copy[day.labelKey]}</label>
-                    <input
-                      className="input"
-                      value={hours[day.key]}
-                      onChange={(e) => updateHours(day.key, e.target.value)}
-                      placeholder="9am - 6pm / Closed"
-                    />
+                  <div key={day.key} className="hoursRow">
+                    <div className="hoursDay">{copy[day.labelKey]}</div>
+
+                    <select
+                      className="select"
+                      value={hoursOpen[day.key]}
+                      onChange={(e) => updateHoursOpen(day.key, e.target.value)}
+                    >
+                      {TIME_OPTIONS.map((value) => (
+                        <option key={value} value={value}>
+                          {value === 'Closed' ? copy.closed : value}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      className="select"
+                      value={hoursClose[day.key]}
+                      onChange={(e) => updateHoursClose(day.key, e.target.value)}
+                      disabled={hoursOpen[day.key] === 'Closed'}
+                    >
+                      {TIME_OPTIONS.map((value) => (
+                        <option key={value} value={value}>
+                          {value === 'Closed' ? copy.closed : value}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ))}
               </div>
@@ -1947,6 +2254,22 @@ export default function BuilderPage() {
                 {copy.addCategory}
               </button>
 
+              <div className="categoryPresetWrap">
+                <div className="label">{copy.selectCategory}</div>
+                <div className="presetCategoryGrid">
+                  {(Object.keys(CATEGORY_PRESET_OPTIONS) as PlaceholderCategory[]).map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`chip ${selectedPlaceholderCategory === category ? 'chipActive' : ''}`}
+                      onClick={() => applyCategoryPreset(category)}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="categoryList">
                 {categories.map((category) => (
                   <div key={category.id} className="categoryCard">
@@ -2040,29 +2363,12 @@ export default function BuilderPage() {
               <div className="field">
                 <label className="label">{copy.placeholderGallery}</label>
                 <div className="placeholderCategoryRow">
-                  {[
-                    'drinks',
-                    'tacos',
-                    'burgers',
-                    'pizza',
-                    'wings',
-                    'plates',
-                    'desserts',
-                    'seafood',
-                    'breakfast',
-                    'hotdogs',
-                    'sandwiches',
-                    'chicken',
-                    'bbq',
-                    'snacks',
-                    'catering',
-                    'mexican',
-                  ].map((category) => (
+                  {(Object.keys(CATEGORY_PRESET_OPTIONS) as PlaceholderCategory[]).map((category) => (
                     <button
                       key={category}
                       type="button"
                       className={`chip ${selectedPlaceholderCategory === category ? 'chipActive' : ''}`}
-                      onClick={() => setSelectedPlaceholderCategory(category as PlaceholderCategory)}
+                      onClick={() => setSelectedPlaceholderCategory(category)}
                     >
                       {category}
                     </button>
@@ -2124,6 +2430,9 @@ export default function BuilderPage() {
           {expanded === 'options' && selectedItem ? (
             <section className="panelCard">
               <div className="chipRow">
+                <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'combo')}>
+                  {copy.combo}
+                </button>
                 <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
                   {copy.protein}
                 </button>
@@ -2132,6 +2441,9 @@ export default function BuilderPage() {
                 </button>
                 <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
                   {copy.drink}
+                </button>
+                <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'sides')}>
+                  {copy.sides}
                 </button>
                 <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
                   {copy.extras}
@@ -2273,7 +2585,7 @@ export default function BuilderPage() {
                 <div className="field">
                   <label className="label">{copy.flyerStyle}</label>
                   <div className="flyerStyleGrid">
-                    {(['generic', 'hibachi', 'dessert', 'hotdog', 'seafood', 'tacos', 'snacks'] as FlyerStyleKey[]).map((style) => (
+                    {(['generic', 'tacos', 'seafood', 'bbq', 'soul_food', 'pollo', 'burgers', 'snacks', 'coffee'] as FlyerStyleKey[]).map((style) => (
                       <button
                         key={style}
                         type="button"
@@ -2738,7 +3050,9 @@ export default function BuilderPage() {
           .uploadBlock,
           .categoryList,
           .optionGroupList,
-          .choiceList {
+          .choiceList,
+          .planRow,
+          .categoryPresetWrap {
             display: grid;
             gap: 10px;
           }
@@ -2746,6 +3060,19 @@ export default function BuilderPage() {
           .hoursGrid {
             display: grid;
             gap: 10px;
+          }
+
+          .hoursRow {
+            display: grid;
+            grid-template-columns: 90px 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+          }
+
+          .hoursDay {
+            color: #111827;
+            font-size: 14px;
+            font-weight: 800;
           }
 
           .label {
@@ -2758,7 +3085,8 @@ export default function BuilderPage() {
 
           .input,
           .textarea,
-          .urlPill {
+          .urlPill,
+          .select {
             width: 100%;
             border-radius: 14px;
             border: 1px solid rgba(15, 23, 42, 0.12);
@@ -2828,7 +3156,8 @@ export default function BuilderPage() {
           .chipRow,
           .placeholderCategoryRow,
           .flyerStyleGrid,
-          .goLiveActions {
+          .goLiveActions,
+          .presetCategoryGrid {
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
@@ -2928,11 +3257,6 @@ export default function BuilderPage() {
             text-align: left;
           }
 
-          .planRow {
-            display: grid;
-            gap: 10px;
-          }
-
           .planCard {
             min-height: 70px;
             border-radius: 16px;
@@ -3022,12 +3346,14 @@ export default function BuilderPage() {
             overflow: hidden;
           }
 
-          .flyerStyle-hibachi { background: linear-gradient(180deg, #0f172a 0%, #7c2d12 100%); }
-          .flyerStyle-dessert { background: linear-gradient(180deg, #7c2d12 0%, #f59e0b 100%); }
-          .flyerStyle-hotdog { background: linear-gradient(180deg, #7f1d1d 0%, #b45309 100%); }
-          .flyerStyle-seafood { background: linear-gradient(180deg, #0c4a6e 0%, #1d4ed8 100%); }
           .flyerStyle-tacos { background: linear-gradient(180deg, #14532d 0%, #ca8a04 100%); }
+          .flyerStyle-seafood { background: linear-gradient(180deg, #0c4a6e 0%, #1d4ed8 100%); }
+          .flyerStyle-bbq { background: linear-gradient(180deg, #7f1d1d 0%, #b45309 100%); }
+          .flyerStyle-soul_food { background: linear-gradient(180deg, #78350f 0%, #d97706 100%); }
+          .flyerStyle-pollo { background: linear-gradient(180deg, #854d0e 0%, #f59e0b 100%); }
+          .flyerStyle-burgers { background: linear-gradient(180deg, #1f2937 0%, #7c2d12 100%); }
           .flyerStyle-snacks { background: linear-gradient(180deg, #6d28d9 0%, #db2777 100%); }
+          .flyerStyle-coffee { background: linear-gradient(180deg, #3f2a1d 0%, #8b5e3c 100%); }
 
           .customFlyerHeader {
             display: grid;
@@ -3130,7 +3456,8 @@ export default function BuilderPage() {
 
           @media (max-width: 390px) {
             .pricingGrid,
-            .placeholderGrid {
+            .placeholderGrid,
+            .hoursRow {
               grid-template-columns: 1fr;
             }
           }
@@ -3140,4 +3467,3 @@ export default function BuilderPage() {
   );
 }
 
-     
