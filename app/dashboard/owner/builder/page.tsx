@@ -1227,7 +1227,10 @@ export default function BuilderPage() {
           required: true,
           selection: 'single',
           presetType: 'combo',
-          options: getPresetOptions('combo', preset),
+          options: getPresetOptions('combo', preset).map((opt) => ({
+  id: uid('opt'),
+  ...opt,
+}))
         },
       ],
     };
