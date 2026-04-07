@@ -70,7 +70,9 @@ type RestaurantRow = {
   phone: string | null;
   address: string | null;
   hero_image?: string | null;
+  hero_url?: string | null;
   logo_image?: string | null;
+  logo_url?: string | null;
   storefront_theme?: ThemeMode | null;
   storefront_language?: string | null;
   order_language?: string | null;
@@ -84,13 +86,7 @@ type RestaurantRow = {
   stripe_connected?: boolean | null;
   stripe_charges_enabled?: boolean | null;
   stripe_payouts_enabled?: boolean | null;
-  hours_monday?: string | null;
-  hours_tuesday?: string | null;
-  hours_wednesday?: string | null;
-  hours_thursday?: string | null;
-  hours_friday?: string | null;
-  hours_saturday?: string | null;
-  hours_sunday?: string | null;
+  hours?: string | null;
 };
 
 type CategoryRow = {
@@ -109,9 +105,12 @@ type ItemRow = {
   price?: number | null;
   base_price?: number | null;
   image_url?: string | null;
+  image?: string | null;
   availability?: string | null;
+  available?: boolean | null;
   is_available?: boolean | null;
   sort_order?: number | null;
+  position?: number | null;
 };
 
 type OptionGroupRow = {
@@ -539,43 +538,11 @@ const DEFAULT_HOURS: HoursState = {
   sunday: { isOpen: false, open: '09:00', close: '18:00' },
 };
 
-const TIME_OPTIONS = [
-  '05:00',
-  '05:30',
-  '06:00',
-  '06:30',
-  '07:00',
-  '07:30',
-  '08:00',
-  '08:30',
-  '09:00',
-  '09:30',
-  '10:00',
-  '10:30',
-  '11:00',
-  '11:30',
-  '12:00',
-  '12:30',
-  '13:00',
-  '13:30',
-  '14:00',
-  '14:30',
-  '15:00',
-  '15:30',
-  '16:00',
-  '16:30',
-  '17:00',
-  '17:30',
-  '18:00',
-  '18:30',
-  '19:00',
-  '19:30',
-  '20:00',
-  '20:30',
-  '21:00',
-  '21:30',
-  '22:00',
-];
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${String(h).padStart(2, '0')}:${m}`;
+});
 
 const DAY_ORDER: HoursDayKey[] = [
   'monday',
@@ -589,69 +556,27 @@ const DAY_ORDER: HoursDayKey[] = [
 
 const PLACEHOLDER_IMAGES: PlaceholderImage[] = [
   { id: 'drinks_1', category: 'drinks', name: 'Soda Flight', url: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'drinks_2', category: 'drinks', name: 'Soft Drinks', url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'drinks_3', category: 'drinks', name: 'Cold Drinks', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=1200&q=80' },
-
+  { id: 'drinks_2', category: 'drinks', name: 'Cold Drinks', url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80' },
+  { id: 'drinks_3', category: 'drinks', name: 'Coffee Drink', url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80' },
   { id: 'tacos_1', category: 'tacos', name: 'Street Tacos', url: 'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'tacos_2', category: 'tacos', name: 'Birria Tacos', url: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'tacos_3', category: 'tacos', name: 'Taco Plate', url: 'https://images.unsplash.com/photo-1604467715878-83e57e8bc129?auto=format&fit=crop&w=1200&q=80' },
-
+  { id: 'tacos_2', category: 'tacos', name: 'Taco Plate', url: 'https://images.unsplash.com/photo-1604467715878-83e57e8bc129?auto=format&fit=crop&w=1200&q=80' },
   { id: 'burgers_1', category: 'burgers', name: 'Burger Combo', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'burgers_2', category: 'burgers', name: 'Loaded Burger', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'burgers_3', category: 'burgers', name: 'Burger Basket', url: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=1200&q=80' },
-
-  { id: 'pizza_1', category: 'pizza', name: 'Pizza Slice', url: 'https://images.unsplash.com/photo-1541745537411-b8046dc6d66c?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'pizza_2', category: 'pizza', name: 'Whole Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80' },
-
+  { id: 'pizza_1', category: 'pizza', name: 'Whole Pizza', url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80' },
   { id: 'wings_1', category: 'wings', name: 'Hot Wings', url: 'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'wings_2', category: 'wings', name: 'Wing Basket', url: 'https://images.unsplash.com/photo-1527477396000-e27163b481c2?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'plates_1', category: 'plates', name: 'Plate Lunch', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'plates_2', category: 'plates', name: 'Dinner Plate', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'desserts_1', category: 'desserts', name: 'Dessert', url: 'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'desserts_2', category: 'desserts', name: 'Donuts', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'desserts_3', category: 'desserts', name: 'Ice Cream', url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'seafood_1', category: 'seafood', name: 'Seafood Plate', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'seafood_2', category: 'seafood', name: 'Shrimp Plate', url: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'seafood_3', category: 'seafood', name: 'Seafood Boil', url: 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'breakfast_1', category: 'breakfast', name: 'Breakfast Plate', url: 'https://images.unsplash.com/photo-1533089860892-a9c7f0a88666?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'breakfast_2', category: 'breakfast', name: 'Pancakes', url: 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'breakfast_3', category: 'breakfast', name: 'Breakfast Burrito', url: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'hotdogs_1', category: 'hotdogs', name: 'Hotdog Combo', url: 'https://images.unsplash.com/photo-1612392062798-968bf07a7f02?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'hotdogs_2', category: 'hotdogs', name: 'Loaded Hotdog', url: 'https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'sandwiches_1', category: 'sandwiches', name: 'Sandwich Combo', url: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'sandwiches_2', category: 'sandwiches', name: 'Club Sandwich', url: 'https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'chicken_1', category: 'chicken', name: 'Chicken Plate', url: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'chicken_2', category: 'chicken', name: 'Fried Chicken', url: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'bbq_1', category: 'bbq', name: 'BBQ Plate', url: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'bbq_2', category: 'bbq', name: 'Ribs Combo', url: 'https://images.unsplash.com/photo-1558030006-450675393462?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'bbq_3', category: 'bbq', name: 'Brisket Tray', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'snacks_1', category: 'snacks', name: 'Snack Cup', url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'snacks_2', category: 'snacks', name: 'Loaded Snack', url: 'https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'catering_1', category: 'catering', name: 'Catering Tray', url: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'catering_2', category: 'catering', name: 'Family Pack', url: 'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'mexican_1', category: 'mexican', name: 'Mexican Plate', url: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'mexican_2', category: 'mexican', name: 'Burrito Combo', url: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'soul_food_1', category: 'soul_food', name: 'Soul Food Plate', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'soul_food_2', category: 'soul_food', name: 'Mac & Cheese Plate', url: 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'soul_food_3', category: 'soul_food', name: 'Baked Chicken Plate', url: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'pollo_1', category: 'pollo', name: 'Pollo Plate', url: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'pollo_2', category: 'pollo', name: 'Grilled Pollo', url: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=1200&q=80' },
-
   { id: 'coffee_1', category: 'coffee', name: 'Coffee Drink', url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80' },
-  { id: 'coffee_2', category: 'coffee', name: 'Iced Coffee', url: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=1200&q=80' },
 ];
 
 const CATEGORY_PRESETS: Record<
@@ -786,8 +711,11 @@ function safeArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
-function uid(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+function makeId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function slugifyValue(value: string) {
@@ -816,14 +744,8 @@ function money(value: string | number | null | undefined) {
 }
 
 function getPlanFee(plan: BuilderPlan) {
-  if (plan === 'starter') {
-    return { percent: '10%', monthly: '$19/mo' };
-  }
-
-  if (plan === 'growth') {
-    return { percent: '5%', monthly: '$39/mo' };
-  }
-
+  if (plan === 'starter') return { percent: '10%', monthly: '$19/mo' };
+  if (plan === 'growth') return { percent: '5%', monthly: '$39/mo' };
   return { percent: '3%', monthly: '$99/mo' };
 }
 
@@ -842,22 +764,26 @@ function toDisplayTime(value: string) {
   return `${hour12}:${mm} ${suffix}`;
 }
 
-function serializeHours(row: HoursRow) {
-  if (!row.isOpen) return 'Closed';
-  return `${row.open}-${row.close}`;
+function serializeHours(hours: HoursState) {
+  return JSON.stringify(hours);
 }
 
-function parseHours(value: string | null | undefined): HoursRow {
-  if (!value || value === 'Closed') {
-    return { isOpen: false, open: '09:00', close: '18:00' };
+function parseHours(value: string | null | undefined): HoursState {
+  if (!value) return DEFAULT_HOURS;
+  try {
+    const parsed = JSON.parse(value) as Partial<HoursState>;
+    return {
+      monday: parsed.monday ?? DEFAULT_HOURS.monday,
+      tuesday: parsed.tuesday ?? DEFAULT_HOURS.tuesday,
+      wednesday: parsed.wednesday ?? DEFAULT_HOURS.wednesday,
+      thursday: parsed.thursday ?? DEFAULT_HOURS.thursday,
+      friday: parsed.friday ?? DEFAULT_HOURS.friday,
+      saturday: parsed.saturday ?? DEFAULT_HOURS.saturday,
+      sunday: parsed.sunday ?? DEFAULT_HOURS.sunday,
+    };
+  } catch {
+    return DEFAULT_HOURS;
   }
-
-  const [open, close] = value.split('-');
-  return {
-    isOpen: true,
-    open: open || '09:00',
-    close: close || '18:00',
-  };
 }
 
 function getPresetOptions(
@@ -870,16 +796,12 @@ function getPresetOptions(
   }
 ) {
   if (type === 'combo') {
-    const values = preset?.comboOptions?.length
-      ? preset.comboOptions
-      : ['Combo', 'Item only', 'Item + side'];
+    const values = preset?.comboOptions?.length ? preset.comboOptions : ['Combo', 'Item only', 'Item + side'];
     return values.map((name) => ({ name, price: '0' }));
   }
 
   if (type === 'protein') {
-    const values = preset?.proteinOptions?.length
-      ? preset.proteinOptions
-      : ['Chicken', 'Beef', 'Shrimp'];
+    const values = preset?.proteinOptions?.length ? preset.proteinOptions : ['Chicken', 'Beef', 'Shrimp'];
     return values.map((name) => ({ name, price: '0' }));
   }
 
@@ -892,16 +814,12 @@ function getPresetOptions(
   }
 
   if (type === 'drink') {
-    const values = preset?.drinkOptions?.length
-      ? preset.drinkOptions
-      : ['Coke', 'Sprite', 'Water'];
+    const values = preset?.drinkOptions?.length ? preset.drinkOptions : ['Coke', 'Sprite', 'Water'];
     return values.map((name) => ({ name, price: '0' }));
   }
 
   if (type === 'sides') {
-    const values = preset?.sideOptions?.length
-      ? preset.sideOptions
-      : ['Fries', 'Rice', 'Beans'];
+    const values = preset?.sideOptions?.length ? preset.sideOptions : ['Fries', 'Rice', 'Beans'];
     return values.map((name) => ({ name, price: '0' }));
   }
 
@@ -925,7 +843,9 @@ function getPresetOptions(
 }
 
 function normalizeAvailability(item: ItemRow): Availability {
-  if (item.availability === 'sold_out' || item.is_available === false) return 'sold_out';
+  if (item.availability === 'sold_out' || item.is_available === false || item.available === false) {
+    return 'sold_out';
+  }
   return 'available';
 }
 
@@ -1008,180 +928,171 @@ export default function BuilderPage() {
   }, [categories, selectedItemId]);
 
   const selectedItem = useMemo(() => {
-  for (const category of categories) {
-    const match = category.items.find((item) => item.id === selectedItemId);
-    if (match) return match;
-  }
-  return null;
-}, [categories, selectedItemId]);
+    for (const category of categories) {
+      const match = category.items.find((item) => item.id === selectedItemId);
+      if (match) return match;
+    }
+    return null;
+  }, [categories, selectedItemId]);
 
-const filteredPlaceholderImages = useMemo(() => {
-  return PLACEHOLDER_IMAGES.filter((image) => image.category === selectedPlaceholderCategory);
-}, [selectedPlaceholderCategory]);
+  const filteredPlaceholderImages = useMemo(() => {
+    return PLACEHOLDER_IMAGES.filter((image) => image.category === selectedPlaceholderCategory);
+  }, [selectedPlaceholderCategory]);
 
-const freeFlyerQrUrl = useMemo(() => {
-  const target =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}${previewLink || '/store/your-store'}`
-      : previewLink || '/store/your-store';
+  const freeFlyerQrUrl = useMemo(() => {
+    const target =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}${previewLink || '/store/your-store'}`
+        : previewLink || '/store/your-store';
 
-  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(target)}`;
-}, [previewLink]);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(target)}`;
+  }, [previewLink]);
 
-const customFlyerPreviewQrUrl = useMemo(() => {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-    'preview-only-menuflow-custom-flyer'
-  )}`;
-}, []);
+  const customFlyerPreviewQrUrl = useMemo(() => {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+      'preview-only-menuflow-custom-flyer'
+    )}`;
+  }, []);
 
-const flyerHoursText = useMemo(() => {
-  const openDays = DAY_ORDER.filter((day) => hours[day].isOpen);
-  if (!openDays.length) return 'Closed';
+  const flyerHoursText = useMemo(() => {
+    const openDays = DAY_ORDER.filter((day) => hours[day].isOpen);
+    if (!openDays.length) return 'Closed';
 
-  const lines = openDays.map((day) => {
-    const row = hours[day];
-    return `${COPY.en[day]} ${toDisplayTime(row.open)}-${toDisplayTime(row.close)}`;
-  });
+    const lines = openDays.map((day) => {
+      const row = hours[day];
+      return `${COPY.en[day]} ${toDisplayTime(row.open)}-${toDisplayTime(row.close)}`;
+    });
 
-  return lines.join(' • ');
-}, [hours]);
+    return lines.join(' • ');
+  }, [hours]);
 
-useEffect(() => {
-  const loadBuilder = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const loadBuilder = async () => {
+      try {
+        setLoading(true);
+        setError('');
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.push('/auth/login');
-        return;
-      }
+        if (userError) throw userError;
 
-      setOwnerId(user.id);
+        if (!user) {
+          router.push('/auth/login');
+          return;
+        }
 
-      const { data: restaurant, error: restaurantError } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('owner_id', user.id)
-        .maybeSingle<RestaurantRow>();
+        setOwnerId(user.id);
 
-      if (restaurantError) throw restaurantError;
-
-      if (restaurant) {
-        setRestaurantId(restaurant.id);
-        setName(restaurant.name || '');
-        setPhone(restaurant.phone || '');
-        setAddress(restaurant.address || '');
-        setHeroImage(restaurant.hero_image || '');
-        setLogoImage(restaurant.logo_image || '');
-        setTheme((restaurant.storefront_theme as ThemeMode) || 'light');
-        setStorefrontLanguage(
-          ((restaurant.storefront_language || 'en').toLowerCase() as LanguageMode) || 'en'
-        );
-        setOrderLanguage(((restaurant.order_language || 'EN').toLowerCase() as LanguageMode) || 'en');
-        setPickupEnabled(Boolean(restaurant.pickup_enabled ?? true));
-        setDeliveryEnabled(Boolean(restaurant.delivery_enabled ?? false));
-        setDeliveryFee(String(restaurant.delivery_fee ?? 0));
-        setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
-        setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
-        setPlan((restaurant.plan as BuilderPlan) || 'starter');
-        setStripeConnected(
-          Boolean(
-            restaurant.stripe_connected ||
-              (restaurant.stripe_account_id &&
-                restaurant.stripe_charges_enabled &&
-                restaurant.stripe_payouts_enabled)
-          )
-        );
-
-        setHours({
-          monday: parseHours(restaurant.hours_monday),
-          tuesday: parseHours(restaurant.hours_tuesday),
-          wednesday: parseHours(restaurant.hours_wednesday),
-          thursday: parseHours(restaurant.hours_thursday),
-          friday: parseHours(restaurant.hours_friday),
-          saturday: parseHours(restaurant.hours_saturday),
-          sunday: parseHours(restaurant.hours_sunday),
-        });
-
-        setFlyerBusinessName(restaurant.name || '');
-
-        const { data: categoryRows, error: categoryError } = await supabase
-          .from('menu_categories')
+        const { data: restaurant, error: restaurantError } = await supabase
+          .from('restaurants')
           .select('*')
-          .eq('restaurant_id', restaurant.id)
-          .order('sort_order', { ascending: true });
+          .eq('owner_id', user.id)
+          .maybeSingle<RestaurantRow>();
 
-        if (categoryError) throw categoryError;
+        if (restaurantError) throw restaurantError;
 
-        const { data: itemRows, error: itemError } = await supabase
-          .from('menu_items')
-          .select('*')
-          .eq('restaurant_id', restaurant.id)
-          .order('sort_order', { ascending: true });
+        if (restaurant) {
+          setRestaurantId(restaurant.id);
+          setName(restaurant.name || '');
+          setPhone(restaurant.phone || '');
+          setAddress(restaurant.address || '');
+          setHeroImage(restaurant.hero_image || restaurant.hero_url || '');
+          setLogoImage(restaurant.logo_image || restaurant.logo_url || '');
+          setTheme((restaurant.storefront_theme as ThemeMode) || 'light');
+          setStorefrontLanguage(((restaurant.storefront_language || 'en').toLowerCase() as LanguageMode) || 'en');
+          setOrderLanguage(((restaurant.order_language || 'EN').toLowerCase() as LanguageMode) || 'en');
+          setPickupEnabled(Boolean(restaurant.pickup_enabled ?? true));
+          setDeliveryEnabled(Boolean(restaurant.delivery_enabled ?? false));
+          setDeliveryFee(String(restaurant.delivery_fee ?? 0));
+          setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
+          setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
+          setPlan((restaurant.plan as BuilderPlan) || 'starter');
+          setStripeConnected(
+            Boolean(
+              restaurant.stripe_connected ||
+                (restaurant.stripe_account_id &&
+                  restaurant.stripe_charges_enabled &&
+                  restaurant.stripe_payouts_enabled)
+            )
+          );
+          setHours(parseHours(restaurant.hours));
+          setFlyerBusinessName(restaurant.name || '');
 
-        if (itemError) throw itemError;
-
-        const itemIds = safeArray(itemRows).map((item) => item.id);
-
-        let optionGroupRows: OptionGroupRow[] = [];
-        let optionChoiceRows: OptionChoiceRow[] = [];
-
-        if (itemIds.length) {
-          const { data: groups, error: groupsError } = await supabase
-            .from('menu_option_groups')
+          const { data: categoryRows, error: categoryError } = await supabase
+            .from('menu_categories')
             .select('*')
-            .in('item_id', itemIds)
+            .eq('restaurant_id', restaurant.id)
             .order('sort_order', { ascending: true });
 
-          if (groupsError) throw groupsError;
-          optionGroupRows = safeArray(groups);
+          if (categoryError) throw categoryError;
 
-          const groupIds = optionGroupRows.map((group) => group.id);
+          const { data: itemRows, error: itemError } = await supabase
+            .from('menu_items')
+            .select('*')
+            .eq('restaurant_id', restaurant.id)
+            .order('sort_order', { ascending: true });
 
-          if (groupIds.length) {
-            const { data: choices, error: choicesError } = await supabase
-              .from('menu_option_choices')
+          if (itemError) throw itemError;
+
+          const itemIds = safeArray(itemRows).map((item) => item.id);
+
+          let optionGroupRows: OptionGroupRow[] = [];
+          let optionChoiceRows: OptionChoiceRow[] = [];
+
+          if (itemIds.length) {
+            const { data: groups, error: groupsError } = await supabase
+              .from('menu_option_groups')
               .select('*')
-              .in('option_group_id', groupIds)
+              .in('item_id', itemIds)
               .order('sort_order', { ascending: true });
 
-            if (choicesError) throw choicesError;
-            optionChoiceRows = safeArray(choices);
+            if (groupsError) throw groupsError;
+            optionGroupRows = safeArray(groups);
+
+            const groupIds = optionGroupRows.map((group) => group.id);
+
+            if (groupIds.length) {
+              const { data: choices, error: choicesError } = await supabase
+                .from('menu_option_choices')
+                .select('*')
+                .in('option_group_id', groupIds)
+                .order('sort_order', { ascending: true });
+
+              if (choicesError) throw choicesError;
+              optionChoiceRows = safeArray(choices);
+            }
           }
-        }
 
-        const groupsByItem = new Map<string, BuilderOptionGroup[]>();
+          const groupsByItem = new Map<string, BuilderOptionGroup[]>();
 
-        for (const group of optionGroupRows) {
-          const options: BuilderOptionChoice[] = optionChoiceRows
-            .filter((choice) => choice.option_group_id === group.id)
-            .map((choice) => ({
-              id: choice.id,
-              name: choice.name || '',
-              price: String(choice.price_delta ?? choice.price ?? 0),
-            }));
+          for (const group of optionGroupRows) {
+            const options = optionChoiceRows
+              .filter((choice) => choice.option_group_id === group.id)
+              .map((choice) => ({
+                id: choice.id,
+                name: choice.name || '',
+                price: String(choice.price_delta ?? choice.price ?? 0),
+              }));
 
-          const normalizedGroup: BuilderOptionGroup = {
-            id: group.id,
-            name: group.name || '',
-            required: Boolean(group.is_required),
-            selection: normalizeSelectionMode(group),
-            presetType: 'custom',
-            options,
-          };
+            const normalizedGroup: BuilderOptionGroup = {
+              id: group.id,
+              name: group.name || '',
+              required: Boolean(group.is_required),
+              selection: normalizeSelectionMode(group),
+              presetType: 'custom',
+              options,
+            };
 
-          const itemKey = group.item_id || '';
-          const existing = groupsByItem.get(itemKey) || [];
-          existing.push(normalizedGroup);
-          groupsByItem.set(itemKey, existing);
-        }
+            const key = group.item_id || '';
+            const existing = groupsByItem.get(key) || [];
+            existing.push(normalizedGroup);
+            groupsByItem.set(key, existing);
+          }
 
-        const normalizedCategories: BuilderCategory[] = safeArray(categoryRows).map(
-          (category, categoryIndex) => ({
+          const normalizedCategories: BuilderCategory[] = safeArray(categoryRows).map((category, categoryIndex) => ({
             id: category.id,
             name: category.name || '',
             sort_order: category.sort_order ?? categoryIndex,
@@ -1193,758 +1104,768 @@ useEffect(() => {
                 name: item.name || '',
                 base_price: String(item.base_price ?? item.price ?? 0),
                 description: item.description || '',
-                image_url: item.image_url || '',
+                image_url: item.image_url || item.image || '',
                 availability: normalizeAvailability(item),
                 option_groups: groupsByItem.get(item.id) || [],
               })),
-          })
-        );
+          }));
 
-        setCategories(normalizedCategories);
-        setSelectedItemId(normalizedCategories[0]?.items[0]?.id || null);
+          setCategories(normalizedCategories);
+          setSelectedItemId(normalizedCategories[0]?.items[0]?.id || null);
 
-        const placeholderCount = normalizedCategories
-          .flatMap((category) => category.items)
-          .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
+          const placeholderCount = normalizedCategories
+            .flatMap((category) => category.items)
+            .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
 
-        setPlaceholderUsedCount(placeholderCount);
-      } else {
-        const categoryId = uid('cat');
-        const itemId = uid('item');
+          setPlaceholderUsedCount(placeholderCount);
+        } else {
+          const categoryId = makeId();
+          const itemId = makeId();
 
-        setCategories([
-          {
-            id: categoryId,
-            name: 'Featured',
-            sort_order: 0,
-            items: [
-              {
-                id: itemId,
-                category_id: categoryId,
-                name: '',
-                base_price: '12',
-                description: '',
-                image_url: '',
-                availability: 'available',
-                option_groups: [],
-              },
-            ],
-          },
-        ]);
-        setSelectedItemId(itemId);
+          setCategories([
+            {
+              id: categoryId,
+              name: 'Featured',
+              sort_order: 0,
+              items: [
+                {
+                  id: itemId,
+                  category_id: categoryId,
+                  name: '',
+                  base_price: '12',
+                  description: '',
+                  image_url: '',
+                  availability: 'available',
+                  option_groups: [],
+                },
+              ],
+            },
+          ]);
+          setSelectedItemId(itemId);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : copy.couldNotSave;
+        setError(message);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    void loadBuilder();
+  }, [router, copy.couldNotSave]);
+
+  function updateHours(day: HoursDayKey, patch: Partial<HoursRow>) {
+    setHours((current) => ({
+      ...current,
+      [day]: {
+        ...current[day],
+        ...patch,
+      },
+    }));
+  }
+
+  function toggleSection(section: SectionKey) {
+    setExpanded((current) => (current === section ? null : section));
+  }
+
+  function updateCategory(categoryId: string, nextName: string) {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId ? { ...category, name: nextName } : category
+      )
+    );
+  }
+
+  function addCategory() {
+    const categoryId = makeId();
+    const itemId = makeId();
+
+    setCategories((current) => [
+      ...current,
+      {
+        id: categoryId,
+        name: `${copy.menu} ${current.length + 1}`,
+        sort_order: current.length,
+        items: [
+          {
+            id: itemId,
+            category_id: categoryId,
+            name: '',
+            base_price: '0',
+            description: '',
+            image_url: '',
+            availability: 'available',
+            option_groups: [],
+          },
+        ],
+      },
+    ]);
+
+    setSelectedItemId(itemId);
+    setExpanded('menu');
+  }
+
+  function addItem(categoryId: string) {
+    const newItemId = makeId();
+
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: [
+                ...category.items,
+                {
+                  id: newItemId,
+                  category_id: categoryId,
+                  name: '',
+                  base_price: '0',
+                  description: '',
+                  image_url: '',
+                  availability: 'available',
+                  option_groups: [],
+                },
+              ],
+            }
+          : category
+      )
+    );
+
+    setSelectedItemId(newItemId);
+    setExpanded('item');
+  }
+
+  function selectItem(itemId: string) {
+    setSelectedItemId(itemId);
+    setExpanded('item');
+  }
+
+  function updateItem(itemId: string, patch: Partial<BuilderItem>) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+      }))
+    );
+  }
+
+  function deleteItem(categoryId: string, itemId: string) {
+    setCategories((current) =>
+      current.map((category) =>
+        category.id === categoryId
+          ? { ...category, items: category.items.filter((item) => item.id !== itemId) }
+          : category
+      )
+    );
+
+    setSelectedItemId((current) => (current === itemId ? null : current));
+  }
+
+  function addOptionGroup(itemId: string, presetType: BuilderOptionGroup['presetType']) {
+    const groupId = makeId();
+    const preset = CATEGORY_PRESETS[selectedPlaceholderCategory];
+
+    const nextGroup: BuilderOptionGroup = {
+      id: groupId,
+      name:
+        presetType === 'custom'
+          ? copy.optionGroups
+          : presetType === 'combo'
+            ? copy.combo
+            : presetType === 'protein'
+              ? copy.protein
+              : presetType === 'size'
+                ? copy.size
+                : presetType === 'drink'
+                  ? copy.drink
+                  : presetType === 'sides'
+                    ? copy.sides
+                    : presetType === 'extras'
+                      ? copy.extras
+                      : copy.removals,
+      required: presetType === 'combo',
+      selection: presetType === 'extras' || presetType === 'removals' ? 'multiple' : 'single',
+      presetType,
+      options: getPresetOptions(presetType, preset).map((option) => ({
+        id: makeId(),
+        name: option.name,
+        price: option.price,
+      })),
+    };
+
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? { ...item, option_groups: [...item.option_groups, nextGroup] }
+            : item
+        ),
+      }))
+    );
+
+    setExpanded('options');
+  }
+
+  function updateOptionGroup(itemId: string, groupId: string, patch: Partial<BuilderOptionGroup>) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId ? { ...group, ...patch } : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function deleteOptionGroup(itemId: string, groupId: string) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.filter((group) => group.id !== groupId),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function addOptionChoice(itemId: string, groupId: string) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? {
+                        ...group,
+                        options: [
+                          ...group.options,
+                          { id: makeId(), name: copy.newChoice, price: '0' },
+                        ],
+                      }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function updateOptionChoice(
+    itemId: string,
+    groupId: string,
+    optionId: string,
+    patch: Partial<BuilderOptionChoice>
+  ) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? {
+                        ...group,
+                        options: group.options.map((option) =>
+                          option.id === optionId ? { ...option, ...patch } : option
+                        ),
+                      }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function deleteOptionChoice(itemId: string, groupId: string, optionId: string) {
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                option_groups: item.option_groups.map((group) =>
+                  group.id === groupId
+                    ? {
+                        ...group,
+                        options: group.options.filter((option) => option.id !== optionId),
+                      }
+                    : group
+                ),
+              }
+            : item
+        ),
+      }))
+    );
+  }
+
+  function countPlaceholderUsage(nextCategories: BuilderCategory[]) {
+    return nextCategories
+      .flatMap((category) => category.items)
+      .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
+  }
+
+  function applyPlaceholderToSelectedItem(url: string) {
+    if (!selectedItemId) return;
+
+    setCategories((current) => {
+      const next = current.map((category) => ({
+        ...category,
+        items: category.items.map((item) =>
+          item.id === selectedItemId ? { ...item, image_url: url } : item
+        ),
+      }));
+
+      const usage = countPlaceholderUsage(next);
+      const limit = getPlaceholderLimit(plan);
+
+      if (usage > limit) {
+        setError(copy.starterLimitReached);
+        return current;
+      }
+
+      setPlaceholderUsedCount(usage);
+      setError('');
+      return next;
+    });
+  }
+
+  function applyCategoryPreset(categoryType: PlaceholderCategory) {
+    setSelectedPlaceholderCategory(categoryType);
+
+    if (!selectedItemId) return;
+
+    const preset = CATEGORY_PRESETS[categoryType];
+    const firstImage = PLACEHOLDER_IMAGES.find((item) => item.category === categoryType);
+
+    setCategories((current) =>
+      current.map((category) => ({
+        ...category,
+        items: category.items.map((item) => {
+          if (item.id !== selectedItemId) return item;
+
+          const comboGroup: BuilderOptionGroup = {
+            id: makeId(),
+            name: copy.combo,
+            required: true,
+            selection: 'single',
+            presetType: 'combo',
+            options: getPresetOptions('combo', preset).map((option) => ({
+              id: makeId(),
+              name: option.name,
+              price: option.price,
+            })),
+          };
+
+          const drinkGroup: BuilderOptionGroup = {
+            id: makeId(),
+            name: copy.drink,
+            required: false,
+            selection: 'single',
+            presetType: 'drink',
+            options: getPresetOptions('drink', preset).map((option) => ({
+              id: makeId(),
+              name: option.name,
+              price: option.price,
+            })),
+          };
+
+          const sideGroup: BuilderOptionGroup = {
+            id: makeId(),
+            name: copy.sides,
+            required: false,
+            selection: 'single',
+            presetType: 'sides',
+            options: getPresetOptions('sides', preset).map((option) => ({
+              id: makeId(),
+              name: option.name,
+              price: option.price,
+            })),
+          };
+
+          const proteinGroup: BuilderOptionGroup | null = preset.proteinOptions?.length
+            ? {
+                id: makeId(),
+                name: copy.protein,
+                required: false,
+                selection: 'single',
+                presetType: 'protein',
+                options: getPresetOptions('protein', preset).map((option) => ({
+                  id: makeId(),
+                  name: option.name,
+                  price: option.price,
+                })),
+              }
+            : null;
+
+          return {
+            ...item,
+            name: preset.itemNames[0] || item.name,
+            description: `${preset.itemNames[0] || item.name} ${copy.itemNameFallback}`,
+            image_url: firstImage?.url || item.image_url,
+            option_groups: [comboGroup, ...(proteinGroup ? [proteinGroup] : []), sideGroup, drinkGroup],
+          };
+        }),
+      }))
+    );
+
+    setExpanded('item');
+  }
+
+  async function uploadImageToSupabase(file: File, bucket: 'heroes' | 'logos' | 'menu-images', folder: string) {
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    return data.publicUrl;
+  }
+
+  async function handleHeroUpload(file: File | null) {
+    if (!file) return;
+    try {
+      setUploadingHero(true);
+      setError('');
+      const publicUrl = await uploadImageToSupabase(file, 'heroes', 'hero');
+      setHeroImage(publicUrl);
     } catch (err) {
       const message = err instanceof Error ? err.message : copy.couldNotSave;
       setError(message);
     } finally {
-      setLoading(false);
+      setUploadingHero(false);
     }
-  };
+  }
 
-  void loadBuilder();
-}, [router, copy.couldNotSave]);
+  async function handleLogoUpload(file: File | null) {
+    if (!file) return;
+    try {
+      setUploadingLogo(true);
+      setError('');
+      const publicUrl = await uploadImageToSupabase(file, 'logos', 'logo');
+      setLogoImage(publicUrl);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : copy.couldNotSave;
+      setError(message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
-function updateHours(day: HoursDayKey, patch: Partial<HoursRow>) {
-  setHours((current) => ({
-    ...current,
-    [day]: {
-      ...current[day],
-      ...patch,
-    },
-  }));
-}
+  async function handleItemImageUpload(itemId: string, file: File | null) {
+    if (!file) return;
+    try {
+      setUploadingItemId(itemId);
+      setError('');
+      const publicUrl = await uploadImageToSupabase(file, 'menu-images', 'items');
+      updateItem(itemId, { image_url: publicUrl });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : copy.couldNotSave;
+      setError(message);
+    } finally {
+      setUploadingItemId(null);
+    }
+  }
 
-function toggleSection(section: SectionKey) {
-  setExpanded((current) => (current === section ? null : section));
-}
+  function removeHeroImage() {
+    setHeroImage('');
+  }
 
-function updateCategory(categoryId: string, nextName: string) {
-  setCategories((current) =>
-    current.map((category) =>
-      category.id === categoryId ? { ...category, name: nextName } : category
-    )
-  );
-}
+  function removeLogoImage() {
+    setLogoImage('');
+  }
 
-function addCategory() {
-  const categoryId = uid('cat');
-  const itemId = uid('item');
+  function removeItemImage(itemId: string) {
+    updateItem(itemId, { image_url: '' });
 
-  setCategories((current) => [
-    ...current,
-    {
-      id: categoryId,
-      name: `${copy.menu} ${current.length + 1}`,
-      sort_order: current.length,
-      items: [
-        {
-          id: itemId,
-          category_id: categoryId,
-          name: '',
-          base_price: '0',
-          description: '',
-          image_url: '',
-          availability: 'available',
-          option_groups: [],
-        },
-      ],
-    },
-  ]);
-
-  setSelectedItemId(itemId);
-  setExpanded('menu');
-}
-
-function addItem(categoryId: string) {
-  const newItemId = uid('item');
-
-  setCategories((current) =>
-    current.map((category) =>
-      category.id === categoryId
-        ? {
-            ...category,
-            items: [
-              ...category.items,
-              {
-                id: newItemId,
-                category_id: categoryId,
-                name: '',
-                base_price: '0',
-                description: '',
-                image_url: '',
-                availability: 'available',
-                option_groups: [],
-              },
-            ],
-          }
-        : category
-    )
-  );
-
-  setSelectedItemId(newItemId);
-  setExpanded('item');
-}
-
-function selectItem(itemId: string) {
-  setSelectedItemId(itemId);
-  setExpanded('item');
-}
-
-function updateItem(itemId: string, patch: Partial<BuilderItem>) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-    }))
-  );
-}
-
-function deleteItem(categoryId: string, itemId: string) {
-  setCategories((current) =>
-    current.map((category) =>
-      category.id === categoryId
-        ? { ...category, items: category.items.filter((item) => item.id !== itemId) }
-        : category
-    )
-  );
-
-  setSelectedItemId((current) => (current === itemId ? null : current));
-}
-
-function addOptionGroup(itemId: string, presetType: BuilderOptionGroup['presetType']) {
-  const groupId = uid('group');
-  const preset = CATEGORY_PRESETS[selectedPlaceholderCategory];
-
-  const nextGroup: BuilderOptionGroup = {
-    id: groupId,
-    name:
-      presetType === 'custom'
-        ? copy.optionGroups
-        : presetType === 'combo'
-          ? copy.combo
-          : presetType === 'protein'
-            ? copy.protein
-            : presetType === 'size'
-              ? copy.size
-              : presetType === 'drink'
-                ? copy.drink
-                : presetType === 'sides'
-                  ? copy.sides
-                  : presetType === 'extras'
-                    ? copy.extras
-                    : copy.removals,
-    required: presetType === 'combo',
-    selection: presetType === 'extras' || presetType === 'removals' ? 'multiple' : 'single',
-    presetType,
-    options: getPresetOptions(presetType, preset ?? undefined).map((option) => ({
-      id: uid('choice'),
-      name: option.name,
-      price: option.price,
-    })),
-  };
-
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId ? { ...item, option_groups: [...item.option_groups, nextGroup] } : item
-      ),
-    }))
-  );
-
-  setExpanded('options');
-}
-
-function updateOptionGroup(itemId: string, groupId: string, patch: Partial<BuilderOptionGroup>) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              option_groups: item.option_groups.map((group) =>
-                group.id === groupId ? { ...group, ...patch } : group
-              ),
-            }
-          : item
-      ),
-    }))
-  );
-}
-
-function deleteOptionGroup(itemId: string, groupId: string) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              option_groups: item.option_groups.filter((group) => group.id !== groupId),
-            }
-          : item
-      ),
-    }))
-  );
-}
-
-function addOptionChoice(itemId: string, groupId: string) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              option_groups: item.option_groups.map((group) =>
-                group.id === groupId
-                  ? {
-                      ...group,
-                      options: [
-                        ...group.options,
-                        { id: uid('choice'), name: copy.newChoice, price: '0' },
-                      ],
-                    }
-                  : group
-              ),
-            }
-          : item
-      ),
-    }))
-  );
-}
-
-function updateOptionChoice(
-  itemId: string,
-  groupId: string,
-  optionId: string,
-  patch: Partial<BuilderOptionChoice>
-) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              option_groups: item.option_groups.map((group) =>
-                group.id === groupId
-                  ? {
-                      ...group,
-                      options: group.options.map((option) =>
-                        option.id === optionId ? { ...option, ...patch } : option
-                      ),
-                    }
-                  : group
-              ),
-            }
-          : item
-      ),
-    }))
-  );
-}
-
-function deleteOptionChoice(itemId: string, groupId: string, optionId: string) {
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              option_groups: item.option_groups.map((group) =>
-                group.id === groupId
-                  ? {
-                      ...group,
-                      options: group.options.filter((option) => option.id !== optionId),
-                    }
-                  : group
-              ),
-            }
-          : item
-      ),
-    }))
-  );
-}
-
-function countPlaceholderUsage(nextCategories: BuilderCategory[]) {
-  return nextCategories
-    .flatMap((category) => category.items)
-    .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
-}
-
-function applyPlaceholderToSelectedItem(url: string) {
-  if (!selectedItemId) return;
-
-  setCategories((current) => {
-    const next = current.map((category) => ({
-      ...category,
-      items: category.items.map((item) =>
-        item.id === selectedItemId ? { ...item, image_url: url } : item
-      ),
-    }));
-
-    const usage = countPlaceholderUsage(next);
-    const limit = getPlaceholderLimit(plan);
-
-    if (usage > limit) {
-      setError(copy.starterLimitReached);
+    setCategories((current) => {
+      const usage = countPlaceholderUsage(current);
+      setPlaceholderUsedCount(usage);
       return current;
+    });
+  }
+
+  async function handleSave() {
+    try {
+      if (!ownerId) {
+        setError('User not authenticated.');
+        return;
+      }
+
+      setSaving(true);
+      setError('');
+      setSuccess('');
+
+      const generatedSlug = slugifyValue(name);
+
+      const restaurantPayload = {
+        owner_id: ownerId,
+        name: name.trim() || null,
+        slug: generatedSlug || null,
+        phone: phone.trim() || null,
+        address: address.trim() || null,
+        hero_image: heroImage.trim() || null,
+        hero_url: heroImage.trim() || null,
+        logo_image: logoImage.trim() || null,
+        logo_url: logoImage.trim() || null,
+        storefront_theme: theme,
+        storefront_language: storefrontLanguage,
+        order_language: orderLanguage === 'es' ? 'ES' : 'EN',
+        pickup_enabled: pickupEnabled,
+        delivery_enabled: deliveryEnabled,
+        delivery_fee: Number(deliveryFee || 0),
+        delivery_radius: Number(deliveryRadius || 0),
+        delivery_minimum: Number(deliveryMinimum || 0),
+        plan,
+        stripe_connected: stripeConnected,
+        hours: serializeHours(hours),
+      };
+
+      let currentRestaurantId = restaurantId;
+
+      if (restaurantId) {
+        const { error: updateError } = await supabase
+          .from('restaurants')
+          .update(restaurantPayload)
+          .eq('id', restaurantId);
+
+        if (updateError) throw updateError;
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('restaurants')
+          .insert(restaurantPayload)
+          .select('id')
+          .single();
+
+        if (insertError) throw insertError;
+        currentRestaurantId = inserted.id;
+        setRestaurantId(inserted.id);
+      }
+
+      if (!currentRestaurantId) throw new Error('Missing restaurant id.');
+
+      const { data: existingCategories, error: existingCategoriesError } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingCategoriesError) throw existingCategoriesError;
+
+      const { data: existingItems, error: existingItemsError } = await supabase
+        .from('menu_items')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+
+      if (existingItemsError) throw existingItemsError;
+
+      const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
+      const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
+
+      if (existingItemIds.length) {
+        const { data: existingGroups, error: existingGroupsError } = await supabase
+          .from('menu_option_groups')
+          .select('id')
+          .in('item_id', existingItemIds);
+
+        if (existingGroupsError) throw existingGroupsError;
+
+        const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
+
+        if (existingGroupIds.length) {
+          const { error: deleteChoicesError } = await supabase
+            .from('menu_option_choices')
+            .delete()
+            .in('option_group_id', existingGroupIds);
+
+          if (deleteChoicesError) throw deleteChoicesError;
+        }
+
+        const { error: deleteGroupsError } = await supabase
+          .from('menu_option_groups')
+          .delete()
+          .in('item_id', existingItemIds);
+
+        if (deleteGroupsError) throw deleteGroupsError;
+
+        const { error: deleteItemsError } = await supabase
+          .from('menu_items')
+          .delete()
+          .in('id', existingItemIds);
+
+        if (deleteItemsError) throw deleteItemsError;
+      }
+
+      if (existingCategoryIds.length) {
+        const { error: deleteCategoriesError } = await supabase
+          .from('menu_categories')
+          .delete()
+          .in('id', existingCategoryIds);
+
+        if (deleteCategoriesError) throw deleteCategoriesError;
+      }
+
+      const allCategories = categories.map((category, categoryIndex) => ({
+        id: category.id || makeId(),
+        restaurant_id: currentRestaurantId,
+        name: category.name.trim() || `${copy.menu} ${categoryIndex + 1}`,
+        sort_order: categoryIndex,
+      }));
+
+      if (allCategories.length) {
+        const { error: categoryInsertError } = await supabase
+          .from('menu_categories')
+          .insert(allCategories);
+
+        if (categoryInsertError) throw categoryInsertError;
+      }
+
+      const allItems = categories.flatMap((category, categoryIndex) =>
+        category.items.map((item, itemIndex) => ({
+          id: item.id || makeId(),
+          restaurant_id: currentRestaurantId,
+          category_id: category.id,
+          name: item.name.trim() || copy.itemNameFallback,
+          base_price: Number(item.base_price || 0),
+          price: Number(item.base_price || 0),
+          description: item.description.trim() || null,
+          image_url: item.image_url || null,
+          image: item.image_url || null,
+          availability: item.availability,
+          available: item.availability === 'available',
+          is_available: item.availability === 'available',
+          sort_order: itemIndex + categoryIndex * 100,
+          position: itemIndex + categoryIndex * 100,
+        }))
+      );
+
+      if (allItems.length) {
+        const { error: itemInsertError } = await supabase
+          .from('menu_items')
+          .insert(allItems);
+
+        if (itemInsertError) throw itemInsertError;
+      }
+
+      const allOptionGroups = categories.flatMap((category) =>
+        category.items.flatMap((item) =>
+          item.option_groups.map((group, groupIndex) => ({
+            id: group.id || makeId(),
+            item_id: item.id,
+            name: group.name.trim() || copy.optionGroups,
+            is_required: group.required,
+            is_multiple: group.selection === 'multiple',
+            selection_mode: group.selection,
+            sort_order: groupIndex,
+          }))
+        )
+      );
+
+      if (allOptionGroups.length) {
+        const { error: groupInsertError } = await supabase
+          .from('menu_option_groups')
+          .insert(allOptionGroups);
+
+        if (groupInsertError) throw groupInsertError;
+      }
+
+      const allChoices = categories.flatMap((category) =>
+        category.items.flatMap((item) =>
+          item.option_groups.flatMap((group) =>
+            group.options.map((option, optionIndex) => ({
+              id: option.id || makeId(),
+              option_group_id: group.id,
+              name: option.name.trim() || copy.newChoice,
+              price: Number(option.price || 0),
+              price_delta: Number(option.price || 0),
+              sort_order: optionIndex,
+            }))
+          )
+        )
+      );
+
+      if (allChoices.length) {
+        const { error: choiceInsertError } = await supabase
+          .from('menu_option_choices')
+          .insert(allChoices);
+
+        if (choiceInsertError) throw choiceInsertError;
+      }
+
+      setSuccess(copy.builderSaved);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : copy.couldNotSave;
+      setError(message || copy.couldNotSave);
+    } finally {
+      setSaving(false);
     }
-
-    setPlaceholderUsedCount(usage);
-    setError('');
-    return next;
-  });
-}
-
-function applyCategoryPreset(categoryType: PlaceholderCategory) {
-  setSelectedPlaceholderCategory(categoryType);
-
-  if (!selectedItemId) return;
-
-  const preset = CATEGORY_PRESETS[categoryType];
-  const firstImage = PLACEHOLDER_IMAGES.find((item) => item.category === categoryType);
-
-  setCategories((current) =>
-    current.map((category) => ({
-      ...category,
-      items: category.items.map((item) => {
-        if (item.id !== selectedItemId) return item;
-
-        const comboGroup: BuilderOptionGroup = {
-          id: uid('group'),
-          name: copy.combo,
-          required: true,
-          selection: 'single',
-          presetType: 'combo',
-          options: getPresetOptions('combo', preset ?? undefined).map((option) => ({
-            id: uid('choice'),
-            name: option.name,
-            price: option.price,
-          })),
-        };
-
-        const drinkGroup: BuilderOptionGroup = {
-          id: uid('group'),
-          name: copy.drink,
-          required: false,
-          selection: 'single',
-          presetType: 'drink',
-          options: getPresetOptions('drink', preset ?? undefined).map((option) => ({
-            id: uid('choice'),
-            name: option.name,
-            price: option.price,
-          })),
-        };
-
-        const sideGroup: BuilderOptionGroup = {
-          id: uid('group'),
-          name: copy.sides,
-          required: false,
-          selection: 'single',
-          presetType: 'sides',
-          options: getPresetOptions('sides', preset ?? undefined).map((option) => ({
-            id: uid('choice'),
-            name: option.name,
-            price: option.price,
-          })),
-        };
-
-        const proteinGroup: BuilderOptionGroup | null = preset.proteinOptions?.length
-          ? {
-              id: uid('group'),
-              name: copy.protein,
-              required: false,
-              selection: 'single',
-              presetType: 'protein',
-              options: getPresetOptions('protein', preset ?? undefined).map((option) => ({
-                id: uid('choice'),
-                name: option.name,
-                price: option.price,
-              })),
-            }
-          : null;
-
-        return {
-          ...item,
-          name: preset.itemNames[0] || item.name,
-          description: `${preset.itemNames[0] || item.name} ${copy.itemNameFallback}`,
-          image_url: firstImage?.url || item.image_url,
-          option_groups: [comboGroup, ...(proteinGroup ? [proteinGroup] : []), sideGroup, drinkGroup],
-        };
-      }),
-    }))
-  );
-
-  setExpanded('item');
-}
-
-async function uploadImageToSupabase(file: File, folder: string) {
-  const fileExt = file.name.split('.').pop() || 'jpg';
-  const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from('restaurant-images')
-    .upload(fileName, file, { upsert: true });
-
-  if (uploadError) throw uploadError;
-
-  const { data } = supabase.storage.from('restaurant-images').getPublicUrl(fileName);
-  return data.publicUrl;
-}
-
-async function handleHeroUpload(file: File | null) {
-  if (!file) return;
-  try {
-    setUploadingHero(true);
-    setError('');
-    const publicUrl = await uploadImageToSupabase(file, 'hero');
-    setHeroImage(publicUrl);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : copy.couldNotSave;
-    setError(message);
-  } finally {
-    setUploadingHero(false);
   }
-}
 
-async function handleLogoUpload(file: File | null) {
-  if (!file) return;
-  try {
-    setUploadingLogo(true);
-    setError('');
-    const publicUrl = await uploadImageToSupabase(file, 'logo');
-    setLogoImage(publicUrl);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : copy.couldNotSave;
-    setError(message);
-  } finally {
-    setUploadingLogo(false);
-  }
-}
-
-async function handleItemImageUpload(itemId: string, file: File | null) {
-  if (!file) return;
-  try {
-    setUploadingItemId(itemId);
-    setError('');
-    const publicUrl = await uploadImageToSupabase(file, 'items');
-    updateItem(itemId, { image_url: publicUrl });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : copy.couldNotSave;
-    setError(message);
-  } finally {
-    setUploadingItemId(null);
-  }
-}
-
-function removeHeroImage() {
-  setHeroImage('');
-}
-
-function removeLogoImage() {
-  setLogoImage('');
-}
-
-function removeItemImage(itemId: string) {
-  updateItem(itemId, { image_url: '' });
-
-  setCategories((current) => {
-    const usage = countPlaceholderUsage(current);
-    setPlaceholderUsedCount(usage);
-    return current;
-  });
-}
-
-async function handleSave() {
-  try {
-    if (!ownerId) {
-      setError('User not authenticated.');
+  async function handleGoLive() {
+    if (!stripeConnected) {
+      setError(copy.stripeNeeded);
       return;
     }
 
-    setSaving(true);
-    setError('');
-    setSuccess('');
-
-    const generatedSlug = slugifyValue(name);
-
-    const restaurantPayload = {
-      owner_id: ownerId,
-      name: name.trim() || null,
-      slug: generatedSlug || null,
-      phone: phone.trim() || null,
-      address: address.trim() || null,
-      hero_image: heroImage.trim() || null,
-      logo_image: logoImage.trim() || null,
-      storefront_theme: theme,
-      storefront_language: storefrontLanguage,
-      order_language: orderLanguage === 'es' ? 'ES' : 'EN',
-      pickup_enabled: pickupEnabled,
-      delivery_enabled: deliveryEnabled,
-      delivery_fee: Number(deliveryFee || 0),
-      delivery_radius: Number(deliveryRadius || 0),
-      delivery_minimum: Number(deliveryMinimum || 0),
-      plan,
-      stripe_connected: stripeConnected,
-      hours_monday: serializeHours(hours.monday),
-      hours_tuesday: serializeHours(hours.tuesday),
-      hours_wednesday: serializeHours(hours.wednesday),
-      hours_thursday: serializeHours(hours.thursday),
-      hours_friday: serializeHours(hours.friday),
-      hours_saturday: serializeHours(hours.saturday),
-      hours_sunday: serializeHours(hours.sunday),
-    };
-
-    let currentRestaurantId = restaurantId;
-
-    if (restaurantId) {
-      const { error: updateError } = await supabase
-        .from('restaurants')
-        .update(restaurantPayload)
-        .eq('id', restaurantId);
-
-      if (updateError) throw updateError;
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('restaurants')
-        .insert(restaurantPayload)
-        .select('id')
-        .single();
-
-      if (insertError) throw insertError;
-      currentRestaurantId = inserted.id;
-      setRestaurantId(inserted.id);
-    }
-
-    if (!currentRestaurantId) {
-      throw new Error('Missing restaurant id.');
-    }
-
-    const { data: existingCategories, error: existingCategoriesError } = await supabase
-      .from('menu_categories')
-      .select('id')
-      .eq('restaurant_id', currentRestaurantId);
-
-    if (existingCategoriesError) throw existingCategoriesError;
-
-    const { data: existingItems, error: existingItemsError } = await supabase
-      .from('menu_items')
-      .select('id')
-      .eq('restaurant_id', currentRestaurantId);
-
-    if (existingItemsError) throw existingItemsError;
-
-    const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
-    const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
-
-    if (existingItemIds.length) {
-      const { data: existingGroups, error: existingGroupsError } = await supabase
-        .from('menu_option_groups')
-        .select('id')
-        .in('item_id', existingItemIds);
-
-      if (existingGroupsError) throw existingGroupsError;
-
-      const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
-
-      if (existingGroupIds.length) {
-        const { error: deleteChoicesError } = await supabase
-          .from('menu_option_choices')
-          .delete()
-          .in('option_group_id', existingGroupIds);
-
-        if (deleteChoicesError) throw deleteChoicesError;
-      }
-
-      const { error: deleteGroupsError } = await supabase
-        .from('menu_option_groups')
-        .delete()
-        .in('item_id', existingItemIds);
-
-      if (deleteGroupsError) throw deleteGroupsError;
-
-      const { error: deleteItemsError } = await supabase
-        .from('menu_items')
-        .delete()
-        .in('id', existingItemIds);
-
-      if (deleteItemsError) throw deleteItemsError;
-    }
-
-    if (existingCategoryIds.length) {
-      const { error: deleteCategoriesError } = await supabase
-        .from('menu_categories')
-        .delete()
-        .in('id', existingCategoryIds);
-
-      if (deleteCategoriesError) throw deleteCategoriesError;
-    }
-
-    const allCategories = categories.map((category, categoryIndex) => ({
-      id: category.id,
-      restaurant_id: currentRestaurantId,
-      name: category.name.trim() || `${copy.menu} ${categoryIndex + 1}`,
-      sort_order: categoryIndex,
-    }));
-
-    if (allCategories.length) {
-      const { error: categoryInsertError } = await supabase.from('menu_categories').insert(allCategories);
-      if (categoryInsertError) throw categoryInsertError;
-    }
-
-    const allItems = categories.flatMap((category, categoryIndex) =>
-      category.items.map((item, itemIndex) => ({
-        id: item.id,
-        restaurant_id: currentRestaurantId,
-        category_id: category.id,
-        name: item.name.trim() || copy.itemNameFallback,
-        base_price: Number(item.base_price || 0),
-        price: Number(item.base_price || 0),
-        description: item.description.trim() || null,
-        image_url: item.image_url || null,
-        availability: item.availability,
-        is_available: item.availability === 'available',
-        sort_order: itemIndex + categoryIndex * 100,
-      }))
-    );
-
-    if (allItems.length) {
-      const { error: itemInsertError } = await supabase.from('menu_items').insert(allItems);
-      if (itemInsertError) throw itemInsertError;
-    }
-
-    const allOptionGroups = categories.flatMap((category) =>
-      category.items.flatMap((item) =>
-        item.option_groups.map((group, groupIndex) => ({
-          id: group.id,
-          item_id: item.id,
-          name: group.name.trim() || copy.optionGroups,
-          is_required: group.required,
-          is_multiple: group.selection === 'multiple',
-          selection_mode: group.selection,
-          sort_order: groupIndex,
-        }))
-      )
-    );
-
-    if (allOptionGroups.length) {
-      const { error: groupInsertError } = await supabase.from('menu_option_groups').insert(allOptionGroups);
-      if (groupInsertError) throw groupInsertError;
-    }
-
-    const allChoices = categories.flatMap((category) =>
-      category.items.flatMap((item) =>
-        item.option_groups.flatMap((group) =>
-          group.options.map((option, optionIndex) => ({
-            id: option.id,
-            option_group_id: group.id,
-            name: option.name.trim() || copy.newChoice,
-            price: Number(option.price || 0),
-            price_delta: Number(option.price || 0),
-            sort_order: optionIndex,
-          }))
-        )
-      )
-    );
-
-    if (allChoices.length) {
-      const { error: choiceInsertError } = await supabase.from('menu_option_choices').insert(allChoices);
-      if (choiceInsertError) throw choiceInsertError;
-    }
-
-    setSuccess(copy.builderSaved);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : copy.couldNotSave;
-    setError(message || copy.couldNotSave);
-  } finally {
-    setSaving(false);
-  }
-}
-
-async function handleGoLive() {
-  if (!stripeConnected) {
-    setError(copy.stripeNeeded);
-    return;
+    await handleSave();
+    setSuccess(copy.goLiveReady);
   }
 
-  await handleSave();
-  setSuccess(copy.goLiveReady);
-}
-
-function SectionCard({
-  section,
-  icon,
-  title,
-  right,
-  summary,
-}: {
-  section: SectionKey;
-  icon: ReactNode;
-  title: string;
-  right?: ReactNode;
-  summary?: ReactNode;
-}) {
-  return (
-    <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
-      <div className="sectionCardTop">
-        <div className="sectionCardLeft">
-          <MiniIcon>{icon}</MiniIcon>
-          <span className="sectionCardTitle">{title}</span>
+  function SectionCard({
+    section,
+    icon,
+    title,
+    right,
+    summary,
+  }: {
+    section: SectionKey;
+    icon: ReactNode;
+    title: string;
+    right?: ReactNode;
+    summary?: ReactNode;
+  }) {
+    return (
+      <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
+        <div className="sectionCardTop">
+          <div className="sectionCardLeft">
+            <MiniIcon>{icon}</MiniIcon>
+            <span className="sectionCardTitle">{title}</span>
+          </div>
+          <div className="sectionCardRight">
+            {right ? <span className="sectionCardMeta">{right}</span> : null}
+            <span className="sectionCardArrow">›</span>
+          </div>
         </div>
-        <div className="sectionCardRight">
-          {right ? <span className="sectionCardMeta">{right}</span> : null}
-          <span className="sectionCardArrow">›</span>
-        </div>
-      </div>
-      {summary ? <div className="sectionCardSummary">{summary}</div> : null}
-    </button>
-  );
-}
+        {summary ? <div className="sectionCardSummary">{summary}</div> : null}
+      </button>
+    );
+  }
 
-if (loading) {
+  if (loading) {
   return (
     <main className="page">
       <div className="shell">
@@ -2020,7 +1941,11 @@ return (
 
       <section className="heroCard">
         <div className="heroWrap">
-          {heroImage ? <img src={heroImage} alt={copy.heroPreview} className="heroImage" /> : <div className="heroFallback" />}
+          {heroImage ? (
+            <img src={heroImage} alt={copy.heroPreview} className="heroImage" />
+          ) : (
+            <div className="heroFallback" />
+          )}
 
           <div className="heroOverlay">
             <div className="heroIdentity">
@@ -2099,7 +2024,7 @@ return (
                       className={`chip ${hours[day].isOpen ? 'chipActive' : ''}`}
                       onClick={() => updateHours(day, { isOpen: !hours[day].isOpen })}
                     >
-                      {hours[day].isOpen ? 'Open' : 'Closed'}
+                      {hours[day].isOpen ? copy.openClosed.split(' / ')[0] : copy.openClosed.split(' / ')[1]}
                     </button>
 
                     <select
@@ -2134,7 +2059,12 @@ return (
           </section>
         ) : null}
 
-        <SectionCard section="branding" icon="▣" title={copy.branding} right={copy.heroAndLogoImages} />
+        <SectionCard
+          section="branding"
+          icon="▣"
+          title={copy.branding}
+          right={copy.heroAndLogoImages}
+        />
 
         {expanded === 'branding' ? (
           <section className="panelCard">
@@ -2288,7 +2218,12 @@ return (
           </section>
         ) : null}
 
-        <SectionCard section="menu" icon="▦" title={copy.menu} right={copy.categoriesAndItems} />
+        <SectionCard
+          section="menu"
+          icon="▦"
+          title={copy.menu}
+          right={copy.categoriesAndItems}
+        />
 
         {expanded === 'menu' ? (
           <section className="panelCard">
@@ -2436,7 +2371,9 @@ return (
                 ))}
               </div>
 
-              {plan === 'starter' ? <div className="limitNote">{copy.starterLimitReached}</div> : null}
+              {plan === 'starter' ? (
+                <div className="limitNote">{copy.starterLimitReached}</div>
+              ) : null}
             </div>
 
             <div className="chipRow">
@@ -2516,7 +2453,9 @@ return (
                       <button
                         type="button"
                         className={`chip ${group.required ? 'chipActive' : ''}`}
-                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { required: !group.required })
+                        }
                       >
                         {group.required ? copy.required : copy.optional}
                       </button>
@@ -2524,7 +2463,9 @@ return (
                       <button
                         type="button"
                         className={`chip ${group.selection === 'single' ? 'chipActive' : ''}`}
-                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })
+                        }
                       >
                         {copy.singleChoice}
                       </button>
@@ -2532,7 +2473,9 @@ return (
                       <button
                         type="button"
                         className={`chip ${group.selection === 'multiple' ? 'chipActive' : ''}`}
-                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
+                        onClick={() =>
+                          updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })
+                        }
                       >
                         {copy.multipleChoice}
                       </button>
@@ -2731,7 +2674,7 @@ return (
                 >
                   <em>{copy.bestValue}</em>
                   <strong>500</strong>
-                  <span>$450</span>
+                  <span>$500</span>
                 </button>
               </div>
 
