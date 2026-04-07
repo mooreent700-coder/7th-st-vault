@@ -1008,56 +1008,94 @@ export default function BuilderPage() {
   }, [categories, selectedItemId]);
 
   const selectedItem = useMemo(() => {
+  for (const category of categories) {
+    const match = category.items.find((item) => item.id === selectedItemId);
+    if (match) return match;
+  }
+  return null;
+}, [categories, selectedItemId]);
 
-       for (const category of categories) {
-      const match = category.items.find((item) => item.id === selectedItemId);
-      if (match) return match;
-    }
-    return null;
-  }, [categories, selectedItemId]);
+const filteredPlaceholderImages = useMemo(() => {
+  return PLACEHOLDER_IMAGES.filter((image) => image.category === selectedPlaceholderCategory);
+}, [selectedPlaceholderCategory]);
 
-  // =========================
-  // LOAD DATA (FIXED)
-  // =========================
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
+const freeFlyerQrUrl = useMemo(() => {
+  const target =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}${previewLink || '/store/your-store'}`
+      : previewLink || '/store/your-store';
 
-        const { data: userRes } = await supabase.auth.getUser();
-        const user = userRes?.user;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(target)}`;
+}, [previewLink]);
 
-        if (!user) {
-          router.push('/login');
-          return;
-        }
+const customFlyerPreviewQrUrl = useMemo(() => {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+    'preview-only-menuflow-custom-flyer'
+  )}`;
+}, []);
 
-        setOwnerId(user.id);
+const flyerHoursText = useMemo(() => {
+  const openDays = DAY_ORDER.filter((day) => hours[day].isOpen);
+  if (!openDays.length) return 'Closed';
 
-        // GET RESTAURANT
-        const { data: restaurant } = await supabase
-          .from('restaurants')
-          .select('*')
-          .eq('owner_id', user.id)
-          .single();
+  const lines = openDays.map((day) => {
+    const row = hours[day];
+    return `${COPY.en[day]} ${toDisplayTime(row.open)}-${toDisplayTime(row.close)}`;
+  });
 
-        if (!restaurant) {
-          setLoading(false);
-          return;
-        }
+  return lines.join(' • ');
+}, [hours]);
 
+useEffect(() => {
+  const loadBuilder = async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+
+      setOwnerId(user.id);
+
+      const { data: restaurant, error: restaurantError } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('owner_id', user.id)
+        .maybeSingle<RestaurantRow>();
+
+      if (restaurantError) throw restaurantError;
+
+      if (restaurant) {
         setRestaurantId(restaurant.id);
-
         setName(restaurant.name || '');
         setPhone(restaurant.phone || '');
         setAddress(restaurant.address || '');
         setHeroImage(restaurant.hero_image || '');
         setLogoImage(restaurant.logo_image || '');
         setTheme((restaurant.storefront_theme as ThemeMode) || 'light');
-        setStorefrontLanguage((restaurant.storefront_language as LanguageMode) || 'en');
-        setOrderLanguage((restaurant.order_language as LanguageMode) || 'en');
+        setStorefrontLanguage(
+          ((restaurant.storefront_language || 'en').toLowerCase() as LanguageMode) || 'en'
+        );
+        setOrderLanguage(((restaurant.order_language || 'EN').toLowerCase() as LanguageMode) || 'en');
+        setPickupEnabled(Boolean(restaurant.pickup_enabled ?? true));
+        setDeliveryEnabled(Boolean(restaurant.delivery_enabled ?? false));
+        setDeliveryFee(String(restaurant.delivery_fee ?? 0));
+        setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
+        setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
         setPlan((restaurant.plan as BuilderPlan) || 'starter');
-        setStripeConnected(!!restaurant.stripe_connected);
+        setStripeConnected(
+          Boolean(
+            restaurant.stripe_connected ||
+              (restaurant.stripe_account_id &&
+                restaurant.stripe_charges_enabled &&
+                restaurant.stripe_payouts_enabled)
+          )
+        );
 
         setHours({
           monday: parseHours(restaurant.hours_monday),
@@ -1069,424 +1107,2423 @@ export default function BuilderPage() {
           sunday: parseHours(restaurant.hours_sunday),
         });
 
-        // LOAD CATEGORIES
-        const { data: cats } = await supabase
-          .from('categories')
+        setFlyerBusinessName(restaurant.name || '');
+
+        const { data: categoryRows, error: categoryError } = await supabase
+          .from('menu_categories')
           .select('*')
           .eq('restaurant_id', restaurant.id)
-          .order('sort_order');
+          .order('sort_order', { ascending: true });
 
-        const { data: items } = await supabase
+        if (categoryError) throw categoryError;
+
+        const { data: itemRows, error: itemError } = await supabase
           .from('menu_items')
           .select('*')
-          .eq('restaurant_id', restaurant.id);
+          .eq('restaurant_id', restaurant.id)
+          .order('sort_order', { ascending: true });
 
-        const built: BuilderCategory[] = (cats || []).map((cat) => ({
-          id: cat.id,
-          name: cat.name || '',
-          sort_order: cat.sort_order || 0,
-          items:
-            (items || [])
-              .filter((i) => i.category_id === cat.id)
-              .map((i) => ({
-                id: i.id,
-                category_id: cat.id,
-                name: i.name || '',
-                base_price: String(i.base_price || 0),
-                description: i.description || '',
-                image_url: i.image_url || '',
-                availability: normalizeAvailability(i),
-                option_groups: [],
-              })) || [],
-        }));
+        if (itemError) throw itemError;
 
-        setCategories(built);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+        const itemIds = safeArray(itemRows).map((item) => item.id);
 
-    load();
-  }, [router]);
+        let optionGroupRows: OptionGroupRow[] = [];
+        let optionChoiceRows: OptionChoiceRow[] = [];
 
-  // =========================
-  // SAVE (FIXED)
-  // =========================
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      setError('');
-      setSuccess('');
+        if (itemIds.length) {
+          const { data: groups, error: groupsError } = await supabase
+            .from('menu_option_groups')
+            .select('*')
+            .in('item_id', itemIds)
+            .order('sort_order', { ascending: true });
 
-      if (!restaurantId) {
-        setError(copy.couldNotSave);
-        return;
-      }
+          if (groupsError) throw groupsError;
+          optionGroupRows = safeArray(groups);
 
-      const slug = slugifyValue(name);
+          const groupIds = optionGroupRows.map((group) => group.id);
 
-      // UPDATE RESTAURANT
-      const { error: rError } = await supabase
-        .from('restaurants')
-        .update({
-          name,
-          slug,
-          phone,
-          address,
-          hero_image: heroImage,
-          logo_image: logoImage,
-          storefront_theme: theme,
-          storefront_language: storefrontLanguage,
-          order_language: orderLanguage,
-          hours_monday: serializeHours(hours.monday),
-          hours_tuesday: serializeHours(hours.tuesday),
-          hours_wednesday: serializeHours(hours.wednesday),
-          hours_thursday: serializeHours(hours.thursday),
-          hours_friday: serializeHours(hours.friday),
-          hours_saturday: serializeHours(hours.saturday),
-          hours_sunday: serializeHours(hours.sunday),
-        })
-        .eq('id', restaurantId);
+          if (groupIds.length) {
+            const { data: choices, error: choicesError } = await supabase
+              .from('menu_option_choices')
+              .select('*')
+              .in('option_group_id', groupIds)
+              .order('sort_order', { ascending: true });
 
-      if (rError) throw rError;
-
-      // RESET
-      await supabase.from('categories').delete().eq('restaurant_id', restaurantId);
-      await supabase.from('menu_items').delete().eq('restaurant_id', restaurantId);
-
-      // INSERT FRESH
-      for (const cat of categories) {
-        const { data: newCat } = await supabase
-          .from('categories')
-          .insert({
-            restaurant_id: restaurantId,
-            name: cat.name,
-            sort_order: cat.sort_order,
-          })
-          .select()
-          .single();
-
-        for (const item of cat.items) {
-          await supabase.from('menu_items').insert({
-            restaurant_id: restaurantId,
-            category_id: newCat.id,
-            name: item.name,
-            base_price: Number(item.base_price || 0),
-            description: item.description,
-            image_url: item.image_url,
-            availability: item.availability,
-          });
+            if (choicesError) throw choicesError;
+            optionChoiceRows = safeArray(choices);
+          }
         }
-      }
 
-      setSuccess(copy.builderSaved);
+        const groupsByItem = new Map<string, BuilderOptionGroup[]>();
+
+        for (const group of optionGroupRows) {
+          const options: BuilderOptionChoice[] = optionChoiceRows
+            .filter((choice) => choice.option_group_id === group.id)
+            .map((choice) => ({
+              id: choice.id,
+              name: choice.name || '',
+              price: String(choice.price_delta ?? choice.price ?? 0),
+            }));
+
+          const normalizedGroup: BuilderOptionGroup = {
+            id: group.id,
+            name: group.name || '',
+            required: Boolean(group.is_required),
+            selection: normalizeSelectionMode(group),
+            presetType: 'custom',
+            options,
+          };
+
+          const itemKey = group.item_id || '';
+          const existing = groupsByItem.get(itemKey) || [];
+          existing.push(normalizedGroup);
+          groupsByItem.set(itemKey, existing);
+        }
+
+        const normalizedCategories: BuilderCategory[] = safeArray(categoryRows).map(
+          (category, categoryIndex) => ({
+            id: category.id,
+            name: category.name || '',
+            sort_order: category.sort_order ?? categoryIndex,
+            items: safeArray(itemRows)
+              .filter((item) => item.category_id === category.id)
+              .map((item) => ({
+                id: item.id,
+                category_id: category.id,
+                name: item.name || '',
+                base_price: String(item.base_price ?? item.price ?? 0),
+                description: item.description || '',
+                image_url: item.image_url || '',
+                availability: normalizeAvailability(item),
+                option_groups: groupsByItem.get(item.id) || [],
+              })),
+          })
+        );
+
+        setCategories(normalizedCategories);
+        setSelectedItemId(normalizedCategories[0]?.items[0]?.id || null);
+
+        const placeholderCount = normalizedCategories
+          .flatMap((category) => category.items)
+          .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
+
+        setPlaceholderUsedCount(placeholderCount);
+      } else {
+        const categoryId = uid('cat');
+        const itemId = uid('item');
+
+        setCategories([
+          {
+            id: categoryId,
+            name: 'Featured',
+            sort_order: 0,
+            items: [
+              {
+                id: itemId,
+                category_id: categoryId,
+                name: '',
+                base_price: '12',
+                description: '',
+                image_url: '',
+                availability: 'available',
+                option_groups: [],
+              },
+            ],
+          },
+        ]);
+        setSelectedItemId(itemId);
+      }
     } catch (err) {
-      console.error(err);
-      setError(copy.couldNotSave);
+      const message = err instanceof Error ? err.message : copy.couldNotSave;
+      setError(message);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  // =========================
-  // ADD CATEGORY (PRESET FIXED)
-  // =========================
-  const addCategory = (presetKey?: PlaceholderCategory) => {
-    const preset = presetKey ? CATEGORY_PRESETS[presetKey] : null;
+  void loadBuilder();
+}, [router, copy.couldNotSave]);
 
-    const newCategory: BuilderCategory = {
-      id: uid('cat'),
-      name: preset ? preset.itemNames[0] : 'New Category',
-      sort_order: categories.length,
-      items: [],
-    };
+function updateHours(day: HoursDayKey, patch: Partial<HoursRow>) {
+  setHours((current) => ({
+    ...current,
+    [day]: {
+      ...current[day],
+      ...patch,
+    },
+  }));
+}
 
-    setCategories([...categories, newCategory]);
+function toggleSection(section: SectionKey) {
+  setExpanded((current) => (current === section ? null : section));
+}
+
+function updateCategory(categoryId: string, nextName: string) {
+  setCategories((current) =>
+    current.map((category) =>
+      category.id === categoryId ? { ...category, name: nextName } : category
+    )
+  );
+}
+
+function addCategory() {
+  const categoryId = uid('cat');
+  const itemId = uid('item');
+
+  setCategories((current) => [
+    ...current,
+    {
+      id: categoryId,
+      name: `${copy.menu} ${current.length + 1}`,
+      sort_order: current.length,
+      items: [
+        {
+          id: itemId,
+          category_id: categoryId,
+          name: '',
+          base_price: '0',
+          description: '',
+          image_url: '',
+          availability: 'available',
+          option_groups: [],
+        },
+      ],
+    },
+  ]);
+
+  setSelectedItemId(itemId);
+  setExpanded('menu');
+}
+
+function addItem(categoryId: string) {
+  const newItemId = uid('item');
+
+  setCategories((current) =>
+    current.map((category) =>
+      category.id === categoryId
+        ? {
+            ...category,
+            items: [
+              ...category.items,
+              {
+                id: newItemId,
+                category_id: categoryId,
+                name: '',
+                base_price: '0',
+                description: '',
+                image_url: '',
+                availability: 'available',
+                option_groups: [],
+              },
+            ],
+          }
+        : category
+    )
+  );
+
+  setSelectedItemId(newItemId);
+  setExpanded('item');
+}
+
+function selectItem(itemId: string) {
+  setSelectedItemId(itemId);
+  setExpanded('item');
+}
+
+function updateItem(itemId: string, patch: Partial<BuilderItem>) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+    }))
+  );
+}
+
+function deleteItem(categoryId: string, itemId: string) {
+  setCategories((current) =>
+    current.map((category) =>
+      category.id === categoryId
+        ? { ...category, items: category.items.filter((item) => item.id !== itemId) }
+        : category
+    )
+  );
+
+  setSelectedItemId((current) => (current === itemId ? null : current));
+}
+
+function addOptionGroup(itemId: string, presetType: BuilderOptionGroup['presetType']) {
+  const groupId = uid('group');
+  const preset = CATEGORY_PRESETS[selectedPlaceholderCategory];
+
+  const nextGroup: BuilderOptionGroup = {
+    id: groupId,
+    name:
+      presetType === 'custom'
+        ? copy.optionGroups
+        : presetType === 'combo'
+          ? copy.combo
+          : presetType === 'protein'
+            ? copy.protein
+            : presetType === 'size'
+              ? copy.size
+              : presetType === 'drink'
+                ? copy.drink
+                : presetType === 'sides'
+                  ? copy.sides
+                  : presetType === 'extras'
+                    ? copy.extras
+                    : copy.removals,
+    required: presetType === 'combo',
+    selection: presetType === 'extras' || presetType === 'removals' ? 'multiple' : 'single',
+    presetType,
+    options: getPresetOptions(presetType, preset ?? undefined).map((option) => ({
+      id: uid('choice'),
+      name: option.name,
+      price: option.price,
+    })),
   };
 
-  // =========================
-  // ADD ITEM (COMBO FIRST FIXED)
-  // =========================
-  const addItem = (categoryId: string, presetKey?: PlaceholderCategory) => {
-    const preset = presetKey ? CATEGORY_PRESETS[presetKey] : null;
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId ? { ...item, option_groups: [...item.option_groups, nextGroup] } : item
+      ),
+    }))
+  );
 
-    const newItem: BuilderItem = {
-      id: uid('item'),
-      category_id: categoryId,
-      name: preset ? preset.itemNames[0] : 'New Item',
-      base_price: '10',
-      description: '',
-      image_url: '',
-      availability: 'available',
-      option_groups: [
-        {
-          id: uid('grp'),
-          name: 'Combo Options',
+  setExpanded('options');
+}
+
+function updateOptionGroup(itemId: string, groupId: string, patch: Partial<BuilderOptionGroup>) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              option_groups: item.option_groups.map((group) =>
+                group.id === groupId ? { ...group, ...patch } : group
+              ),
+            }
+          : item
+      ),
+    }))
+  );
+}
+
+function deleteOptionGroup(itemId: string, groupId: string) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              option_groups: item.option_groups.filter((group) => group.id !== groupId),
+            }
+          : item
+      ),
+    }))
+  );
+}
+
+function addOptionChoice(itemId: string, groupId: string) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              option_groups: item.option_groups.map((group) =>
+                group.id === groupId
+                  ? {
+                      ...group,
+                      options: [
+                        ...group.options,
+                        { id: uid('choice'), name: copy.newChoice, price: '0' },
+                      ],
+                    }
+                  : group
+              ),
+            }
+          : item
+      ),
+    }))
+  );
+}
+
+function updateOptionChoice(
+  itemId: string,
+  groupId: string,
+  optionId: string,
+  patch: Partial<BuilderOptionChoice>
+) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              option_groups: item.option_groups.map((group) =>
+                group.id === groupId
+                  ? {
+                      ...group,
+                      options: group.options.map((option) =>
+                        option.id === optionId ? { ...option, ...patch } : option
+                      ),
+                    }
+                  : group
+              ),
+            }
+          : item
+      ),
+    }))
+  );
+}
+
+function deleteOptionChoice(itemId: string, groupId: string, optionId: string) {
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              option_groups: item.option_groups.map((group) =>
+                group.id === groupId
+                  ? {
+                      ...group,
+                      options: group.options.filter((option) => option.id !== optionId),
+                    }
+                  : group
+              ),
+            }
+          : item
+      ),
+    }))
+  );
+}
+
+function countPlaceholderUsage(nextCategories: BuilderCategory[]) {
+  return nextCategories
+    .flatMap((category) => category.items)
+    .filter((item) => PLACEHOLDER_IMAGES.some((ph) => ph.url === item.image_url)).length;
+}
+
+function applyPlaceholderToSelectedItem(url: string) {
+  if (!selectedItemId) return;
+
+  setCategories((current) => {
+    const next = current.map((category) => ({
+      ...category,
+      items: category.items.map((item) =>
+        item.id === selectedItemId ? { ...item, image_url: url } : item
+      ),
+    }));
+
+    const usage = countPlaceholderUsage(next);
+    const limit = getPlaceholderLimit(plan);
+
+    if (usage > limit) {
+      setError(copy.starterLimitReached);
+      return current;
+    }
+
+    setPlaceholderUsedCount(usage);
+    setError('');
+    return next;
+  });
+}
+
+function applyCategoryPreset(categoryType: PlaceholderCategory) {
+  setSelectedPlaceholderCategory(categoryType);
+
+  if (!selectedItemId) return;
+
+  const preset = CATEGORY_PRESETS[categoryType];
+  const firstImage = PLACEHOLDER_IMAGES.find((item) => item.category === categoryType);
+
+  setCategories((current) =>
+    current.map((category) => ({
+      ...category,
+      items: category.items.map((item) => {
+        if (item.id !== selectedItemId) return item;
+
+        const comboGroup: BuilderOptionGroup = {
+          id: uid('group'),
+          name: copy.combo,
           required: true,
           selection: 'single',
           presetType: 'combo',
-          options: getPresetOptions('combo', preset).map((opt) => ({
-  id: uid('opt'),
-  ...opt,
-}))
-        },
-      ],
+          options: getPresetOptions('combo', preset ?? undefined).map((option) => ({
+            id: uid('choice'),
+            name: option.name,
+            price: option.price,
+          })),
+        };
+
+        const drinkGroup: BuilderOptionGroup = {
+          id: uid('group'),
+          name: copy.drink,
+          required: false,
+          selection: 'single',
+          presetType: 'drink',
+          options: getPresetOptions('drink', preset ?? undefined).map((option) => ({
+            id: uid('choice'),
+            name: option.name,
+            price: option.price,
+          })),
+        };
+
+        const sideGroup: BuilderOptionGroup = {
+          id: uid('group'),
+          name: copy.sides,
+          required: false,
+          selection: 'single',
+          presetType: 'sides',
+          options: getPresetOptions('sides', preset ?? undefined).map((option) => ({
+            id: uid('choice'),
+            name: option.name,
+            price: option.price,
+          })),
+        };
+
+        const proteinGroup: BuilderOptionGroup | null = preset.proteinOptions?.length
+          ? {
+              id: uid('group'),
+              name: copy.protein,
+              required: false,
+              selection: 'single',
+              presetType: 'protein',
+              options: getPresetOptions('protein', preset ?? undefined).map((option) => ({
+                id: uid('choice'),
+                name: option.name,
+                price: option.price,
+              })),
+            }
+          : null;
+
+        return {
+          ...item,
+          name: preset.itemNames[0] || item.name,
+          description: `${preset.itemNames[0] || item.name} ${copy.itemNameFallback}`,
+          image_url: firstImage?.url || item.image_url,
+          option_groups: [comboGroup, ...(proteinGroup ? [proteinGroup] : []), sideGroup, drinkGroup],
+        };
+      }),
+    }))
+  );
+
+  setExpanded('item');
+}
+
+async function uploadImageToSupabase(file: File, folder: string) {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('restaurant-images')
+    .upload(fileName, file, { upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from('restaurant-images').getPublicUrl(fileName);
+  return data.publicUrl;
+}
+
+async function handleHeroUpload(file: File | null) {
+  if (!file) return;
+  try {
+    setUploadingHero(true);
+    setError('');
+    const publicUrl = await uploadImageToSupabase(file, 'hero');
+    setHeroImage(publicUrl);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : copy.couldNotSave;
+    setError(message);
+  } finally {
+    setUploadingHero(false);
+  }
+}
+
+async function handleLogoUpload(file: File | null) {
+  if (!file) return;
+  try {
+    setUploadingLogo(true);
+    setError('');
+    const publicUrl = await uploadImageToSupabase(file, 'logo');
+    setLogoImage(publicUrl);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : copy.couldNotSave;
+    setError(message);
+  } finally {
+    setUploadingLogo(false);
+  }
+}
+
+async function handleItemImageUpload(itemId: string, file: File | null) {
+  if (!file) return;
+  try {
+    setUploadingItemId(itemId);
+    setError('');
+    const publicUrl = await uploadImageToSupabase(file, 'items');
+    updateItem(itemId, { image_url: publicUrl });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : copy.couldNotSave;
+    setError(message);
+  } finally {
+    setUploadingItemId(null);
+  }
+}
+
+function removeHeroImage() {
+  setHeroImage('');
+}
+
+function removeLogoImage() {
+  setLogoImage('');
+}
+
+function removeItemImage(itemId: string) {
+  updateItem(itemId, { image_url: '' });
+
+  setCategories((current) => {
+    const usage = countPlaceholderUsage(current);
+    setPlaceholderUsedCount(usage);
+    return current;
+  });
+}
+
+async function handleSave() {
+  try {
+    if (!ownerId) {
+      setError('User not authenticated.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    const generatedSlug = slugifyValue(name);
+
+    const restaurantPayload = {
+      owner_id: ownerId,
+      name: name.trim() || null,
+      slug: generatedSlug || null,
+      phone: phone.trim() || null,
+      address: address.trim() || null,
+      hero_image: heroImage.trim() || null,
+      logo_image: logoImage.trim() || null,
+      storefront_theme: theme,
+      storefront_language: storefrontLanguage,
+      order_language: orderLanguage === 'es' ? 'ES' : 'EN',
+      pickup_enabled: pickupEnabled,
+      delivery_enabled: deliveryEnabled,
+      delivery_fee: Number(deliveryFee || 0),
+      delivery_radius: Number(deliveryRadius || 0),
+      delivery_minimum: Number(deliveryMinimum || 0),
+      plan,
+      stripe_connected: stripeConnected,
+      hours_monday: serializeHours(hours.monday),
+      hours_tuesday: serializeHours(hours.tuesday),
+      hours_wednesday: serializeHours(hours.wednesday),
+      hours_thursday: serializeHours(hours.thursday),
+      hours_friday: serializeHours(hours.friday),
+      hours_saturday: serializeHours(hours.saturday),
+      hours_sunday: serializeHours(hours.sunday),
     };
 
-    setCategories((prev) =>
-      prev.map((cat) =>
-        cat.id === categoryId
-          ? { ...cat, items: [...cat.items, newItem] }
-          : cat
+    let currentRestaurantId = restaurantId;
+
+    if (restaurantId) {
+      const { error: updateError } = await supabase
+        .from('restaurants')
+        .update(restaurantPayload)
+        .eq('id', restaurantId);
+
+      if (updateError) throw updateError;
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from('restaurants')
+        .insert(restaurantPayload)
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+      currentRestaurantId = inserted.id;
+      setRestaurantId(inserted.id);
+    }
+
+    if (!currentRestaurantId) {
+      throw new Error('Missing restaurant id.');
+    }
+
+    const { data: existingCategories, error: existingCategoriesError } = await supabase
+      .from('menu_categories')
+      .select('id')
+      .eq('restaurant_id', currentRestaurantId);
+
+    if (existingCategoriesError) throw existingCategoriesError;
+
+    const { data: existingItems, error: existingItemsError } = await supabase
+      .from('menu_items')
+      .select('id')
+      .eq('restaurant_id', currentRestaurantId);
+
+    if (existingItemsError) throw existingItemsError;
+
+    const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
+    const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
+
+    if (existingItemIds.length) {
+      const { data: existingGroups, error: existingGroupsError } = await supabase
+        .from('menu_option_groups')
+        .select('id')
+        .in('item_id', existingItemIds);
+
+      if (existingGroupsError) throw existingGroupsError;
+
+      const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
+
+      if (existingGroupIds.length) {
+        const { error: deleteChoicesError } = await supabase
+          .from('menu_option_choices')
+          .delete()
+          .in('option_group_id', existingGroupIds);
+
+        if (deleteChoicesError) throw deleteChoicesError;
+      }
+
+      const { error: deleteGroupsError } = await supabase
+        .from('menu_option_groups')
+        .delete()
+        .in('item_id', existingItemIds);
+
+      if (deleteGroupsError) throw deleteGroupsError;
+
+      const { error: deleteItemsError } = await supabase
+        .from('menu_items')
+        .delete()
+        .in('id', existingItemIds);
+
+      if (deleteItemsError) throw deleteItemsError;
+    }
+
+    if (existingCategoryIds.length) {
+      const { error: deleteCategoriesError } = await supabase
+        .from('menu_categories')
+        .delete()
+        .in('id', existingCategoryIds);
+
+      if (deleteCategoriesError) throw deleteCategoriesError;
+    }
+
+    const allCategories = categories.map((category, categoryIndex) => ({
+      id: category.id,
+      restaurant_id: currentRestaurantId,
+      name: category.name.trim() || `${copy.menu} ${categoryIndex + 1}`,
+      sort_order: categoryIndex,
+    }));
+
+    if (allCategories.length) {
+      const { error: categoryInsertError } = await supabase.from('menu_categories').insert(allCategories);
+      if (categoryInsertError) throw categoryInsertError;
+    }
+
+    const allItems = categories.flatMap((category, categoryIndex) =>
+      category.items.map((item, itemIndex) => ({
+        id: item.id,
+        restaurant_id: currentRestaurantId,
+        category_id: category.id,
+        name: item.name.trim() || copy.itemNameFallback,
+        base_price: Number(item.base_price || 0),
+        price: Number(item.base_price || 0),
+        description: item.description.trim() || null,
+        image_url: item.image_url || null,
+        availability: item.availability,
+        is_available: item.availability === 'available',
+        sort_order: itemIndex + categoryIndex * 100,
+      }))
+    );
+
+    if (allItems.length) {
+      const { error: itemInsertError } = await supabase.from('menu_items').insert(allItems);
+      if (itemInsertError) throw itemInsertError;
+    }
+
+    const allOptionGroups = categories.flatMap((category) =>
+      category.items.flatMap((item) =>
+        item.option_groups.map((group, groupIndex) => ({
+          id: group.id,
+          item_id: item.id,
+          name: group.name.trim() || copy.optionGroups,
+          is_required: group.required,
+          is_multiple: group.selection === 'multiple',
+          selection_mode: group.selection,
+          sort_order: groupIndex,
+        }))
       )
     );
 
-    setSelectedItemId(newItem.id);
-  };
+    if (allOptionGroups.length) {
+      const { error: groupInsertError } = await supabase.from('menu_option_groups').insert(allOptionGroups);
+      if (groupInsertError) throw groupInsertError;
+    }
 
-  // =========================
-  // UI
-  // =========================
-  if (loading) {
-    return <div className="p-6">{copy.loading}</div>;
+    const allChoices = categories.flatMap((category) =>
+      category.items.flatMap((item) =>
+        item.option_groups.flatMap((group) =>
+          group.options.map((option, optionIndex) => ({
+            id: option.id,
+            option_group_id: group.id,
+            name: option.name.trim() || copy.newChoice,
+            price: Number(option.price || 0),
+            price_delta: Number(option.price || 0),
+            sort_order: optionIndex,
+          }))
+        )
+      )
+    );
+
+    if (allChoices.length) {
+      const { error: choiceInsertError } = await supabase.from('menu_option_choices').insert(allChoices);
+      if (choiceInsertError) throw choiceInsertError;
+    }
+
+    setSuccess(copy.builderSaved);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : copy.couldNotSave;
+    setError(message || copy.couldNotSave);
+  } finally {
+    setSaving(false);
+  }
+}
+
+async function handleGoLive() {
+  if (!stripeConnected) {
+    setError(copy.stripeNeeded);
+    return;
   }
 
+  await handleSave();
+  setSuccess(copy.goLiveReady);
+}
+
+function SectionCard({
+  section,
+  icon,
+  title,
+  right,
+  summary,
+}: {
+  section: SectionKey;
+  icon: ReactNode;
+  title: string;
+  right?: ReactNode;
+  summary?: ReactNode;
+}) {
   return (
-    <div className="p-4 space-y-4">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">MENUFLOW BUILDER</h1>
+    <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
+      <div className="sectionCardTop">
+        <div className="sectionCardLeft">
+          <MiniIcon>{icon}</MiniIcon>
+          <span className="sectionCardTitle">{title}</span>
+        </div>
+        <div className="sectionCardRight">
+          {right ? <span className="sectionCardMeta">{right}</span> : null}
+          <span className="sectionCardArrow">›</span>
+        </div>
+      </div>
+      {summary ? <div className="sectionCardSummary">{summary}</div> : null}
+    </button>
+  );
+}
 
-        <div className="flex gap-2">
+if (loading) {
+  return (
+    <main className="page">
+      <div className="shell">
+        <div className="notch" />
+        <div className="loadingCard">{copy.loading}</div>
+      </div>
+
+      <style jsx global>{`
+        .page {
+          min-height: 100vh;
+          background: #eef1f5;
+          padding: 16px 12px 28px;
+          display: grid;
+          place-items: start center;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+            sans-serif;
+        }
+        .shell {
+          width: min(100%, 430px);
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 34px;
+          box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+          padding: 14px;
+        }
+        .notch {
+          width: 122px;
+          height: 8px;
+          border-radius: 999px;
+          background: #0f172a;
+          margin: 2px auto 16px;
+        }
+        .loadingCard {
+          border-radius: 18px;
+          padding: 20px;
+          background: #f8fafc;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+      `}</style>
+    </main>
+  );
+}
+
+return (
+  <main className="page">
+    <div className="shell">
+      <div className="notch" />
+
+      <div className="topBar">
+        <div className="brand">
+          <span className="brandStrong">MENUFLOW</span>
+          <span className="brandSoft"> {copy.builderWord}</span>
+        </div>
+        <div className="topActions">
           <button
-            onClick={() =>
-              setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')
-            }
-            className="px-3 py-1 border rounded"
+            type="button"
+            className="langButton"
+            onClick={() => setBuilderLanguage(builderLanguage === 'en' ? 'es' : 'en')}
           >
-            {builderLanguage === 'en' ? 'EN' : 'ES'}
+            {builderLanguage.toUpperCase()}
           </button>
-
-          <button
-            onClick={handleSave}
-            className="bg-black text-white px-4 py-2 rounded"
-          >
+          <button type="button" className="saveButton" onClick={handleSave} disabled={saving}>
             {saving ? copy.saving : copy.save}
           </button>
         </div>
       </div>
 
-      {/* ERROR */}
-      {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded">
-          {error}
-        </div>
-      )}
+      {error ? <div className="message error">{error}</div> : null}
+      {success ? <div className="message success">{success}</div> : null}
 
-      {/* SUCCESS */}
-      {success && (
-        <div className="bg-green-100 text-green-700 p-3 rounded">
-          {success}
-        </div>
-      )}
+      <section className="heroCard">
+        <div className="heroWrap">
+          {heroImage ? <img src={heroImage} alt={copy.heroPreview} className="heroImage" /> : <div className="heroFallback" />}
 
-      {/* STORE */}
-      <div className="bg-white rounded-xl p-4 shadow space-y-3">
-        <h2 className="font-bold">{copy.storeSetup}</h2>
+          <div className="heroOverlay">
+            <div className="heroIdentity">
+              {logoImage ? (
+                <img src={logoImage} alt={copy.logoPreview} className="heroLogo" />
+              ) : (
+                <div className="heroLogoFallback">{(name || 'M').charAt(0).toUpperCase()}</div>
+              )}
 
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={copy.storeName}
-          className="w-full border p-2 rounded"
-        />
-
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder={copy.phone}
-          className="w-full border p-2 rounded"
-        />
-
-        <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder={copy.address}
-          className="w-full border p-2 rounded"
-        />
-
-        <div className="text-sm">
-          {copy.liveUrl}: {previewLink}
-        </div>
-      </div>
-
-      {/* HOURS (AUTO SYSTEM) */}
-      <div className="bg-white rounded-xl p-4 shadow">
-        <h2 className="font-bold mb-2">{copy.hours}</h2>
-
-        {DAY_ORDER.map((day) => (
-          <div key={day} className="flex gap-2 items-center mb-2">
-            <span className="w-24 capitalize">{copy[day]}</span>
-
-            <input
-              type="checkbox"
-              checked={hours[day].isOpen}
-              onChange={(e) =>
-                setHours({
-                  ...hours,
-                  [day]: { ...hours[day], isOpen: e.target.checked },
-                })
-              }
-            />
-
-            {hours[day].isOpen && (
-              <>
-                <select
-                  value={hours[day].open}
-                  onChange={(e) =>
-                    setHours({
-                      ...hours,
-                      [day]: { ...hours[day], open: e.target.value },
-                    })
-                  }
-                >
-                  {TIME_OPTIONS.map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={hours[day].close}
-                  onChange={(e) =>
-                    setHours({
-                      ...hours,
-                      [day]: { ...hours[day], close: e.target.value },
-                    })
-                  }
-                >
-                  {TIME_OPTIONS.map((t) => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-              </>
-            )}
+              <div className="heroText">
+                <div className="heroName">{name || 'Your Store'}</div>
+                <div className="heroMetaRow">
+                  <span>{address || '123 Main St'}</span>
+                  <span>{phone || '323 555 1212'}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      </section>
 
-      {/* MENU */}
-      <div className="bg-white rounded-xl p-4 shadow space-y-3">
-        <h2 className="font-bold">{copy.menu}</h2>
+      <section className="introCard">
+        <h1 className="title">{copy.title}</h1>
+        <p className="subtitle">{copy.subtitle}</p>
 
-        <button
-          onClick={() => addCategory()}
-          className="bg-black text-white px-3 py-2 rounded"
-        >
-          {copy.addCategory}
-        </button>
+        <Link href={previewLink || '#'} className={`previewButton ${!previewLink ? 'isDisabled' : ''}`}>
+          {copy.previewStore}
+        </Link>
+      </section>
 
-        {categories.map((cat) => (
-          <div key={cat.id} className="border p-3 rounded space-y-2">
-            <input
-              value={cat.name}
-              onChange={(e) =>
-                setCategories((prev) =>
-                  prev.map((c) =>
-                    c.id === cat.id ? { ...c, name: e.target.value } : c
-                  )
-                )
-              }
-              className="border p-2 w-full rounded"
-            />
+      <div className="sectionStack">
+        <SectionCard
+          section="store"
+          icon="⌂"
+          title={copy.storeSetup}
+          summary={
+            <div className="summaryLines">
+              <strong>{name || copy.storeName}</strong>
+              <span>{phone || copy.phone}</span>
+              <span>{address || copy.address}</span>
+            </div>
+          }
+        />
 
-            <button
-              onClick={() => addItem(cat.id)}
-              className="bg-black text-white px-2 py-1 rounded"
-            >
-              {copy.addItem}
+        {expanded === 'store' ? (
+          <section className="panelCard">
+            <div className="field">
+              <label className="label">{copy.storeName}</label>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.liveUrl}</label>
+              <div className="urlPill">{previewLink || '/store/your-store'}</div>
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.phone}</label>
+              <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.address}</label>
+              <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
+            </div>
+
+            <div className="hoursBlock">
+              <label className="label">{copy.hours}</label>
+              <div className="hoursGrid">
+                {DAY_ORDER.map((day) => (
+                  <div key={day} className="hoursRow">
+                    <div className="hoursDay">{copy[day]}</div>
+
+                    <button
+                      type="button"
+                      className={`chip ${hours[day].isOpen ? 'chipActive' : ''}`}
+                      onClick={() => updateHours(day, { isOpen: !hours[day].isOpen })}
+                    >
+                      {hours[day].isOpen ? 'Open' : 'Closed'}
+                    </button>
+
+                    <select
+                      className="select"
+                      value={hours[day].open}
+                      disabled={!hours[day].isOpen}
+                      onChange={(e) => updateHours(day, { open: e.target.value })}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>
+                          {toDisplayTime(time)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      className="select"
+                      value={hours[day].close}
+                      disabled={!hours[day].isOpen}
+                      onChange={(e) => updateHours(day, { close: e.target.value })}
+                    >
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time}>
+                          {toDisplayTime(time)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <SectionCard section="branding" icon="▣" title={copy.branding} right={copy.heroAndLogoImages} />
+
+        {expanded === 'branding' ? (
+          <section className="panelCard">
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadHeroImage}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingHero ? copy.saving : copy.uploadHeroImage}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleHeroUpload(e.target.files?.[0] || null)}
+                />
+              </label>
+              <button type="button" className="secondaryButton fullWidth" onClick={removeHeroImage}>
+                {copy.removeImage}
+              </button>
+              {heroImage ? (
+                <img src={heroImage} alt={copy.heroPreview} className="uploadPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.heroPreview}</div>
+              )}
+            </div>
+
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadLogo}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingLogo ? copy.saving : copy.uploadLogo}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleLogoUpload(e.target.files?.[0] || null)}
+                />
+              </label>
+              <button type="button" className="secondaryButton fullWidth" onClick={removeLogoImage}>
+                {copy.removeImage}
+              </button>
+              {logoImage ? (
+                <img src={logoImage} alt={copy.logoPreview} className="uploadPreview logoPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.logoPreview}</div>
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        <SectionCard
+          section="theme"
+          icon="◐"
+          title={copy.theme}
+          right={theme === 'dark' ? copy.dark : copy.light}
+        />
+
+        {expanded === 'theme' ? (
+          <section className="panelCard">
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${theme === 'light' ? 'chipActive' : ''}`}
+                onClick={() => setTheme('light')}
+              >
+                {copy.light}
+              </button>
+              <button
+                type="button"
+                className={`chip ${theme === 'dark' ? 'chipActive' : ''}`}
+                onClick={() => setTheme('dark')}
+              >
+                {copy.dark}
+              </button>
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${storefrontLanguage === 'en' ? 'chipActive' : ''}`}
+                onClick={() => setStorefrontLanguage('en')}
+              >
+                {copy.english}
+              </button>
+              <button
+                type="button"
+                className={`chip ${storefrontLanguage === 'es' ? 'chipActive' : ''}`}
+                onClick={() => setStorefrontLanguage('es')}
+              >
+                {copy.spanish}
+              </button>
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${orderLanguage === 'en' ? 'chipActive' : ''}`}
+                onClick={() => setOrderLanguage('en')}
+              >
+                {copy.english}
+              </button>
+              <button
+                type="button"
+                className={`chip ${orderLanguage === 'es' ? 'chipActive' : ''}`}
+                onClick={() => setOrderLanguage('es')}
+              >
+                {copy.spanish}
+              </button>
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${pickupEnabled ? 'chipActive' : ''}`}
+                onClick={() => setPickupEnabled((value) => !value)}
+              >
+                {pickupEnabled ? copy.pickupOn : copy.pickupOff}
+              </button>
+              <button
+                type="button"
+                className={`chip ${deliveryEnabled ? 'chipActive' : ''}`}
+                onClick={() => setDeliveryEnabled((value) => !value)}
+              >
+                {deliveryEnabled ? copy.deliveryOn : copy.deliveryOff}
+              </button>
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryFee}</label>
+              <input
+                className="input"
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryRadius}</label>
+              <input
+                className="input"
+                value={deliveryRadius}
+                onChange={(e) => setDeliveryRadius(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.deliveryMinimum}</label>
+              <input
+                className="input"
+                value={deliveryMinimum}
+                onChange={(e) => setDeliveryMinimum(sanitizeNumberInput(e.target.value))}
+              />
+            </div>
+          </section>
+        ) : null}
+
+        <SectionCard section="menu" icon="▦" title={copy.menu} right={copy.categoriesAndItems} />
+
+        {expanded === 'menu' ? (
+          <section className="panelCard">
+            <button type="button" className="primaryButton fullWidth" onClick={addCategory}>
+              {copy.addCategory}
             </button>
 
-            {cat.items.map((item) => (
-              <div key={item.id} className="border p-2 rounded">
-                <input
-                  value={item.name}
-                  onChange={(e) =>
-                    setCategories((prev) =>
-                      prev.map((c) =>
-                        c.id === cat.id
-                          ? {
-                              ...c,
-                              items: c.items.map((i) =>
-                                i.id === item.id
-                                  ? { ...i, name: e.target.value }
-                                  : i
-                              ),
-                            }
-                          : c
-                      )
-                    )
-                  }
-                  className="border p-2 w-full rounded"
-                />
+            <div className="field">
+              <label className="label">{copy.selectCategory}</label>
+              <div className="placeholderCategoryRow">
+                {(Object.keys(CATEGORY_PRESETS) as PlaceholderCategory[]).map((categoryType) => (
+                  <button
+                    key={categoryType}
+                    type="button"
+                    className={`chip ${selectedPlaceholderCategory === categoryType ? 'chipActive' : ''}`}
+                    onClick={() => applyCategoryPreset(categoryType)}
+                  >
+                    {categoryType.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                <input
-                  value={item.base_price}
-                  onChange={(e) =>
-                    setCategories((prev) =>
-                      prev.map((c) =>
-                        c.id === cat.id
-                          ? {
-                              ...c,
-                              items: c.items.map((i) =>
-                                i.id === item.id
-                                  ? {
-                                      ...i,
-                                      base_price: sanitizeNumberInput(
-                                        e.target.value
-                                      ),
-                                    }
-                                  : i
-                              ),
-                            }
-                          : c
-                      )
-                    )
-                  }
-                  className="border p-2 w-full rounded mt-2"
-                />
+            <div className="categoryList">
+              {categories.map((category) => (
+                <div key={category.id} className="categoryCard">
+                  <div className="field">
+                    <label className="label">{copy.categoryName}</label>
+                    <input
+                      className="input"
+                      value={category.name}
+                      onChange={(e) => updateCategory(category.id, e.target.value)}
+                    />
+                  </div>
 
-                {/* OPTION BOX (YOU ASKED FOR THIS) */}
-                <div className="mt-2 p-2 border rounded bg-gray-50">
-                  <strong>Options</strong>
-                  {item.option_groups.map((grp) => (
-                    <div key={grp.id}>
-                      {grp.options.map((opt) => (
-                        <div key={opt.id}>{opt.name}</div>
-                      ))}
+                  <button type="button" className="secondaryButton fullWidth" onClick={() => addItem(category.id)}>
+                    {copy.addItem}
+                  </button>
+
+                  {category.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`itemListButton ${selectedItemId === item.id ? 'itemListButtonActive' : ''}`}
+                      onClick={() => selectItem(item.id)}
+                    >
+                      <span>{item.name || copy.itemNameFallback}</span>
+                      <strong>{money(item.base_price)}</strong>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <SectionCard section="item" icon="□" title={copy.itemBuilder} />
+
+        {expanded === 'item' && selectedItem ? (
+          <section className="panelCard">
+            <div className="uploadBlock">
+              <div className="uploadTitle">{copy.uploadItemImage}</div>
+              <label className="primaryButton fullWidth">
+                {uploadingItemId === selectedItem.id ? copy.saving : copy.uploadItemImage}
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={(e) => void handleItemImageUpload(selectedItem.id, e.target.files?.[0] || null)}
+                />
+              </label>
+              <button
+                type="button"
+                className="secondaryButton fullWidth"
+                onClick={() => removeItemImage(selectedItem.id)}
+              >
+                {copy.removeImage}
+              </button>
+
+              {selectedItem.image_url ? (
+                <img src={selectedItem.image_url} alt={copy.itemPreview} className="uploadPreview" />
+              ) : (
+                <div className="imagePlaceholder">{copy.itemPreview}</div>
+              )}
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.itemName}</label>
+              <input
+                className="input"
+                value={selectedItem.name}
+                onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.basePrice}</label>
+              <input
+                className="input"
+                value={selectedItem.base_price}
+                onChange={(e) => updateItem(selectedItem.id, { base_price: sanitizeNumberInput(e.target.value) })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.description}</label>
+              <textarea
+                className="textarea"
+                value={selectedItem.description}
+                onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="label">{copy.placeholderGallery}</label>
+
+              <div className="placeholderCategoryRow">
+                {(Object.keys(CATEGORY_PRESETS) as PlaceholderCategory[]).map((categoryType) => (
+                  <button
+                    key={categoryType}
+                    type="button"
+                    className={`chip ${selectedPlaceholderCategory === categoryType ? 'chipActive' : ''}`}
+                    onClick={() => setSelectedPlaceholderCategory(categoryType)}
+                  >
+                    {categoryType.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+
+              <div className="placeholderMeta">
+                {copy.placeholdersUsed}: {placeholderUsedCount}
+              </div>
+
+              <div className="placeholderGrid">
+                {filteredPlaceholderImages.map((placeholder) => (
+                  <button
+                    key={placeholder.id}
+                    type="button"
+                    className="placeholderCard"
+                    onClick={() => applyPlaceholderToSelectedItem(placeholder.url)}
+                  >
+                    <img src={placeholder.url} alt={placeholder.name} className="placeholderImage" />
+                    <span className="placeholderName">{placeholder.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {plan === 'starter' ? <div className="limitNote">{copy.starterLimitReached}</div> : null}
+            </div>
+
+            <div className="chipRow">
+              <button
+                type="button"
+                className={`chip ${selectedItem.availability === 'available' ? 'chipActive' : ''}`}
+                onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
+              >
+                {copy.available}
+              </button>
+              <button
+                type="button"
+                className={`chip ${selectedItem.availability === 'sold_out' ? 'chipActive' : ''}`}
+                onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
+              >
+                {copy.soldOut}
+              </button>
+            </div>
+
+            {selectedCategory ? (
+              <button
+                type="button"
+                className="dangerWide"
+                onClick={() => deleteItem(selectedCategory.id, selectedItem.id)}
+              >
+                {copy.deleteItem}
+              </button>
+            ) : null}
+          </section>
+        ) : null}
+
+        <SectionCard section="options" icon="⋯" title={copy.optionGroups} />
+
+        {expanded === 'options' && selectedItem ? (
+          <section className="panelCard">
+            <div className="chipRow">
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'combo')}>
+                {copy.combo}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'protein')}>
+                {copy.protein}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'size')}>
+                {copy.size}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'drink')}>
+                {copy.drink}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'sides')}>
+                {copy.sides}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'extras')}>
+                {copy.extras}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'removals')}>
+                {copy.removals}
+              </button>
+              <button type="button" className="chip" onClick={() => addOptionGroup(selectedItem.id, 'custom')}>
+                {copy.custom}
+              </button>
+            </div>
+
+            {selectedItem.option_groups.length ? (
+              <div className="optionGroupList">
+                {selectedItem.option_groups.map((group) => (
+                  <div key={group.id} className="optionGroupCard">
+                    <div className="field">
+                      <label className="label">{copy.optionGroups}</label>
+                      <input
+                        className="input"
+                        value={group.name}
+                        onChange={(e) => updateOptionGroup(selectedItem.id, group.id, { name: e.target.value })}
+                      />
                     </div>
+
+                    <div className="chipRow">
+                      <button
+                        type="button"
+                        className={`chip ${group.required ? 'chipActive' : ''}`}
+                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { required: !group.required })}
+                      >
+                        {group.required ? copy.required : copy.optional}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`chip ${group.selection === 'single' ? 'chipActive' : ''}`}
+                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'single' })}
+                      >
+                        {copy.singleChoice}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`chip ${group.selection === 'multiple' ? 'chipActive' : ''}`}
+                        onClick={() => updateOptionGroup(selectedItem.id, group.id, { selection: 'multiple' })}
+                      >
+                        {copy.multipleChoice}
+                      </button>
+                    </div>
+
+                    <div className="choiceList">
+                      {group.options.map((option) => (
+                        <div key={option.id} className="choiceRow">
+                          <input
+                            className="input choiceName"
+                            value={option.name}
+                            onChange={(e) =>
+                              updateOptionChoice(selectedItem.id, group.id, option.id, { name: e.target.value })
+                            }
+                          />
+                          <input
+                            className="input choicePrice"
+                            value={option.price}
+                            onChange={(e) =>
+                              updateOptionChoice(selectedItem.id, group.id, option.id, {
+                                price: sanitizeNumberInput(e.target.value),
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="dangerButton"
+                            onClick={() => deleteOptionChoice(selectedItem.id, group.id, option.id)}
+                          >
+                            {copy.more}
+                          </button>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        className="secondaryButton fullWidth"
+                        onClick={() => addOptionChoice(selectedItem.id, group.id)}
+                      >
+                        {copy.addChoice}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="dangerWide"
+                      onClick={() => deleteOptionGroup(selectedItem.id, group.id)}
+                    >
+                      {copy.more}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="emptyState">{copy.noOptionGroups}</div>
+            )}
+          </section>
+        ) : null}
+
+        <SectionCard
+          section="flyers"
+          icon="⌁"
+          title={copy.flyers}
+          right={copy.customFlyers}
+          summary={
+            <div className="summaryLines">
+              <strong>{copy.freeFlyer}</strong>
+              <span>{copy.freeQrLive}</span>
+            </div>
+          }
+        />
+
+        {expanded === 'flyers' ? (
+          <section className="panelCard">
+            <div className="flyerBox">
+              <div className="flyerTitle">{copy.freeFlyer}</div>
+              <div className="flyerSub">{copy.freeQrLive}</div>
+              <div className="qrCard">
+                <img src={freeFlyerQrUrl} alt="QR code" className="qrImage" />
+              </div>
+            </div>
+
+            <div className="flyerBox">
+              <div className="flyerTitle">{copy.customFlyers}</div>
+              <div className="flyerSub">{copy.flyerQrUnlock}</div>
+
+              <div className="field">
+                <label className="label">{copy.flyerStyle}</label>
+                <div className="flyerStyleGrid">
+                  {(
+                    [
+                      'generic',
+                      'hibachi',
+                      'dessert',
+                      'hotdog',
+                      'seafood',
+                      'tacos',
+                      'snacks',
+                      'bbq',
+                      'soul_food',
+                      'pollo',
+                      'coffee',
+                    ] as FlyerStyle[]
+                  ).map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      className={`chip ${flyerStyle === style ? 'chipActive' : ''}`}
+                      onClick={() => setFlyerStyle(style)}
+                    >
+                      {style.replace(/_/g, ' ')}
+                    </button>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
-        ))}
+
+              <div className="field">
+                <label className="label">{copy.flyerBusinessName}</label>
+                <input className="input" value={flyerBusinessName} onChange={(e) => setFlyerBusinessName(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label">{copy.flyerHeadline}</label>
+                <input className="input" value={flyerHeadline} onChange={(e) => setFlyerHeadline(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label">{copy.flyerSubheadline}</label>
+                <input className="input" value={flyerSubheadline} onChange={(e) => setFlyerSubheadline(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label">{copy.flyerPromoLine}</label>
+                <input className="input" value={flyerPromoLine} onChange={(e) => setFlyerPromoLine(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label">{copy.flyerInstagram}</label>
+                <input className="input" value={flyerInstagram} onChange={(e) => setFlyerInstagram(e.target.value)} />
+              </div>
+
+              <div className="field">
+                <label className="label">{copy.flyerHours}</label>
+                <input className="input" value={flyerHoursText} readOnly />
+              </div>
+
+              <div className={`customFlyerPreview flyer-${flyerStyle}`}>
+                <div className="customFlyerPreviewInner">
+                  <div className="customFlyerBusinessName">{flyerBusinessName || name || 'Business Name'}</div>
+                  <div className="customFlyerHeadline">{flyerHeadline || 'SCAN TO ORDER'}</div>
+                  <div className="customFlyerSubheadline">
+                    {flyerSubheadline || flyerPromoLine || 'Fresh food. Fast pickup.'}
+                  </div>
+
+                  <div className="customFlyerQrWrap">
+                    <img
+                      src={flyerPaid ? freeFlyerQrUrl : customFlyerPreviewQrUrl}
+                      alt="Custom flyer qr"
+                      className={`customFlyerQr ${flyerPaid ? '' : 'customFlyerQrPreviewOnly'}`}
+                    />
+                    {!flyerPaid ? <div className="customFlyerPreviewLabel">{copy.flyerPreviewOnly}</div> : null}
+                  </div>
+
+                  <div className="customFlyerFooter">
+                    <div>{address || '123 Main St'}</div>
+                    <div>{phone || '323-555-1212'}</div>
+                    <div>{flyerInstagram || '@yourbusiness'}</div>
+                    <div>{flyerHoursText}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pricingGrid">
+                <button
+                  type="button"
+                  className={`priceCard ${flyerPack === '100' ? 'priceCardActive' : ''}`}
+                  onClick={() => setFlyerPack('100')}
+                >
+                  <strong>100</strong>
+                  <span>$120</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`priceCard ${flyerPack === '250' ? 'priceCardActive' : ''}`}
+                  onClick={() => setFlyerPack('250')}
+                >
+                  <strong>250</strong>
+                  <span>$250</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`priceCard bestValueCard ${flyerPack === '500' ? 'priceCardActive' : ''}`}
+                  onClick={() => setFlyerPack('500')}
+                >
+                  <em>{copy.bestValue}</em>
+                  <strong>500</strong>
+                  <span>$450</span>
+                </button>
+              </div>
+
+              <button type="button" className="secondaryButton fullWidth" onClick={() => setFlyerPaid(true)}>
+                {copy.flyerQrUnlock}
+              </button>
+            </div>
+
+            <div className="goLiveBox">
+              <div className="goLiveTitle">{copy.goLiveReady}</div>
+              <div className="goLiveSub">
+                {plan === 'starter' ? copy.starterPlan : plan === 'growth' ? copy.growthPlan : copy.premiumPlan}
+                {' • '}
+                {plan === 'starter' ? copy.firstMonthFree : currentFee.monthly}
+                {' • '}
+                {currentFee.percent} {copy.perOrder}
+              </div>
+
+              <div className="goLiveActions">
+                <button type="button" className="secondaryButton" onClick={() => setStripeConnected(true)}>
+                  {copy.connectStripe}
+                </button>
+                <button type="button" className="primaryButton" onClick={handleGoLive}>
+                  {copy.goLive}
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <nav className="bottomNav">
+          <Link href="/dashboard/owner" className="navItem">
+            <span className="navDot" />
+            <span>{copy.dashboard}</span>
+          </Link>
+          <Link href="/dashboard/owner/builder" className="navItem navItemActive">
+            <span className="navDot" />
+            <span>{copy.builder}</span>
+          </Link>
+          <Link href={previewLink || '#'} className={`navItem ${!previewLink ? 'isDisabled' : ''}`}>
+            <span className="navDot" />
+            <span>{copy.preview}</span>
+          </Link>
+          <button type="button" className="navItem" onClick={() => setExpanded('flyers')}>
+            <span className="navDot" />
+            <span>{copy.flyers}</span>
+          </button>
+          <Link href="/dashboard/owner/orders" className="navItem">
+            <span className="navDot" />
+            <span>{copy.orders}</span>
+          </Link>
+          <Link href="/dashboard/owner/settings" className="navItem">
+            <span className="navDot" />
+            <span>{copy.more}</span>
+          </Link>
+        </nav>
       </div>
 
-      {/* GO LIVE */}
-      <div className="bg-white p-4 rounded-xl shadow space-y-2">
-        <h2 className="font-bold">{copy.goLiveReady}</h2>
+      <style jsx global>{`
+        .page {
+          min-height: 100vh;
+          background: #eef1f5;
+          padding: 16px 12px 28px;
+          display: grid;
+          place-items: start center;
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
 
-        <button className="border px-4 py-2 rounded">
-          {copy.connectStripe}
-        </button>
+        .shell {
+          width: min(100%, 430px);
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          border-radius: 34px;
+          box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+          padding: 14px 14px 96px;
+          position: relative;
+        }
 
-        <button className="bg-black text-white px-4 py-2 rounded">
-          {copy.goLive}
-        </button>
-      </div>
+        .notch {
+          width: 122px;
+          height: 8px;
+          border-radius: 999px;
+          background: #0f172a;
+          margin: 2px auto 16px;
+        }
+
+        .topBar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 12px;
+        }
+
+        .brand {
+          color: #111827;
+          font-size: 18px;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .brandStrong {
+          font-weight: 900;
+          letter-spacing: 0.02em;
+        }
+
+        .brandSoft {
+          color: #6b7280;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+        }
+
+        .topActions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .langButton,
+        .saveButton,
+        .primaryButton,
+        .secondaryButton,
+        .dangerButton,
+        .chip,
+        .previewButton,
+        .itemListButton,
+        .priceCard {
+          min-height: 44px;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: #ffffff;
+          color: #111827;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          font-size: 15px;
+          font-weight: 800;
+          text-decoration: none;
+        }
+
+        .saveButton,
+        .primaryButton,
+        .previewButton {
+          background: #0f172a;
+          border-color: #0f172a;
+          color: #ffffff;
+        }
+
+        .secondaryButton {
+          background: #f8fafc;
+        }
+
+        .dangerButton,
+        .dangerWide {
+          background: #f7e2e2;
+          border-color: transparent;
+          color: #9f2f2f;
+        }
+
+        .fullWidth,
+        .dangerWide {
+          width: 100%;
+        }
+
+        .message {
+          margin-bottom: 12px;
+          border-radius: 14px;
+          padding: 12px 14px;
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .error {
+          color: #991b1b;
+          background: #fbeaea;
+          border: 1px solid rgba(153, 27, 27, 0.12);
+        }
+
+        .success {
+          color: #166534;
+          background: #ebf7ee;
+          border: 1px solid rgba(22, 101, 52, 0.12);
+        }
+
+        .heroCard {
+          margin: 0 -14px;
+          overflow: hidden;
+        }
+
+        .heroWrap {
+          position: relative;
+          min-height: 190px;
+          background: #111827;
+        }
+
+        .heroImage,
+        .heroFallback {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+        }
+
+        .heroImage {
+          object-fit: cover;
+        }
+
+        .heroFallback {
+          background: linear-gradient(135deg, #111827 0%, #334155 100%);
+        }
+
+        .heroOverlay {
+          position: relative;
+          min-height: 190px;
+          display: flex;
+          align-items: flex-end;
+          padding: 16px;
+          background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.64) 100%);
+        }
+
+        .heroIdentity {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+        }
+
+        .heroLogo,
+        .heroLogoFallback {
+          width: 60px;
+          height: 60px;
+          border-radius: 999px;
+          flex-shrink: 0;
+          background: #ffffff;
+        }
+
+        .heroLogo {
+          object-fit: cover;
+        }
+
+        .heroLogoFallback {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #111827;
+          font-size: 24px;
+          font-weight: 900;
+        }
+
+        .heroText {
+          min-width: 0;
+        }
+
+        .heroName {
+          color: #ffffff;
+          font-size: 22px;
+          font-weight: 900;
+        }
+
+        .heroMetaRow {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 6px;
+          color: rgba(255, 255, 255, 0.94);
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .introCard {
+          padding: 18px 2px 14px;
+          display: grid;
+          gap: 8px;
+        }
+
+        .title {
+          margin: 0;
+          color: #111827;
+          font-size: 28px;
+          font-weight: 900;
+        }
+
+        .subtitle {
+          margin: 0;
+          color: #6b7280;
+          font-size: 15px;
+          font-weight: 600;
+        }
+
+        .previewButton {
+          margin-top: 10px;
+          width: 100%;
+        }
+
+        .isDisabled {
+          pointer-events: none;
+          opacity: 0.5;
+        }
+
+        .sectionStack {
+          display: grid;
+          gap: 12px;
+        }
+
+        .sectionCard,
+        .panelCard,
+        .categoryCard,
+        .optionGroupCard,
+        .flyerBox,
+        .goLiveBox {
+          width: 100%;
+          border-radius: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #ffffff;
+        }
+
+        .sectionCard {
+          padding: 14px;
+          text-align: left;
+        }
+
+        .sectionCardTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .sectionCardLeft,
+        .sectionCardRight {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .sectionCardTitle {
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .sectionCardMeta,
+        .sectionCardArrow,
+        .sectionCardSummary {
+          color: #6b7280;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .sectionCardSummary {
+          margin-top: 10px;
+        }
+
+        .summaryLines {
+          display: grid;
+          gap: 4px;
+        }
+
+        .summaryLines strong {
+          color: #111827;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .panelCard,
+        .categoryCard,
+        .optionGroupCard,
+        .flyerBox,
+        .goLiveBox {
+          padding: 14px;
+          display: grid;
+          gap: 12px;
+        }
+
+        .field,
+        .uploadBlock,
+        .categoryList,
+        .optionGroupList,
+        .choiceList,
+        .hoursBlock {
+          display: grid;
+          gap: 10px;
+        }
+
+        .hoursGrid {
+          display: grid;
+          gap: 10px;
+        }
+
+        .hoursRow {
+          display: grid;
+          grid-template-columns: 1fr 120px 1fr 1fr;
+          gap: 10px;
+          align-items: center;
+        }
+
+        .hoursDay {
+          color: #111827;
+          font-size: 14px;
+          font-weight: 800;
+          text-transform: capitalize;
+        }
+
+        .label {
+          color: #6b7280;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .input,
+        .textarea,
+        .urlPill,
+        .select {
+          width: 100%;
+          border-radius: 14px;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          background: #ffffff;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 700;
+          min-height: 52px;
+          padding: 0 14px;
+        }
+
+        .textarea {
+          min-height: 120px;
+          padding: 14px;
+          resize: vertical;
+        }
+
+        .urlPill {
+          display: flex;
+          align-items: center;
+          background: #f8fafc;
+          word-break: break-word;
+        }
+
+        .uploadTitle,
+        .flyerTitle,
+        .goLiveTitle {
+          color: #111827;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .flyerSub,
+        .goLiveSub,
+        .placeholderMeta,
+        .limitNote {
+          color: #6b7280;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .uploadPreview,
+        .imagePlaceholder {
+          width: 100%;
+          border-radius: 16px;
+          min-height: 180px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #eef1f5;
+          color: #6b7280;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .uploadPreview {
+          object-fit: cover;
+        }
+
+        .logoPreview {
+          max-height: 240px;
+          object-fit: contain;
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .chipRow,
+        .placeholderCategoryRow,
+        .flyerStyleGrid,
+        .goLiveActions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .chipActive,
+        .itemListButtonActive,
+        .priceCardActive {
+          background: #0f172a;
+          color: #ffffff;
+          border-color: #0f172a;
+        }
+
+        .itemListButton {
+          justify-content: space-between;
+          width: 100%;
+          background: #ffffff;
+          color: #111827;
+        }
+
+        .choiceRow {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+        }
+
+        .choiceName {
+          flex: 1 1 auto;
+        }
+
+        .choicePrice {
+          width: 96px;
+        }
+
+        .emptyState {
+          border-radius: 14px;
+          border: 1px dashed rgba(15, 23, 42, 0.14);
+          padding: 24px;
+          text-align: center;
+          color: #6b7280;
+          font-size: 16px;
+          font-weight: 800;
+          background: #fafafa;
+        }
+
+        .miniIcon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #f3f4f6;
+          color: #111827;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .placeholderGrid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .placeholderCard {
+          border-radius: 14px;
+          overflow: hidden;
+          border: 1px solid rgba(15, 23, 42, 0.1);
+          background: #ffffff;
+          padding: 0;
+        }
+
+        .placeholderImage {
+          width: 100%;
+          aspect-ratio: 1.1 / 1;
+          object-fit: cover;
+          display: block;
+        }
+
+        .placeholderName {
+          display: block;
+          padding: 10px;
+          color: #111827;
+          font-size: 13px;
+          font-weight: 800;
+          text-align: left;
+        }
+
+        .qrCard {
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          padding: 14px;
+          display: grid;
+          place-items: center;
+        }
+
+        .qrImage {
+          width: 220px;
+          max-width: 100%;
+          border-radius: 12px;
+          display: block;
+        }
+
+        .pricingGrid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .priceCard {
+          display: grid;
+          gap: 6px;
+          justify-items: center;
+          padding: 12px;
+        }
+
+        .priceCard strong {
+          color: inherit;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .priceCard span,
+        .bestValueCard em {
+          color: inherit;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .bestValueCard {
+          background: #fff7ed;
+          border-color: rgba(249, 115, 22, 0.18);
+        }
+
+        .customFlyerPreview {
+          border-radius: 22px;
+          padding: 18px;
+          min-height: 520px;
+          color: #ffffff;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .customFlyerPreviewInner {
+          display: grid;
+          gap: 18px;
+          justify-items: center;
+          text-align: center;
+        }
+
+        .customFlyerBusinessName {
+          font-size: 28px;
+          font-weight: 900;
+          line-height: 1.05;
+        }
+
+        .customFlyerHeadline {
+          font-size: 48px;
+          line-height: 0.95;
+          font-weight: 900;
+        }
+
+        .customFlyerSubheadline {
+          font-size: 18px;
+          font-weight: 800;
+        }
+
+        .customFlyerQrWrap {
+          position: relative;
+          width: 100%;
+          display: grid;
+          place-items: center;
+        }
+
+        .customFlyerQr {
+          width: min(100%, 260px);
+          border-radius: 16px;
+          background: #ffffff;
+          padding: 8px;
+        }
+
+        .customFlyerQrPreviewOnly {
+          filter: blur(2px) saturate(0.9);
+        }
+
+        .customFlyerPreviewLabel {
+          position: absolute;
+          inset: 0;
+          display: grid;
+          place-items: center;
+          font-size: 22px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+        }
+
+        .customFlyerFooter {
+          display: grid;
+          gap: 8px;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .flyer-generic {
+          background: linear-gradient(180deg, #7c2d12 0%, #b45309 100%);
+        }
+
+        .flyer-hibachi {
+          background: linear-gradient(180deg, #111111 0%, #7f1d1d 100%);
+        }
+
+        .flyer-dessert {
+          background: linear-gradient(180deg, #ec4899 0%, #f9a8d4 100%);
+        }
+
+        .flyer-hotdog {
+          background: linear-gradient(180deg, #991b1b 0%, #f59e0b 100%);
+        }
+
+        .flyer-seafood {
+          background: linear-gradient(180deg, #0c4a6e 0%, #2563eb 100%);
+        }
+
+        .flyer-tacos {
+          background: linear-gradient(180deg, #14532d 0%, #ca8a04 100%);
+        }
+
+        .flyer-snacks {
+          background: linear-gradient(180deg, #7c3aed 0%, #db2777 100%);
+        }
+
+        .flyer-bbq {
+          background: linear-gradient(180deg, #7f1d1d 0%, #ea580c 100%);
+        }
+
+        .flyer-soul_food {
+          background: linear-gradient(180deg, #78350f 0%, #d97706 100%);
+        }
+
+        .flyer-pollo {
+          background: linear-gradient(180deg, #854d0e 0%, #facc15 100%);
+        }
+
+        .flyer-coffee {
+          background: linear-gradient(180deg, #3f2a1d 0%, #8b5e3c 100%);
+        }
+
+        .bottomNav {
+          position: absolute;
+          left: 14px;
+          right: 14px;
+          bottom: 14px;
+          min-height: 72px;
+          border-radius: 18px;
+          border: 1px solid rgba(15, 23, 42, 0.08);
+          background: rgba(255, 255, 255, 0.96);
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 4px;
+          padding: 8px 6px;
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        .navItem {
+          min-height: 56px;
+          border-radius: 12px;
+          color: #6b7280;
+          display: grid;
+          justify-items: center;
+          align-content: center;
+          gap: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          background: transparent;
+          border: 0;
+          text-decoration: none;
+        }
+
+        .navItemActive {
+          background: #0f172a;
+          color: #ffffff;
+        }
+
+        .navDot {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+          background: currentColor;
+          display: inline-block;
+        }
+
+        @media (max-width: 390px) {
+          .pricingGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .hoursRow {
+            grid-template-columns: 1fr;
+          }
+
+          .placeholderGrid {
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+      `}</style>
     </div>
-  );
+  </main>
+);
 }
-
