@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -34,8 +33,8 @@ type RestaurantRow = {
   delivery_fee?: number | null;
   delivery_radius?: number | null;
   delivery_minimum?: number | null;
-  hours?: string | null;
   plan?: string | null;
+  created_at?: string | null;
 };
 
 type MenuCategoryRow = {
@@ -102,6 +101,7 @@ type BuilderItem = {
   price: string;
   description: string;
   image_url: string;
+  image_source: 'upload' | 'placeholder' | 'empty';
   availability: Availability;
   option_groups: BuilderOptionGroup[];
 };
@@ -111,13 +111,6 @@ type BuilderCategory = {
   name: string;
   sort_order: number;
   items: BuilderItem[];
-};
-
-type HoursRow = {
-  day: string;
-  open: boolean;
-  start: string;
-  end: string;
 };
 
 const FLYER_LINKS = {
@@ -138,35 +131,72 @@ const PLAN_COPY: Record<PlanKey, string> = {
   premium: '$99/mo • 3% fee/order • unlimited placeholders',
 };
 
-const DEFAULT_HOURS: HoursRow[] = [
-  { day: 'Monday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Tuesday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Wednesday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Thursday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Friday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Saturday', open: false, start: '09:00', end: '18:00' },
-  { day: 'Sunday', open: false, start: '09:00', end: '18:00' },
-];
+const PLACEHOLDER_LIBRARY: Record<string, string[]> = {
+  bbq: [
+    'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80',
+  ],
+  breakfast: [
+    'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1506084868230-bb9d95c24759?auto=format&fit=crop&w=1200&q=80',
+  ],
+  combos: [
+    'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80',
+  ],
+  desserts: [
+    'https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1464306076886-da185f6a9d05?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?auto=format&fit=crop&w=1200&q=80',
+  ],
+  drinks: [
+    'https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1497534446932-c925b458314e?auto=format&fit=crop&w=1200&q=80',
+  ],
+  mexican: [
+    'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1613514785940-daed07799d9b?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1565299585323-38174c4a6e0f?auto=format&fit=crop&w=1200&q=80',
+  ],
+  pasta: [
+    'https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=1200&q=80',
+  ],
+  sandwiches: [
+    'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=80',
+  ],
+  seafood: [
+    'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=1200&q=80',
+  ],
+  sides: [
+    'https://images.unsplash.com/photo-1576107232684-1279f390859f?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1518013431117-eb1465fa5752?auto=format&fit=crop&w=1200&q=80',
+  ],
+  singles: [
+    'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1499028344343-cd173ffc68a9?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80',
+  ],
+  wings: [
+    'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1527477396000-e27163b481c2?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1608039755401-742074f0548d?auto=format&fit=crop&w=1200&q=80',
+  ],
+};
 
-const PLACEHOLDER_BUCKET = 'menu-images';
 const HERO_BUCKET = 'heroes';
 const LOGO_BUCKET = 'logos';
 const ITEM_BUCKET = 'menu-items';
-
-const PLACEHOLDER_FOLDERS = [
-  'bbq',
-  'breakfast',
-  'combos',
-  'desserts',
-  'drinks',
-  'mexican',
-  'pasta',
-  'sandwiches',
-  'seafood',
-  'sides',
-  'singles',
-  'wings',
-] as const;
 
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -194,32 +224,7 @@ function money(value: string | number | null | undefined) {
       : 0;
 
   if (!Number.isFinite(num)) return '$0';
-  return `$${num.toFixed(2).replace(/\.00$/, '')}`;
-}
-
-function parseHours(raw: string | null | undefined): HoursRow[] {
-  if (!raw) return DEFAULT_HOURS;
-  try {
-    const parsed = JSON.parse(raw) as HoursRow[];
-    if (!Array.isArray(parsed)) return DEFAULT_HOURS;
-    return DEFAULT_HOURS.map((baseRow) => {
-      const found = parsed.find((entry) => entry.day === baseRow.day);
-      return found
-        ? {
-            day: baseRow.day,
-            open: !!found.open,
-            start: found.start || baseRow.start,
-            end: found.end || baseRow.end,
-          }
-        : baseRow;
-    });
-  } catch {
-    return DEFAULT_HOURS;
-  }
-}
-
-function serializeHours(rows: HoursRow[]) {
-  return JSON.stringify(rows);
+  return `$${num.toFixed(2).replace(/\\.00$/, '')}`;
 }
 
 function safeArray<T>(value: T[] | null | undefined): T[] {
@@ -227,7 +232,7 @@ function safeArray<T>(value: T[] | null | undefined): T[] {
 }
 
 function normalizePlan(value: string | null | undefined): PlanKey {
-  const next = (value || '').toLowerCase();
+  const next = String(value || '').toLowerCase();
   if (next === 'growth' || next === 'premium') return next;
   return 'starter';
 }
@@ -240,12 +245,14 @@ function normalizeTheme(value: string | null | undefined): ThemeMode {
   return String(value || 'light').toLowerCase() === 'dark' ? 'dark' : 'light';
 }
 
-function pickFlyerStyle(categories: BuilderCategory[]): FlyerStyle {
-  const joined = categories.map((category) => category.name.toLowerCase()).join(' ');
-  if (joined.includes('seafood')) return 'seafood';
-  if (joined.includes('bbq')) return 'bbq';
-  if (joined.includes('street') || joined.includes('taco') || joined.includes('mex')) return 'street';
-  return 'clean';
+function normalizeAvailability(item: MenuItemRow): Availability {
+  if (item.availability === 'sold_out' || item.is_available === false || item.available === false) return 'sold_out';
+  return 'available';
+}
+
+function normalizeSelectionMode(group: OptionGroupRow): 'single' | 'multiple' {
+  if (group.selection_mode === 'multiple' || group.is_multiple) return 'multiple';
+  return 'single';
 }
 
 function deriveFolderFromCategory(name: string) {
@@ -260,12 +267,85 @@ function deriveFolderFromCategory(name: string) {
   if (normalized.includes('sandwich') || normalized.includes('burger')) return 'sandwiches';
   if (normalized.includes('combo')) return 'combos';
   if (normalized.includes('side')) return 'sides';
-  if (normalized.includes('taco') || normalized.includes('mex')) return 'mexican';
+  if (normalized.includes('taco') || normalized.includes('mex') || normalized.includes('burrito') || normalized.includes('quesadilla')) return 'mexican';
   return 'singles';
+}
+
+function pickFlyerStyle(categories: BuilderCategory[]): FlyerStyle {
+  const joined = categories.map((category) => category.name.toLowerCase()).join(' ');
+  if (joined.includes('seafood')) return 'seafood';
+  if (joined.includes('bbq')) return 'bbq';
+  if (joined.includes('street') || joined.includes('taco') || joined.includes('mex')) return 'street';
+  return 'clean';
+}
+
+function getPlaceholderLimit(plan: PlanKey) {
+  if (plan === 'starter') return 6;
+  return Number.POSITIVE_INFINITY;
+}
+
+function getEmptyBuilderState() {
+  const categoryId = uid('cat');
+  const itemId = uid('item');
+
+  return [
+    {
+      id: categoryId,
+      name: 'Featured',
+      sort_order: 0,
+      items: [
+        {
+          id: itemId,
+          category_id: categoryId,
+          name: 'New Item',
+          price: '0',
+          description: '',
+          image_url: '',
+          image_source: 'empty' as const,
+          availability: 'available' as const,
+          option_groups: [],
+        },
+      ],
+    },
+  ] satisfies BuilderCategory[];
 }
 
 function MiniIcon({ children }: { children: ReactNode }) {
   return <span className="miniIcon">{children}</span>;
+}
+
+function SectionCard({
+  section,
+  icon,
+  title,
+  summary,
+  right,
+  expanded,
+  onToggle,
+}: {
+  section: SectionKey;
+  icon: ReactNode;
+  title: string;
+  summary?: ReactNode;
+  right?: ReactNode;
+  expanded: boolean;
+  onToggle: (section: SectionKey) => void;
+}) {
+  return (
+    <button type="button" className={expanded ? 'sectionCard sectionCardActive' : 'sectionCard'} onClick={() => onToggle(section)}>
+      <div className="sectionHead">
+        <div className="sectionLeft">
+          <MiniIcon>{icon}</MiniIcon>
+          <div className="sectionTitle">{title}</div>
+        </div>
+        <div className="sectionRight">
+          {right ? <span className="sectionMeta">{right}</span> : null}
+          <span className="sectionArrow">{expanded ? '−' : '›'}</span>
+        </div>
+      </div>
+      {summary ? <div className="sectionSummary">{summary}</div> : null}
+    </button>
+  );
 }
 
 export default function BuilderPage() {
@@ -285,20 +365,18 @@ export default function BuilderPage() {
   const [logoImage, setLogoImage] = useState('');
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [storefrontLanguage, setStorefrontLanguage] = useState<LanguageMode>('en');
-  const [ownerLanguage, setOwnerLanguage] = useState<LanguageMode>('en');
+  const [orderLanguage, setOrderLanguage] = useState<LanguageMode>('en');
   const [pickupEnabled, setPickupEnabled] = useState(true);
   const [deliveryEnabled, setDeliveryEnabled] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState('0');
   const [deliveryRadius, setDeliveryRadius] = useState('5');
   const [deliveryMinimum, setDeliveryMinimum] = useState('0');
-  const [hours, setHours] = useState<HoursRow[]>(DEFAULT_HOURS);
 
   const [categories, setCategories] = useState<BuilderCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [expanded, setExpanded] = useState<ExpandedSection>('store');
 
-  const [placeholderMap, setPlaceholderMap] = useState<Record<string, string[]>>({});
   const [flyerQty, setFlyerQty] = useState<'100' | '250' | '500'>('100');
   const [flyerStyleOverride, setFlyerStyleOverride] = useState<FlyerStyle | null>(null);
 
@@ -307,6 +385,14 @@ export default function BuilderPage() {
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSlug(slugify(name));
+  }, [name]);
+
+  useEffect(() => {
+    void loadBuilder();
+  }, []);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) || categories[0] || null,
@@ -318,57 +404,25 @@ export default function BuilderPage() {
     return items.find((item) => item.id === selectedItemId) || items[0] || null;
   }, [categories, selectedItemId]);
 
-  const themeClass = theme === 'dark' ? 'themeDark' : 'themeLight';
   const previewSlug = slug || slugify(name);
+  const themeClass = theme === 'dark' ? 'themeDark' : 'themeLight';
   const flyerStyle = flyerStyleOverride || pickFlyerStyle(categories);
+  const placeholderLimit = getPlaceholderLimit(plan);
 
-  useEffect(() => {
-    setSlug(slugify(name));
-  }, [name]);
+  const placeholderCount = useMemo(() => {
+    return categories.reduce((count, category) => {
+      return count + category.items.filter((item) => item.image_source === 'placeholder' && item.image_url).length;
+    }, 0);
+  }, [categories]);
 
-  useEffect(() => {
-    void loadBuilder();
-    void loadPlaceholderImages();
-  }, []);
+  const placeholderChoices = useMemo(() => {
+    const folder = deriveFolderFromCategory(selectedCategory?.name || 'singles');
+    return PLACEHOLDER_LIBRARY[folder] || PLACEHOLDER_LIBRARY.singles;
+  }, [selectedCategory]);
 
-  async function loadPlaceholderImages() {
-    const nextMap: Record<string, string[]> = {};
-
-    for (const folder of PLACEHOLDER_FOLDERS) {
-      const { data } = await supabase.storage.from(PLACEHOLDER_BUCKET).list(folder, {
-        limit: 80,
-        sortBy: { column: 'name', order: 'asc' },
-      });
-
-      nextMap[folder] = [];
-      for (const file of safeArray(data)) {
-        if (!file.name || file.name.startsWith('.')) continue;
-        const { data: publicData } = supabase.storage.from(PLACEHOLDER_BUCKET).getPublicUrl(`${folder}/${file.name}`);
-        if (publicData?.publicUrl) nextMap[folder].push(publicData.publicUrl);
-      }
-    }
-
-    setPlaceholderMap(nextMap);
-  }
-
-  function getSelectedCategoryFolder() {
-    return deriveFolderFromCategory(selectedCategory?.name || 'singles');
-  }
-
-  function getPlaceholderChoicesForSelectedCategory() {
-    return placeholderMap[getSelectedCategoryFolder()] || placeholderMap.singles || [];
-  }
-
-  function getUsedPlaceholderCount(currentCategories = categories) {
-    let count = 0;
-    const placeholderUrls = Object.values(placeholderMap).flat();
-    currentCategories.forEach((category) => {
-      category.items.forEach((item) => {
-        if (placeholderUrls.includes(item.image_url)) count += 1;
-      });
-    });
-    return count;
-  }
+  const flyerTitle = name.trim() || 'Your Store';
+  const flyerSub = selectedCategory?.name || 'Custom Flyer';
+  const flyerImage = selectedItem?.image_url || heroImage || placeholderChoices[0] || '';
 
   async function loadBuilder() {
     setLoading(true);
@@ -387,95 +441,97 @@ export default function BuilderPage() {
 
     setOwnerId(user.id);
 
-    let restaurant: RestaurantRow | null = null;
+    try {
+      let restaurant: RestaurantRow | null = null;
 
-    const { data: byOwner } = await supabase
-      .from('restaurants')
-      .select('*')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    restaurant = (byOwner as RestaurantRow | null) || null;
-
-    if (!restaurant) {
-      const { data: byUser } = await supabase
+      const { data: byOwner } = await supabase
         .from('restaurants')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('owner_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      restaurant = (byUser as RestaurantRow | null) || null;
-    }
+      restaurant = (byOwner as RestaurantRow | null) || null;
 
-    if (!restaurant) {
-      const { data: created, error: createError } = await supabase
-        .from('restaurants')
-        .insert({
-          owner_id: user.id,
-          user_id: user.id,
-          name: '',
-          slug: '',
-          storefront_theme: 'light',
-          storefront_language: 'en',
-          order_language: 'en',
-          pickup_enabled: true,
-          delivery_enabled: false,
-          delivery_fee: 0,
-          delivery_radius: 5,
-          delivery_minimum: 0,
-          hours: serializeHours(DEFAULT_HOURS),
-          plan: 'starter',
-        })
-        .select('*')
-        .single();
+      if (!restaurant) {
+        const { data: byUser } = await supabase
+          .from('restaurants')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (createError) {
-        setError(createError.message);
-        setLoading(false);
-        return;
+        restaurant = (byUser as RestaurantRow | null) || null;
       }
 
-      restaurant = created as RestaurantRow;
+      if (!restaurant) {
+        const { data: created, error: createError } = await supabase
+          .from('restaurants')
+          .insert({
+            owner_id: user.id,
+            user_id: user.id,
+            name: '',
+            slug: '',
+            storefront_theme: 'light',
+            storefront_language: 'en',
+            order_language: 'en',
+            pickup_enabled: true,
+            delivery_enabled: false,
+            delivery_fee: 0,
+            delivery_radius: 5,
+            delivery_minimum: 0,
+            plan: 'starter',
+          })
+          .select('*')
+          .single();
+
+        if (createError) throw createError;
+        restaurant = created as RestaurantRow;
+      }
+
+      setRestaurantId(restaurant.id);
+      setPlan(normalizePlan(restaurant.plan));
+      setName(restaurant.name || '');
+      setSlug(restaurant.slug || '');
+      setPhone(restaurant.phone || '');
+      setAddress(restaurant.address || '');
+      setHeroImage(restaurant.hero_image || restaurant.hero_url || '');
+      setLogoImage(restaurant.logo_image || restaurant.logo_url || '');
+      setTheme(normalizeTheme(restaurant.storefront_theme));
+      setStorefrontLanguage(normalizeLanguage(restaurant.storefront_language));
+      setOrderLanguage(normalizeLanguage(restaurant.order_language));
+      setPickupEnabled(restaurant.pickup_enabled ?? true);
+      setDeliveryEnabled(restaurant.delivery_enabled ?? false);
+      setDeliveryFee(String(restaurant.delivery_fee ?? 0));
+      setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
+      setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
+
+      await loadMenuData(restaurant.id);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not load builder.');
+    } finally {
+      setLoading(false);
     }
-
-    setRestaurantId(restaurant.id);
-    setPlan(normalizePlan(restaurant.plan));
-    setName(restaurant.name || '');
-    setSlug(restaurant.slug || '');
-    setPhone(restaurant.phone || '');
-    setAddress(restaurant.address || '');
-    setHeroImage(restaurant.hero_image || restaurant.hero_url || '');
-    setLogoImage(restaurant.logo_image || restaurant.logo_url || '');
-    setTheme(normalizeTheme(restaurant.storefront_theme));
-    setStorefrontLanguage(normalizeLanguage(restaurant.storefront_language));
-    setOwnerLanguage(normalizeLanguage(restaurant.order_language));
-    setPickupEnabled(restaurant.pickup_enabled ?? true);
-    setDeliveryEnabled(restaurant.delivery_enabled ?? false);
-    setDeliveryFee(String(restaurant.delivery_fee ?? 0));
-    setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
-    setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
-    setHours(parseHours(restaurant.hours));
-
-    await loadMenuData(restaurant.id);
-    setLoading(false);
   }
 
   async function loadMenuData(currentRestaurantId: string) {
-    const { data: categoryRows } = await supabase
+    const { data: categoryRows, error: categoryError } = await supabase
       .from('menu_categories')
       .select('*')
       .eq('restaurant_id', currentRestaurantId)
       .order('sort_order', { ascending: true });
 
-    const { data: itemRows } = await supabase
+    if (categoryError) throw categoryError;
+
+    const { data: itemRows, error: itemError } = await supabase
       .from('menu_items')
       .select('*')
       .eq('restaurant_id', currentRestaurantId)
       .order('sort_order', { ascending: true });
+
+    if (itemError) throw itemError;
 
     const items = safeArray(itemRows) as MenuItemRow[];
     const itemIds = items.map((item) => item.id);
@@ -484,24 +540,26 @@ export default function BuilderPage() {
     let choiceRows: OptionChoiceRow[] = [];
 
     if (itemIds.length) {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('menu_option_groups')
         .select('*')
         .in('item_id', itemIds)
         .order('sort_order', { ascending: true });
 
+      if (error) throw error;
       groupRows = safeArray(data) as OptionGroupRow[];
 
       const groupIds = groupRows.map((group) => group.id);
 
       if (groupIds.length) {
-        const { data: choices } = await supabase
+        const { data: choiceData, error: choiceError } = await supabase
           .from('menu_option_choices')
           .select('*')
           .in('option_group_id', groupIds)
           .order('sort_order', { ascending: true });
 
-        choiceRows = safeArray(choices) as OptionChoiceRow[];
+        if (choiceError) throw choiceError;
+        choiceRows = safeArray(choiceData) as OptionChoiceRow[];
       }
     }
 
@@ -518,18 +576,15 @@ export default function BuilderPage() {
           price: String(item.base_price ?? item.price ?? 0),
           description: item.description || '',
           image_url: item.image_url || item.image || '',
-          availability:
-            item.availability === 'sold_out' || item.is_available === false || item.available === false
-              ? 'sold_out'
-              : 'available',
+          image_source: item.image_url || item.image ? 'upload' : 'empty',
+          availability: normalizeAvailability(item),
           option_groups: groupRows
             .filter((group) => group.item_id === item.id)
             .map((group) => ({
               id: group.id,
               name: group.name || 'Options',
               required: !!group.is_required,
-              selection:
-                group.selection_mode === 'multiple' || group.is_multiple ? 'multiple' : 'single',
+              selection: normalizeSelectionMode(group),
               options: choiceRows
                 .filter((choice) => choice.option_group_id === group.id)
                 .map((choice) => ({
@@ -541,35 +596,10 @@ export default function BuilderPage() {
         })),
     }));
 
-    const fallbackCategoryId = uid('cat');
-    const fallbackItemId = uid('item');
-
-    const finalCategories =
-      nextCategories.length > 0
-        ? nextCategories
-        : [
-            {
-              id: fallbackCategoryId,
-              name: 'Featured',
-              sort_order: 0,
-              items: [
-                {
-                  id: fallbackItemId,
-                  category_id: fallbackCategoryId,
-                  name: 'New Item',
-                  price: '0',
-                  description: '',
-                  image_url: '',
-                  availability: 'available' as Availability,
-                  option_groups: [],
-                },
-              ],
-            },
-          ];
-
+    const finalCategories = nextCategories.length ? nextCategories : getEmptyBuilderState();
     setCategories(finalCategories);
-    setSelectedCategoryId(finalCategories[0].id);
-    setSelectedItemId(finalCategories[0].items[0]?.id || '');
+    setSelectedCategoryId(finalCategories[0]?.id || '');
+    setSelectedItemId(finalCategories[0]?.items[0]?.id || '');
   }
 
   async function uploadFile(file: File, bucket: string) {
@@ -590,7 +620,6 @@ export default function BuilderPage() {
   async function handleHeroUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     try {
       setUploadingHero(true);
       setError('');
@@ -606,7 +635,6 @@ export default function BuilderPage() {
   async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     try {
       setUploadingLogo(true);
       setError('');
@@ -622,7 +650,6 @@ export default function BuilderPage() {
   async function handleItemImageUpload(itemId: string, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     try {
       setUploadingItemId(itemId);
       setError('');
@@ -630,7 +657,9 @@ export default function BuilderPage() {
       setCategories((current) =>
         current.map((category) => ({
           ...category,
-          items: category.items.map((item) => (item.id === itemId ? { ...item, image_url: url } : item)),
+          items: category.items.map((item) =>
+            item.id === itemId ? { ...item, image_url: url, image_source: 'upload' } : item
+          ),
         }))
       );
     } catch (e: unknown) {
@@ -643,51 +672,40 @@ export default function BuilderPage() {
   function usePlaceholder(itemId: string, url: string) {
     const nextCategories = categories.map((category) => ({
       ...category,
-      items: category.items.map((item) => (item.id === itemId ? { ...item, image_url: url } : item)),
+      items: category.items.map((item) =>
+        item.id === itemId ? { ...item, image_url: url, image_source: 'placeholder' } : item
+      ),
     }));
 
-    const nextCount = getUsedPlaceholderCount(nextCategories);
+    const nextCount = nextCategories.reduce((count, category) => {
+      return count + category.items.filter((item) => item.image_source === 'placeholder' && item.image_url).length;
+    }, 0);
+
     if (plan === 'starter' && nextCount > 6) {
       setError('Starter plan placeholder limit reached (6). Upgrade to Growth or Premium for unlimited placeholders.');
       return;
     }
 
-    setError('');
     setCategories(nextCategories);
+    setError('');
   }
 
   function toggleSection(section: SectionKey) {
     setExpanded((current) => (current === section ? null : section));
   }
 
-  function updateHours(index: number, patch: Partial<HoursRow>) {
-    setHours((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-
   function addCategory() {
     const categoryId = uid('cat');
-    const itemId = uid('item');
     const next: BuilderCategory = {
       id: categoryId,
       name: 'New Category',
       sort_order: categories.length,
-      items: [
-        {
-          id: itemId,
-          category_id: categoryId,
-          name: 'New Item',
-          price: '0',
-          description: '',
-          image_url: '',
-          availability: 'available',
-          option_groups: [],
-        },
-      ],
+      items: [],
     };
 
     setCategories((current) => [...current, next]);
     setSelectedCategoryId(categoryId);
-    setSelectedItemId(itemId);
+    setSelectedItemId('');
     setExpanded('menu');
   }
 
@@ -721,6 +739,7 @@ export default function BuilderPage() {
                   price: '0',
                   description: '',
                   image_url: '',
+                  image_source: 'empty',
                   availability: 'available',
                   option_groups: [],
                 },
@@ -731,10 +750,7 @@ export default function BuilderPage() {
     );
     setSelectedCategoryId(categoryId);
     setSelectedItemId(itemId);
-  }
-
-  function saveAndAddNextItem(categoryId: string) {
-    addItem(categoryId);
+    setExpanded('menu');
   }
 
   function updateItem(itemId: string, patch: Partial<BuilderItem>) {
@@ -748,9 +764,7 @@ export default function BuilderPage() {
 
   function deleteItem(categoryId: string, itemId: string) {
     const nextCategories = categories.map((category) =>
-      category.id === categoryId
-        ? { ...category, items: category.items.filter((item) => item.id !== itemId) }
-        : category
+      category.id === categoryId ? { ...category, items: category.items.filter((item) => item.id !== itemId) } : category
     );
     setCategories(nextCategories);
 
@@ -806,9 +820,7 @@ export default function BuilderPage() {
       current.map((category) => ({
         ...category,
         items: category.items.map((item) =>
-          item.id === itemId
-            ? { ...item, option_groups: item.option_groups.filter((group) => group.id !== groupId) }
-            : item
+          item.id === itemId ? { ...item, option_groups: item.option_groups.filter((group) => group.id !== groupId) } : item
         ),
       }))
     );
@@ -847,10 +859,7 @@ export default function BuilderPage() {
                 ...item,
                 option_groups: item.option_groups.map((group) =>
                   group.id === groupId
-                    ? {
-                        ...group,
-                        options: group.options.map((choice) => (choice.id === choiceId ? { ...choice, ...patch } : choice)),
-                      }
+                    ? { ...group, options: group.options.map((choice) => (choice.id === choiceId ? { ...choice, ...patch } : choice)) }
                     : group
                 ),
               }
@@ -869,9 +878,7 @@ export default function BuilderPage() {
             ? {
                 ...item,
                 option_groups: item.option_groups.map((group) =>
-                  group.id === groupId
-                    ? { ...group, options: group.options.filter((choice) => choice.id !== choiceId) }
-                    : group
+                  group.id === groupId ? { ...group, options: group.options.filter((choice) => choice.id !== choiceId) } : group
                 ),
               }
             : item
@@ -903,13 +910,12 @@ export default function BuilderPage() {
         logo_url: logoImage || null,
         storefront_theme: theme,
         storefront_language: storefrontLanguage,
-        order_language: ownerLanguage,
+        order_language: orderLanguage,
         pickup_enabled: pickupEnabled,
         delivery_enabled: deliveryEnabled,
         delivery_fee: Number(deliveryFee || 0),
         delivery_radius: Number(deliveryRadius || 0),
         delivery_minimum: Number(deliveryMinimum || 0),
-        hours: serializeHours(hours),
         plan,
       };
 
@@ -925,19 +931,13 @@ export default function BuilderPage() {
 
       let existingItemIds: string[] = [];
       if (existingCategoryIds.length) {
-        const { data: existingItemRows } = await supabase
-          .from('menu_items')
-          .select('id')
-          .eq('restaurant_id', restaurantId);
+        const { data: existingItemRows } = await supabase.from('menu_items').select('id').eq('restaurant_id', restaurantId);
         existingItemIds = safeArray(existingItemRows).map((row: { id: string }) => row.id);
       }
 
       let existingGroupIds: string[] = [];
       if (existingItemIds.length) {
-        const { data: existingGroupRows } = await supabase
-          .from('menu_option_groups')
-          .select('id')
-          .in('item_id', existingItemIds);
+        const { data: existingGroupRows } = await supabase.from('menu_option_groups').select('id').in('item_id', existingItemIds);
         existingGroupIds = safeArray(existingGroupRows).map((row: { id: string }) => row.id);
       }
 
@@ -1043,45 +1043,18 @@ export default function BuilderPage() {
     }
   }
 
+  const qrValue =
+    typeof window !== 'undefined' && previewSlug
+      ? `${window.location.origin}/store/${previewSlug}`
+      : `/store/${previewSlug || 'your-store'}`;
+
+  const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrValue)}`;
+
   function renderFlyerBackgroundClass() {
     if (flyerStyle === 'street') return 'flyerStreet';
     if (flyerStyle === 'seafood') return 'flyerSeafood';
     if (flyerStyle === 'bbq') return 'flyerBbq';
     return 'flyerClean';
-  }
-
-  const flyerTitle = name.trim() || 'Your Store';
-  const flyerSub = selectedCategory?.name || 'Custom Flyer';
-  const flyerImage = selectedItem?.image_url || heroImage || getPlaceholderChoicesForSelectedCategory()[0] || '';
-
-  function SectionCard({
-    section,
-    icon,
-    title,
-    summary,
-    right,
-  }: {
-    section: SectionKey;
-    icon: ReactNode;
-    title: string;
-    summary?: ReactNode;
-    right?: ReactNode;
-  }) {
-    return (
-      <button type="button" className="sectionCard" onClick={() => toggleSection(section)}>
-        <div className="sectionHead">
-          <div className="sectionLeft">
-            <MiniIcon>{icon}</MiniIcon>
-            <div className="sectionTitle">{title}</div>
-          </div>
-          <div className="sectionRight">
-            {right ? <span className="sectionMeta">{right}</span> : null}
-            <span className="sectionArrow">›</span>
-          </div>
-        </div>
-        {summary ? <div className="sectionSummary">{summary}</div> : null}
-      </button>
-    );
   }
 
   if (loading) {
@@ -1108,9 +1081,14 @@ export default function BuilderPage() {
           </div>
 
           <div className="topActions">
-            <button type="button" className="toggleMini" onClick={() => setOwnerLanguage(ownerLanguage === 'en' ? 'es' : 'en')}>
-              {ownerLanguage.toUpperCase()}
+            <button
+              type="button"
+              className="toggleMini"
+              onClick={() => setOrderLanguage(orderLanguage === 'en' ? 'es' : 'en')}
+            >
+              {orderLanguage.toUpperCase()}
             </button>
+
             <button type="button" className="saveButton" onClick={saveAll} disabled={saving}>
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -1145,12 +1123,14 @@ export default function BuilderPage() {
               section="store"
               icon="⌂"
               title="Store Setup"
-              right="Hours • Pickup • Delivery"
+              right="One owner = one store"
+              expanded={expanded === 'store'}
+              onToggle={toggleSection}
               summary={
                 <div className="summary">
                   <strong>{name || 'Your Store'}</strong>
                   <span>{previewSlug ? `/store/${previewSlug}` : '/store/your-store'}</span>
-                  <span>{phone || 'Phone'}</span>
+                  <span>{phone || 'Phone not set'}</span>
                 </div>
               }
             />
@@ -1176,38 +1156,6 @@ export default function BuilderPage() {
                   <span>Address</span>
                   <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
-
-                <div className="field">
-                  <span>Hours</span>
-                  <div className="hoursStack">
-                    {hours.map((row, index) => (
-                      <div key={row.day} className="hoursRow">
-                        <div className="hoursDay">{row.day}</div>
-                        <button
-                          type="button"
-                          className={row.open ? 'chip active' : 'chip'}
-                          onClick={() => updateHours(index, { open: !row.open })}
-                        >
-                          {row.open ? 'Open' : 'Closed'}
-                        </button>
-                        <input
-                          className="timeInput"
-                          type="time"
-                          value={row.start}
-                          disabled={!row.open}
-                          onChange={(e) => updateHours(index, { start: e.target.value })}
-                        />
-                        <input
-                          className="timeInput"
-                          type="time"
-                          value={row.end}
-                          disabled={!row.open}
-                          onChange={(e) => updateHours(index, { end: e.target.value })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             ) : null}
 
@@ -1215,7 +1163,9 @@ export default function BuilderPage() {
               section="branding"
               icon="▣"
               title="Branding"
-              right="Hero & Logo"
+              right="Hero & logo"
+              expanded={expanded === 'branding'}
+              onToggle={toggleSection}
               summary={<div className="summary"><span>Uploads persist after save.</span></div>}
             />
 
@@ -1257,7 +1207,9 @@ export default function BuilderPage() {
               section="theme"
               icon="◐"
               title="Theme & Language"
-              right={`${theme} • owner ${ownerLanguage.toUpperCase()} • store ${storefrontLanguage.toUpperCase()}`}
+              right={`${theme} • owner ${orderLanguage.toUpperCase()} • store ${storefrontLanguage.toUpperCase()}`}
+              expanded={expanded === 'theme'}
+              onToggle={toggleSection}
             />
 
             {expanded === 'theme' ? (
@@ -1271,18 +1223,18 @@ export default function BuilderPage() {
                 </div>
 
                 <div className="field">
-                  <span>Owner Language</span>
-                  <div className="chipRow">
-                    <button type="button" className={ownerLanguage === 'en' ? 'chip active' : 'chip'} onClick={() => setOwnerLanguage('en')}>EN</button>
-                    <button type="button" className={ownerLanguage === 'es' ? 'chip active' : 'chip'} onClick={() => setOwnerLanguage('es')}>ES</button>
-                  </div>
-                </div>
-
-                <div className="field">
                   <span>Storefront Default Language</span>
                   <div className="chipRow">
                     <button type="button" className={storefrontLanguage === 'en' ? 'chip active' : 'chip'} onClick={() => setStorefrontLanguage('en')}>EN</button>
                     <button type="button" className={storefrontLanguage === 'es' ? 'chip active' : 'chip'} onClick={() => setStorefrontLanguage('es')}>ES</button>
+                  </div>
+                </div>
+
+                <div className="field">
+                  <span>Owner Order Language</span>
+                  <div className="chipRow">
+                    <button type="button" className={orderLanguage === 'en' ? 'chip active' : 'chip'} onClick={() => setOrderLanguage('en')}>EN</button>
+                    <button type="button" className={orderLanguage === 'es' ? 'chip active' : 'chip'} onClick={() => setOrderLanguage('es')}>ES</button>
                   </div>
                 </div>
 
@@ -1314,6 +1266,22 @@ export default function BuilderPage() {
                     </label>
                   </div>
                 ) : null}
+
+                <div className="field">
+                  <span>Plan</span>
+                  <div className="chipRow">
+                    <button type="button" className={plan === 'starter' ? 'chip active' : 'chip'} onClick={() => setPlan('starter')}>Starter</button>
+                    <button type="button" className={plan === 'growth' ? 'chip active' : 'chip'} onClick={() => setPlan('growth')}>Growth</button>
+                    <button type="button" className={plan === 'premium' ? 'chip active' : 'chip'} onClick={() => setPlan('premium')}>Premium</button>
+                  </div>
+                </div>
+
+                <div className="smallNote">
+                  Gallery uploads are unlimited on all plans. Starter only limits placeholder images to 6 total.
+                </div>
+                <div className="smallNote">
+                  Placeholder usage: {placeholderCount}{placeholderLimit !== Number.POSITIVE_INFINITY ? `/6` : ' (unlimited)'}
+                </div>
               </div>
             ) : null}
 
@@ -1321,11 +1289,14 @@ export default function BuilderPage() {
               section="menu"
               icon="▦"
               title="Menu"
-              right="Categories & Items"
+              right="Categories, items, options"
+              expanded={expanded === 'menu'}
+              onToggle={toggleSection}
               summary={
                 <div className="summary">
                   <strong>{categories.length} categories</strong>
                   <span>{categories.flatMap((category) => category.items).length} items</span>
+                  <span>Unlimited gallery uploads</span>
                 </div>
               }
             />
@@ -1349,11 +1320,7 @@ export default function BuilderPage() {
                           <span>{category.name}</span>
                           <span>{category.items.length}</span>
                         </button>
-                        <input
-                          className="compactInput"
-                          value={category.name}
-                          onChange={(e) => updateCategory(category.id, e.target.value)}
-                        />
+                        <input className="compactInput" value={category.name} onChange={(e) => updateCategory(category.id, e.target.value)} />
                         <button type="button" className="dangerButton" onClick={() => deleteCategory(category.id)}>Delete Category</button>
                       </div>
                     ))}
@@ -1367,13 +1334,13 @@ export default function BuilderPage() {
                             <div className="editorTitle">Placeholder Food Choices</div>
                             <div className="smallNote">
                               {plan === 'starter'
-                                ? `Starter uses up to 6 placeholders total • currently ${getUsedPlaceholderCount()} used`
+                                ? `Starter uses up to 6 placeholders total • currently ${placeholderCount} used`
                                 : 'Unlimited placeholders on this plan'}
                             </div>
                           </div>
 
                           <div className="placeholderGrid">
-                            {getPlaceholderChoicesForSelectedCategory().slice(0, plan === 'starter' ? 6 : 24).map((url) => (
+                            {placeholderChoices.map((url) => (
                               <button
                                 type="button"
                                 key={url}
@@ -1410,7 +1377,7 @@ export default function BuilderPage() {
                             <div className="editorHeader">
                               <div className="editorTitle">Item Editor</div>
                               <div className="editorActions">
-                                <button type="button" className="secondaryButton" onClick={() => saveAndAddNextItem(selectedCategory.id)}>Save & Add Next</button>
+                                <button type="button" className="secondaryButton" onClick={() => addItem(selectedCategory.id)}>Save & Add Next</button>
                                 <button type="button" className="dangerButton" onClick={() => deleteItem(selectedCategory.id, selectedItem.id)}>Delete Item</button>
                               </div>
                             </div>
@@ -1426,7 +1393,7 @@ export default function BuilderPage() {
                                     {uploadingItemId === selectedItem.id ? 'Uploading...' : 'Upload Item Image'}
                                     <input hidden type="file" accept="image/*" onChange={(e) => void handleItemImageUpload(selectedItem.id, e)} />
                                   </label>
-                                  <button type="button" className="ghostButton" onClick={() => updateItem(selectedItem.id, { image_url: '' })}>
+                                  <button type="button" className="ghostButton" onClick={() => updateItem(selectedItem.id, { image_url: '', image_source: 'empty' })}>
                                     Remove Image
                                   </button>
                                 </div>
@@ -1437,14 +1404,17 @@ export default function BuilderPage() {
                                   <span>Item Name</span>
                                   <input className="input" value={selectedItem.name} onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })} />
                                 </label>
+
                                 <label className="field">
                                   <span>Price</span>
                                   <input className="input" value={selectedItem.price} onChange={(e) => updateItem(selectedItem.id, { price: sanitizeNumberInput(e.target.value) })} />
                                 </label>
+
                                 <label className="field">
                                   <span>Description</span>
                                   <textarea className="textarea" value={selectedItem.description} onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })} />
                                 </label>
+
                                 <div className="field">
                                   <span>Availability</span>
                                   <div className="chipRow">
@@ -1505,10 +1475,12 @@ export default function BuilderPage() {
               section="flyers"
               icon="⚡"
               title="Flyers"
-              right="Custom QR Flyer Upgrade"
+              right="Free QR + custom packages"
+              expanded={expanded === 'flyers'}
+              onToggle={toggleSection}
               summary={
                 <div className="summary">
-                  <span>Free white QR flyer included.</span>
+                  <span>Free plain white QR flyer included.</span>
                   <span>Custom flyer packages: 100 / 250 / 500.</span>
                 </div>
               }
@@ -1518,7 +1490,7 @@ export default function BuilderPage() {
               <div className="panel">
                 <div className="editorHeader">
                   <div className="editorTitle">Custom Flyer Packages</div>
-                  <div className="smallNote">Pick package + style. Preview stays preview-only until purchase.</div>
+                  <div className="smallNote">Preview only until purchase.</div>
                 </div>
 
                 <div className="chipRow">
@@ -1532,6 +1504,19 @@ export default function BuilderPage() {
                   <button type="button" className={flyerStyle === 'clean' ? 'chip active' : 'chip'} onClick={() => setFlyerStyleOverride('clean')}>Clean</button>
                   <button type="button" className={flyerStyle === 'seafood' ? 'chip active' : 'chip'} onClick={() => setFlyerStyleOverride('seafood')}>Seafood</button>
                   <button type="button" className={flyerStyle === 'bbq' ? 'chip active' : 'chip'} onClick={() => setFlyerStyleOverride('bbq')}>BBQ</button>
+                </div>
+
+                <div className="freeWhiteFlyer">
+                  <div className="editorTitle">Free White QR Flyer</div>
+                  <div className="whiteFlyerCard">
+                    <div className="whiteFlyerQrBox">
+                      <img src={qrImage} alt="QR code" className="whiteFlyerQr" />
+                    </div>
+                    <div className="whiteFlyerStore">{flyerTitle}</div>
+                    <div className="whiteFlyerMeta">{address || '123 Main St'}</div>
+                    <div className="whiteFlyerMeta">{phone || '(323) 555-1212'}</div>
+                    <div className="whiteFlyerSmall">Scan to order</div>
+                  </div>
                 </div>
 
                 <div className="flyerGrid">
@@ -1559,7 +1544,7 @@ export default function BuilderPage() {
                       Buy {flyerQty} Flyers
                     </a>
 
-                    <div className="whiteFlyerNote">Free plain white digital QR flyer stays included.</div>
+                    <div className="whiteFlyerNote">The free plain white digital QR flyer stays included for every owner.</div>
                   </div>
                 </div>
               </div>
@@ -1583,12 +1568,8 @@ export default function BuilderPage() {
                 </div>
 
                 <div className="storeLangBar">
-                  <button type="button" className={storefrontLanguage === 'en' ? 'langPill activePill' : 'langPill'}>
-                    EN
-                  </button>
-                  <button type="button" className={storefrontLanguage === 'es' ? 'langPill activePill' : 'langPill'}>
-                    ES
-                  </button>
+                  <button type="button" className={storefrontLanguage === 'en' ? 'langPill activePill' : 'langPill'}>EN</button>
+                  <button type="button" className={storefrontLanguage === 'es' ? 'langPill activePill' : 'langPill'}>ES</button>
                 </div>
 
                 <div className="previewInfoList">
@@ -1620,7 +1601,7 @@ export default function BuilderPage() {
               </div>
 
               <div className="smallPreviewNote">
-                Owner language controls how orders come in to the owner. Storefront language belongs on the storefront.
+                Storefront language belongs on the storefront. Owner order language is what the owner receives on the order side.
               </div>
             </div>
           </div>
@@ -1761,9 +1742,12 @@ const baseStyles = `
   }
 
   .dangerButton { background: #fae8e8; color: #a12e2e; border-color: transparent; }
-  .chip.active, .activeCard, .activeChoice, .activePill {
+  .chip.active, .activeCard, .activeChoice, .activePill, .sectionCardActive {
     border-color: #0f172a;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  }
+
+  .chip.active, .activePill {
     background: #0f172a;
     color: #ffffff;
   }
@@ -1820,28 +1804,25 @@ const baseStyles = `
   .field { display: grid; gap: 8px; }
   .field span { color: var(--muted); font-size: 12px; font-weight: 950; text-transform: uppercase; letter-spacing: 0.12em; }
 
-  .input, .compactInput, .textarea, .timeInput, .readBox {
+  .input, .compactInput, .textarea, .readBox {
     width: 100%; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg);
     color: var(--text); font-size: 15px; font-weight: 800; outline: none;
   }
 
   .input, .readBox { min-height: 54px; padding: 0 14px; display: flex; align-items: center; }
-  .compactInput, .timeInput { min-height: 44px; padding: 0 12px; }
+  .compactInput { min-height: 44px; padding: 0 12px; }
   .textarea { min-height: 120px; padding: 12px 14px; resize: vertical; }
 
-  .hoursStack, .categoryColumn, .itemColumn, .itemList, .optionGroupStack, .choiceStack { display: grid; gap: 12px; }
-  .hoursRow { display: grid; grid-template-columns: 110px 120px 1fr 1fr; gap: 10px; align-items: center; }
-  .hoursDay { font-weight: 900; color: var(--text); }
-
+  .categoryColumn, .itemColumn, .itemList, .optionGroupStack, .choiceStack { display: grid; gap: 12px; }
   .uploadGrid, .tripleGrid, .flyerGrid, .itemEditorGrid { display: grid; gap: 14px; }
   .uploadGrid, .flyerGrid, .itemEditorGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tripleGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-  .uploadCard, .optionGroupCard, .previewInfoList, .previewCategory, .itemEditor, .categoryCard, .itemTile, .flyerInfo, .placeholderSection {
+  .uploadCard, .optionGroupCard, .previewInfoList, .previewCategory, .itemEditor, .categoryCard, .itemTile, .flyerInfo, .placeholderSection, .whiteFlyerCard {
     border: 1px solid var(--border); border-radius: 16px; background: var(--card-bg);
   }
 
-  .uploadCard, .flyerInfo, .itemEditor, .categoryCard, .placeholderSection { padding: 14px; }
+  .uploadCard, .flyerInfo, .itemEditor, .categoryCard, .placeholderSection, .whiteFlyerCard { padding: 14px; }
   .uploadLabel, .editorTitle, .previewHeader, .flyerPlan { color: var(--text); font-size: 18px; font-weight: 950; }
   .smallNote, .smallPreviewNote { color: var(--muted); font-size: 13px; font-weight: 700; line-height: 1.45; }
 
@@ -1854,7 +1835,7 @@ const baseStyles = `
 
   .placeholderBox.small { font-size: 12px; }
   .desktopMenuGrid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 14px; }
-  .placeholderGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+  .placeholderGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .placeholderChoice { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--card-bg); aspect-ratio: 1 / 1; }
 
   .categorySelect, .itemTile { width: 100%; text-align: left; }
@@ -1890,6 +1871,28 @@ const baseStyles = `
   .previewItem:first-of-type { border-top: 0; padding-top: 0; }
   .previewItemLeft { display: flex; gap: 10px; align-items: center; }
   .previewTinyImage { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+
+  .freeWhiteFlyer { display: grid; gap: 10px; }
+  .whiteFlyerCard {
+    background: #ffffff;
+    color: #0f172a;
+    text-align: center;
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+  }
+  .whiteFlyerQrBox {
+    width: 220px;
+    height: 220px;
+    border-radius: 18px;
+    background: #ffffff;
+    border: 10px solid #0f172a;
+    padding: 12px;
+  }
+  .whiteFlyerQr { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .whiteFlyerStore { font-size: 28px; font-weight: 950; }
+  .whiteFlyerMeta { font-size: 16px; font-weight: 800; }
+  .whiteFlyerSmall { font-size: 18px; font-weight: 950; color: #c2410c; }
 
   .flyerCard { position: relative; min-height: 560px; border-radius: 24px; overflow: hidden; background: #0f172a; }
   .flyerImage { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1950,7 +1953,6 @@ const baseStyles = `
   @media (max-width: 820px) {
     .uploadGrid, .flyerGrid, .itemEditorGrid, .tripleGrid, .desktopMenuGrid { grid-template-columns: 1fr; }
     .placeholderGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .hoursRow { grid-template-columns: 1fr; }
     .topBar { align-items: flex-start; flex-direction: column; }
     .shell { width: min(100%, 430px); padding-bottom: 96px; }
     .brand { font-size: 22px; }
