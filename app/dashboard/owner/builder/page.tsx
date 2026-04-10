@@ -1,45 +1,50 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type StorefrontTheme = 'light' | 'dark';
-type LanguageMode = 'en' | 'es';
+type Lang = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
-type ImageSource = 'empty' | 'upload' | 'placeholder';
-type SectionKey = 'store' | 'branding' | 'theme' | 'menu' | 'flyers';
+type SelectionMode = 'single' | 'multiple';
+type ActiveSection = 'store' | 'branding' | 'theme' | 'menu' | 'flyers';
 
 type RestaurantRow = {
   id: string;
-  owner_id?: string | null;
-  user_id?: string | null;
-  name?: string | null;
-  slug?: string | null;
-  phone?: string | null;
-  address?: string | null;
-  hero_image?: string | null;
-  logo_image?: string | null;
-  storefront_theme?: string | null;
-  storefront_language?: string | null;
-  order_language?: string | null;
-  pickup_enabled?: boolean | null;
-  delivery_enabled?: boolean | null;
-  delivery_fee?: number | null;
-  delivery_radius?: number | null;
-  delivery_minimum?: number | null;
-  hours?: string | null;
-  plan?: string | null;
+  owner_id: string | null;
+  user_id: string | null;
+  name: string | null;
+  slug: string | null;
+  phone: string | null;
+  address: string | null;
+  hero_image: string | null;
+  logo_image: string | null;
+  storefront_theme: StorefrontTheme | null;
+  storefront_language: Lang | null;
+  order_language: Lang | null;
+  pickup_enabled: boolean | null;
+  delivery_enabled: boolean | null;
+  delivery_fee: number | null;
+  delivery_radius: number | null;
+  delivery_minimum: number | null;
+  hours: string | null;
+  plan: string | null;
+  stripe_account_id?: string | null;
+  stripe_connected?: boolean | null;
+  stripe_charges_enabled?: boolean | null;
+  stripe_payouts_enabled?: boolean | null;
+  stripe_onboarding_complete?: boolean | null;
 };
 
-type MenuCategoryRow = {
+type CategoryRow = {
   id: string;
   restaurant_id: string;
   name: string;
   sort_order: number | null;
 };
 
-type MenuItemRow = {
+type ItemRow = {
   id: string;
   restaurant_id: string;
   category_id: string;
@@ -47,7 +52,7 @@ type MenuItemRow = {
   description: string | null;
   base_price: number | null;
   image_file: string | null;
-  availability: string | null;
+  availability: Availability | null;
   sort_order: number | null;
 };
 
@@ -56,7 +61,7 @@ type OptionGroupRow = {
   item_id: string;
   name: string;
   is_required: boolean | null;
-  selection_mode: string | null;
+  selection_mode: SelectionMode | null;
   sort_order: number | null;
 };
 
@@ -68,33 +73,31 @@ type OptionChoiceRow = {
   sort_order: number | null;
 };
 
-type BuilderOptionChoice = {
+type BuilderChoice = {
   id: string;
   name: string;
   price_delta: string;
   sort_order: number;
 };
 
-type BuilderOptionGroup = {
+type BuilderGroup = {
   id: string;
   name: string;
   is_required: boolean;
-  selection_mode: 'single' | 'multiple';
+  selection_mode: SelectionMode;
   sort_order: number;
-  choices: BuilderOptionChoice[];
+  choices: BuilderChoice[];
 };
 
 type BuilderItem = {
   id: string;
-  category_id: string;
   name: string;
   description: string;
   base_price: string;
   image_file: string;
-  image_source: ImageSource;
   availability: Availability;
   sort_order: number;
-  option_groups: BuilderOptionGroup[];
+  option_groups: BuilderGroup[];
 };
 
 type BuilderCategory = {
@@ -104,18 +107,45 @@ type BuilderCategory = {
   items: BuilderItem[];
 };
 
-type PlaceholderImage = {
-  label: string;
-  url: string;
+type BuilderRestaurant = {
+  name: string;
+  slug: string;
+  phone: string;
+  address: string;
+  hero_image: string;
+  logo_image: string;
+  storefront_theme: StorefrontTheme;
+  storefront_language: Lang;
+  order_language: Lang;
+  pickup_enabled: boolean;
+  delivery_enabled: boolean;
+  delivery_fee: string;
+  delivery_radius: string;
+  delivery_minimum: string;
+  hours: string;
+  plan: string;
 };
 
-type UploadTarget = {
-  type: 'hero' | 'logo' | 'item';
-  categoryId?: string;
-  itemId?: string;
+const DEFAULT_RESTAURANT: BuilderRestaurant = {
+  name: '',
+  slug: '',
+  phone: '',
+  address: '',
+  hero_image: '',
+  logo_image: '',
+  storefront_theme: 'light',
+  storefront_language: 'en',
+  order_language: 'en',
+  pickup_enabled: true,
+  delivery_enabled: false,
+  delivery_fee: '0',
+  delivery_radius: '0',
+  delivery_minimum: '0',
+  hours: '',
+  plan: 'starter',
 };
 
-const sectionLabels: Record<SectionKey, string> = {
+const SECTION_LABELS: Record<ActiveSection, string> = {
   store: 'Store Setup',
   branding: 'Branding',
   theme: 'Theme & Language',
@@ -123,394 +153,468 @@ const sectionLabels: Record<SectionKey, string> = {
   flyers: 'Flyers',
 };
 
-const placeholderLibrary: Record<string, PlaceholderImage[]> = {
-  tacos: [
-    { label: 'Street tacos', url: 'https://images.unsplash.com/photo-1552332386-f8dd00dc2f85?auto=format&fit=crop&w=900&q=80' },
-    { label: 'Birria plate', url: 'https://images.unsplash.com/photo-1615870216519-2f9fa575fa5c?auto=format&fit=crop&w=900&q=80' },
-  ],
-  burgers: [
-    { label: 'Loaded burger', url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80' },
-    { label: 'Fries combo', url: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=900&q=80' },
-  ],
-  bbq: [
-    { label: 'BBQ plate', url: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?auto=format&fit=crop&w=900&q=80' },
-    { label: 'Smoked ribs', url: 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=900&q=80' },
-  ],
-  seafood: [
-    { label: 'Shrimp tray', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=900&q=80' },
-    { label: 'Seafood boil', url: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?auto=format&fit=crop&w=900&q=80' },
-  ],
-  breakfast: [
-    { label: 'Breakfast plate', url: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?auto=format&fit=crop&w=900&q=80' },
-    { label: 'French toast', url: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=900&q=80' },
-  ],
-  default: [
-    { label: 'Signature dish', url: 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=900&q=80' },
-    { label: 'Featured meal', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=900&q=80' },
-  ],
-};
+function uid(prefix: string): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
-const newId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-const slugify = (value: string) =>
-  value
+function slugify(value: string): string {
+  return value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
-const safeNumberString = (value: string) => {
-  if (!value.trim()) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+function sanitizeMoneyString(value: string): string {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const parts = cleaned.split('.');
+  if (parts.length <= 1) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join('')}`;
+}
 
-const defaultCategory = (): BuilderCategory => ({
-  id: newId(),
-  name: 'Featured',
-  sort_order: 0,
-  items: [],
-});
+function parseNumber(value: string): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
-const defaultItem = (categoryId: string): BuilderItem => ({
-  id: newId(),
-  category_id: categoryId,
-  name: '',
-  description: '',
-  base_price: '',
-  image_file: '',
-  image_source: 'empty',
-  availability: 'available',
-  sort_order: 0,
-  option_groups: [],
-});
+function buttonClass(active: boolean): string {
+  return active
+    ? 'rounded-full bg-slate-950 px-6 py-4 text-lg font-semibold text-white shadow-sm'
+    : 'rounded-full bg-slate-100 px-6 py-4 text-lg font-semibold text-slate-900';
+}
 
-const defaultGroup = (): BuilderOptionGroup => ({
-  id: newId(),
-  name: 'Choose one',
-  is_required: false,
-  selection_mode: 'single',
-  sort_order: 0,
-  choices: [],
-});
+function fieldClass(): string {
+  return 'w-full rounded-3xl border border-slate-200 bg-white px-5 py-4 text-lg text-slate-950 outline-none transition focus:border-blue-500';
+}
 
-const defaultChoice = (): BuilderOptionChoice => ({
-  id: newId(),
-  name: 'Option',
-  price_delta: '0',
-  sort_order: 0,
-});
+async function uploadImageFile(
+  file: File,
+  bucket: 'heroes' | 'logos' | 'menu-items',
+  ownerId: string,
+): Promise<string> {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const path = `${ownerId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+  });
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function emptyChoice(): BuilderChoice {
+  return {
+    id: uid('choice'),
+    name: '',
+    price_delta: '0',
+    sort_order: 0,
+  };
+}
+
+function emptyGroup(): BuilderGroup {
+  return {
+    id: uid('group'),
+    name: '',
+    is_required: false,
+    selection_mode: 'single',
+    sort_order: 0,
+    choices: [emptyChoice()],
+  };
+}
+
+function emptyMenuItem(): BuilderItem {
+  return {
+    id: uid('item'),
+    name: '',
+    description: '',
+    base_price: '0',
+    image_file: '',
+    availability: 'available',
+    sort_order: 0,
+    option_groups: [emptyGroup()],
+  };
+}
+
+function emptyCategory(): BuilderCategory {
+  return {
+    id: uid('category'),
+    name: '',
+    sort_order: 0,
+    items: [emptyMenuItem()],
+  };
+}
+
+function StorePreview({
+  restaurant,
+  categories,
+}: {
+  restaurant: BuilderRestaurant;
+  categories: BuilderCategory[];
+}) {
+  const categoryTabs = categories.filter((c) => c.name.trim());
+  const activeItems = categoryTabs.length > 0 ? categoryTabs[0].items : [];
+  const themeClasses =
+    restaurant.storefront_theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-white text-slate-950';
+
+  return (
+    <div className={`overflow-hidden rounded-[32px] border border-slate-200 ${themeClasses}`}>
+      <div className="relative">
+        <div className="h-72 w-full overflow-hidden bg-slate-200 md:h-80">
+          {restaurant.hero_image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              alt="Store hero preview"
+              className="h-full w-full object-cover"
+              src={restaurant.hero_image}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xl text-slate-500">
+              Hero image preview
+            </div>
+          )}
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-6 pb-6 pt-16 text-white">
+          <div className="flex items-end gap-4">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-white text-sm font-semibold text-slate-900">
+              {restaurant.logo_image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt="Logo preview" className="h-full w-full object-cover" src={restaurant.logo_image} />
+              ) : (
+                'Logo'
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-4xl font-black leading-none">
+                {restaurant.name || 'Your Store'}
+              </h3>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-base font-medium text-white/90">
+                <span>{restaurant.address || 'Store address'}</span>
+                <span>{restaurant.phone || 'Store phone'}</span>
+              </div>
+            </div>
+
+            <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-bold uppercase tracking-[0.3em] text-slate-950">
+              {restaurant.storefront_language}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200/80 bg-white text-slate-950">
+        <div className="flex flex-wrap gap-3 px-6 py-4">
+          {categoryTabs.length > 0 ? (
+            categoryTabs.map((category, index) => (
+              <button
+                key={category.id}
+                className={
+                  index === 0
+                    ? 'rounded-xl bg-slate-950 px-5 py-3 text-base font-semibold text-white'
+                    : 'rounded-xl bg-slate-100 px-5 py-3 text-base font-semibold text-slate-900'
+                }
+                type="button"
+              >
+                {category.name}
+              </button>
+            ))
+          ) : (
+            <div className="rounded-xl bg-slate-100 px-5 py-3 text-base font-semibold text-slate-500">
+              Featured
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 px-6 pb-6 md:grid-cols-3">
+          {activeItems.length > 0 ? (
+            activeItems.slice(0, 6).map((item) => (
+              <div key={item.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="aspect-[1.1/1] w-full bg-slate-200">
+                  {item.image_file ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={item.name || 'Menu item'} className="h-full w-full object-cover" src={item.image_file} />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
+                      Item image
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1 p-4">
+                  <div className="truncate text-lg font-bold text-slate-950">
+                    {item.name || 'Menu Item'}
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    ${parseNumber(item.base_price).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="col-span-full rounded-3xl border border-dashed border-slate-300 px-6 py-12 text-lg text-slate-500">
+              Your live storefront preview will populate as soon as you add menu items.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function OwnerBuilderPage() {
-  const [activeSection, setActiveSection] = useState<SectionKey>('store');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [restaurantId, setRestaurantId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [heroImage, setHeroImage] = useState('');
-  const [logoImage, setLogoImage] = useState('');
-  const [storefrontTheme, setStorefrontTheme] = useState<StorefrontTheme>('light');
-  const [storefrontLanguage, setStorefrontLanguage] = useState<LanguageMode>('en');
-  const [orderLanguage, setOrderLanguage] = useState<LanguageMode>('en');
-  const [pickupEnabled, setPickupEnabled] = useState(true);
-  const [deliveryEnabled, setDeliveryEnabled] = useState(false);
-  const [deliveryFee, setDeliveryFee] = useState('0');
-  const [deliveryRadius, setDeliveryRadius] = useState('0');
-  const [deliveryMinimum, setDeliveryMinimum] = useState('0');
-  const [hours, setHours] = useState('');
-  const [plan, setPlan] = useState('starter');
-  const [categories, setCategories] = useState<BuilderCategory[]>([defaultCategory()]);
-  const [uploadingTarget, setUploadingTarget] = useState<string>('');
+  const [loadError, setLoadError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState('');
+  const [activeSection, setActiveSection] = useState<ActiveSection>('store');
+  const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [restaurant, setRestaurant] = useState<BuilderRestaurant>(DEFAULT_RESTAURANT);
+  const [categories, setCategories] = useState<BuilderCategory[]>([]);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const pendingItemFiles = useRef<Record<string, File>>({});
 
-  const loadBuilder = useCallback(async () => {
+  useEffect(() => {
+    void bootstrap();
+  }, []);
+
+  const storeUrl = useMemo(() => {
+    return restaurant.slug ? `/store/${restaurant.slug}` : '/store/your-store';
+  }, [restaurant.slug]);
+
+  async function bootstrap() {
     setLoading(true);
-    setError('');
-    setSuccess('');
-
+    setLoadError('');
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) throw userError;
-      if (!user) throw new Error('You must be signed in to use the owner builder.');
-
-      setUserId(user.id);
-
-      const { data: restaurantRows, error: restaurantError } = await supabase
-        .from('restaurants')
-        .select(
-          'id, owner_id, user_id, name, slug, phone, address, hero_image, logo_image, storefront_theme, storefront_language, order_language, pickup_enabled, delivery_enabled, delivery_fee, delivery_radius, delivery_minimum, hours, plan'
-        )
-        .or(`owner_id.eq.${user.id},user_id.eq.${user.id}`)
-        .order('id', { ascending: true })
-        .limit(1);
-
-      if (restaurantError) throw restaurantError;
-
-      const restaurant = (restaurantRows?.[0] as RestaurantRow | undefined) ?? null;
-
-      if (!restaurant) {
-        setRestaurantId('');
-        setStoreName('');
-        setSlug('');
-        setPhone('');
-        setAddress('');
-        setHeroImage('');
-        setLogoImage('');
-        setStorefrontTheme('light');
-        setStorefrontLanguage('en');
-        setOrderLanguage('en');
-        setPickupEnabled(true);
-        setDeliveryEnabled(false);
-        setDeliveryFee('0');
-        setDeliveryRadius('0');
-        setDeliveryMinimum('0');
-        setHours('');
-        setPlan('starter');
-        setCategories([defaultCategory()]);
-        setLoading(false);
-        return;
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        throw authError;
       }
 
-      setRestaurantId(restaurant.id);
-      setStoreName(restaurant.name ?? '');
-      setSlug(restaurant.slug ?? '');
-      setPhone(restaurant.phone ?? '');
-      setAddress(restaurant.address ?? '');
-      setHeroImage(restaurant.hero_image ?? '');
-      setLogoImage(restaurant.logo_image ?? '');
-      setStorefrontTheme(restaurant.storefront_theme === 'dark' ? 'dark' : 'light');
-      setStorefrontLanguage(restaurant.storefront_language === 'es' ? 'es' : 'en');
-      setOrderLanguage(restaurant.order_language === 'es' ? 'es' : 'en');
-      setPickupEnabled(Boolean(restaurant.pickup_enabled ?? true));
-      setDeliveryEnabled(Boolean(restaurant.delivery_enabled ?? false));
-      setDeliveryFee(String(restaurant.delivery_fee ?? 0));
-      setDeliveryRadius(String(restaurant.delivery_radius ?? 0));
-      setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
-      setHours(restaurant.hours ?? '');
-      setPlan(restaurant.plan ?? 'starter');
+      const user = authData.user;
+      if (!user) {
+        throw new Error('You must be signed in to load the builder.');
+      }
 
-      const { data: categoryRows, error: categoryError } = await supabase
+      setOwnerId(user.id);
+
+      const restaurantResult = await supabase
+        .from('restaurants')
+        .select('*')
+        .or(`owner_id.eq.${user.id},user_id.eq.${user.id}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (restaurantResult.error) {
+        throw restaurantResult.error;
+      }
+
+      let restaurantRow = restaurantResult.data as RestaurantRow | null;
+
+      if (!restaurantRow) {
+        const inserted = await supabase
+          .from('restaurants')
+          .insert({
+            owner_id: user.id,
+            user_id: user.id,
+            name: '',
+            slug: '',
+            phone: '',
+            address: '',
+            hero_image: '',
+            logo_image: '',
+            storefront_theme: 'light',
+            storefront_language: 'en',
+            order_language: 'en',
+            pickup_enabled: true,
+            delivery_enabled: false,
+            delivery_fee: 0,
+            delivery_radius: 0,
+            delivery_minimum: 0,
+            hours: '',
+            plan: 'starter',
+          })
+          .select('*')
+          .single();
+
+        if (inserted.error) {
+          throw inserted.error;
+        }
+
+        restaurantRow = inserted.data as RestaurantRow;
+      }
+
+      setRestaurantId(restaurantRow.id);
+
+      setRestaurant({
+        name: restaurantRow.name || '',
+        slug: restaurantRow.slug || '',
+        phone: restaurantRow.phone || '',
+        address: restaurantRow.address || '',
+        hero_image: restaurantRow.hero_image || '',
+        logo_image: restaurantRow.logo_image || '',
+        storefront_theme: restaurantRow.storefront_theme || 'light',
+        storefront_language: restaurantRow.storefront_language || 'en',
+        order_language: restaurantRow.order_language || 'en',
+        pickup_enabled: Boolean(restaurantRow.pickup_enabled ?? true),
+        delivery_enabled: Boolean(restaurantRow.delivery_enabled ?? false),
+        delivery_fee: String(restaurantRow.delivery_fee ?? 0),
+        delivery_radius: String(restaurantRow.delivery_radius ?? 0),
+        delivery_minimum: String(restaurantRow.delivery_minimum ?? 0),
+        hours: restaurantRow.hours || '',
+        plan: restaurantRow.plan || 'starter',
+      });
+
+      const categoryResult = await supabase
         .from('menu_categories')
-        .select('id, restaurant_id, name, sort_order')
-        .eq('restaurant_id', restaurant.id)
+        .select('*')
+        .eq('restaurant_id', restaurantRow.id)
         .order('sort_order', { ascending: true });
 
-      if (categoryError) throw categoryError;
+      if (categoryResult.error) {
+        throw categoryResult.error;
+      }
 
-      const { data: itemRows, error: itemError } = await supabase
+      const itemResult = await supabase
         .from('menu_items')
-        .select('id, restaurant_id, category_id, name, description, base_price, image_file, availability, sort_order')
-        .eq('restaurant_id', restaurant.id)
+        .select('*')
+        .eq('restaurant_id', restaurantRow.id)
         .order('sort_order', { ascending: true });
 
-      if (itemError) throw itemError;
+      if (itemResult.error) {
+        throw itemResult.error;
+      }
 
-      const itemIds = ((itemRows as MenuItemRow[] | null) ?? []).map((item) => item.id);
+      const itemIds = (itemResult.data || []).map((item) => item.id);
+      let optionGroups: OptionGroupRow[] = [];
+      let optionChoices: OptionChoiceRow[] = [];
 
-      let groupRows: OptionGroupRow[] = [];
-      let choiceRows: OptionChoiceRow[] = [];
-
-      if (itemIds.length) {
-        const { data: fetchedGroups, error: groupError } = await supabase
+      if (itemIds.length > 0) {
+        const groupResult = await supabase
           .from('menu_option_groups')
-          .select('id, item_id, name, is_required, selection_mode, sort_order')
+          .select('*')
           .in('item_id', itemIds)
           .order('sort_order', { ascending: true });
 
-        if (groupError) throw groupError;
-        groupRows = (fetchedGroups as OptionGroupRow[] | null) ?? [];
+        if (groupResult.error) {
+          throw groupResult.error;
+        }
 
-        const groupIds = groupRows.map((group) => group.id);
+        optionGroups = (groupResult.data || []) as OptionGroupRow[];
+        const groupIds = optionGroups.map((group) => group.id);
 
-        if (groupIds.length) {
-          const { data: fetchedChoices, error: choiceError } = await supabase
+        if (groupIds.length > 0) {
+          const choiceResult = await supabase
             .from('menu_option_choices')
-            .select('id, option_group_id, name, price_delta, sort_order')
+            .select('*')
             .in('option_group_id', groupIds)
             .order('sort_order', { ascending: true });
 
-          if (choiceError) throw choiceError;
-          choiceRows = (fetchedChoices as OptionChoiceRow[] | null) ?? [];
+          if (choiceResult.error) {
+            throw choiceResult.error;
+          }
+
+          optionChoices = (choiceResult.data || []) as OptionChoiceRow[];
         }
       }
 
-      const nextCategories: BuilderCategory[] = ((categoryRows as MenuCategoryRow[] | null) ?? []).map((category, categoryIndex) => ({
-        id: category.id,
-        name: category.name ?? 'Category',
-        sort_order: category.sort_order ?? categoryIndex,
-        items: ((itemRows as MenuItemRow[] | null) ?? [])
+      const nextCategories: BuilderCategory[] = ((categoryResult.data || []) as CategoryRow[]).map((category) => {
+        const itemsForCategory = ((itemResult.data || []) as ItemRow[])
           .filter((item) => item.category_id === category.id)
-          .map((item, itemIndex) => ({
-            id: item.id,
-            category_id: category.id,
-            name: item.name ?? '',
-            description: item.description ?? '',
-            base_price: item.base_price != null ? String(item.base_price) : '',
-            image_file: item.image_file ?? '',
-            image_source: item.image_file ? 'upload' : 'empty',
-            availability: item.availability === 'sold_out' ? 'sold_out' : 'available',
-            sort_order: item.sort_order ?? itemIndex,
-            option_groups: groupRows
+          .map((item) => {
+            const groupsForItem = optionGroups
               .filter((group) => group.item_id === item.id)
-              .map((group, groupIndex) => ({
+              .map((group) => ({
                 id: group.id,
-                name: group.name ?? '',
+                name: group.name || '',
                 is_required: Boolean(group.is_required),
-                selection_mode: group.selection_mode === 'multiple' ? 'multiple' : 'single',
-                sort_order: group.sort_order ?? groupIndex,
-                choices: choiceRows
+                selection_mode: group.selection_mode || 'single',
+                sort_order: group.sort_order ?? 0,
+                choices: optionChoices
                   .filter((choice) => choice.option_group_id === group.id)
-                  .map((choice, choiceIndex) => ({
+                  .map((choice) => ({
                     id: choice.id,
-                    name: choice.name ?? '',
-                    price_delta: choice.price_delta != null ? String(choice.price_delta) : '0',
-                    sort_order: choice.sort_order ?? choiceIndex,
+                    name: choice.name || '',
+                    price_delta: String(choice.price_delta ?? 0),
+                    sort_order: choice.sort_order ?? 0,
                   })),
-              })),
-          })),
-      }));
+              }));
 
-      setCategories(nextCategories.length ? nextCategories : [defaultCategory()]);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to load builder data.');
-      setCategories([defaultCategory()]);
+            return {
+              id: item.id,
+              name: item.name || '',
+              description: item.description || '',
+              base_price: String(item.base_price ?? 0),
+              image_file: item.image_file || '',
+              availability: item.availability || 'available',
+              sort_order: item.sort_order ?? 0,
+              option_groups: groupsForItem.length > 0 ? groupsForItem : [emptyGroup()],
+            };
+          });
+
+        return {
+          id: category.id,
+          name: category.name || '',
+          sort_order: category.sort_order ?? 0,
+          items: itemsForCategory.length > 0 ? itemsForCategory : [emptyMenuItem()],
+        };
+      });
+
+      setCategories(nextCategories.length > 0 ? nextCategories : [emptyCategory()]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load builder data.';
+      setLoadError(message);
+      setCategories([emptyCategory()]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    void loadBuilder();
-  }, [loadBuilder]);
-
-  useEffect(() => {
-    if (!storeName.trim()) return;
-    setSlug((current) => (current.trim() ? current : slugify(storeName)));
-  }, [storeName]);
-
-  const storeUrl = useMemo(() => `/store/${slug || 'your-store'}`, [slug]);
-
-  const updateCategory = (categoryId: string, patch: Partial<BuilderCategory>) => {
-    setCategories((current) =>
-      current.map((category) => (category.id === categoryId ? { ...category, ...patch } : category))
-    );
-  };
-
-  const addCategory = () => {
-    setCategories((current) => [
-      ...current,
-      {
-        id: newId(),
-        name: `Category ${current.length + 1}`,
-        sort_order: current.length,
-        items: [],
-      },
-    ]);
-    setActiveSection('menu');
-  };
-
-  const removeCategory = (categoryId: string) => {
-    setCategories((current) => {
-      const next = current.filter((category) => category.id !== categoryId);
-      return next.length ? next.map((category, index) => ({ ...category, sort_order: index })) : [defaultCategory()];
+  function updateRestaurant<K extends keyof BuilderRestaurant>(key: K, value: BuilderRestaurant[K]) {
+    setRestaurant((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'name') {
+        next.slug = slugify(String(value));
+      }
+      return next;
     });
-  };
+  }
 
-  const addItem = (categoryId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id !== categoryId
-          ? category
-          : {
-              ...category,
-              items: [
-                ...category.items,
-                {
-                  ...defaultItem(categoryId),
-                  sort_order: category.items.length,
-                },
-              ],
-            }
-      )
+  function updateCategory(categoryId: string, patch: Partial<BuilderCategory>) {
+    setCategories((prev) =>
+      prev.map((category) => (category.id === categoryId ? { ...category, ...patch } : category)),
     );
-  };
+  }
 
-  const updateItem = (categoryId: string, itemId: string, patch: Partial<BuilderItem>) => {
-    setCategories((current) =>
-      current.map((category) =>
+  function updateItem(categoryId: string, itemId: string, patch: Partial<BuilderItem>) {
+    setCategories((prev) =>
+      prev.map((category) =>
         category.id !== categoryId
           ? category
           : {
               ...category,
               items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-            }
-      )
+            },
+      ),
     );
-  };
+  }
 
-  const removeItem = (categoryId: string, itemId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id !== categoryId
-          ? category
-          : {
-              ...category,
-              items: category.items
-                .filter((item) => item.id !== itemId)
-                .map((item, index) => ({ ...item, sort_order: index })),
-            }
-      )
-    );
-  };
-
-  const addGroup = (categoryId: string, itemId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id !== categoryId
-          ? category
-          : {
-              ...category,
-              items: category.items.map((item) =>
-                item.id !== itemId
-                  ? item
-                  : {
-                      ...item,
-                      option_groups: [
-                        ...item.option_groups,
-                        {
-                          ...defaultGroup(),
-                          sort_order: item.option_groups.length,
-                        },
-                      ],
-                    }
-              ),
-            }
-      )
-    );
-  };
-
-  const updateGroup = (
+  function updateGroup(
     categoryId: string,
     itemId: string,
     groupId: string,
-    patch: Partial<BuilderOptionGroup>
-  ) => {
-    setCategories((current) =>
-      current.map((category) =>
+    patch: Partial<BuilderGroup>,
+  ) {
+    setCategories((prev) =>
+      prev.map((category) =>
         category.id !== categoryId
           ? category
           : {
@@ -521,79 +625,24 @@ export default function OwnerBuilderPage() {
                   : {
                       ...item,
                       option_groups: item.option_groups.map((group) =>
-                        group.id === groupId ? { ...group, ...patch } : group
+                        group.id === groupId ? { ...group, ...patch } : group,
                       ),
-                    }
+                    },
               ),
-            }
-      )
+            },
+      ),
     );
-  };
+  }
 
-  const removeGroup = (categoryId: string, itemId: string, groupId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id !== categoryId
-          ? category
-          : {
-              ...category,
-              items: category.items.map((item) =>
-                item.id !== itemId
-                  ? item
-                  : {
-                      ...item,
-                      option_groups: item.option_groups
-                        .filter((group) => group.id !== groupId)
-                        .map((group, index) => ({ ...group, sort_order: index })),
-                    }
-              ),
-            }
-      )
-    );
-  };
-
-  const addChoice = (categoryId: string, itemId: string, groupId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
-        category.id !== categoryId
-          ? category
-          : {
-              ...category,
-              items: category.items.map((item) =>
-                item.id !== itemId
-                  ? item
-                  : {
-                      ...item,
-                      option_groups: item.option_groups.map((group) =>
-                        group.id !== groupId
-                          ? group
-                          : {
-                              ...group,
-                              choices: [
-                                ...group.choices,
-                                {
-                                  ...defaultChoice(),
-                                  sort_order: group.choices.length,
-                                },
-                              ],
-                            }
-                      ),
-                    }
-              ),
-            }
-      )
-    );
-  };
-
-  const updateChoice = (
+  function updateChoice(
     categoryId: string,
     itemId: string,
     groupId: string,
     choiceId: string,
-    patch: Partial<BuilderOptionChoice>
-  ) => {
-    setCategories((current) =>
-      current.map((category) =>
+    patch: Partial<BuilderChoice>,
+  ) {
+    setCategories((prev) =>
+      prev.map((category) =>
         category.id !== categoryId
           ? category
           : {
@@ -609,20 +658,109 @@ export default function OwnerBuilderPage() {
                           : {
                               ...group,
                               choices: group.choices.map((choice) =>
-                                choice.id === choiceId ? { ...choice, ...patch } : choice
+                                choice.id === choiceId ? { ...choice, ...patch } : choice,
                               ),
-                            }
+                            },
                       ),
-                    }
+                    },
               ),
-            }
-      )
+            },
+      ),
     );
-  };
+  }
 
-  const removeChoice = (categoryId: string, itemId: string, groupId: string, choiceId: string) => {
-    setCategories((current) =>
-      current.map((category) =>
+  function addCategory() {
+    setCategories((prev) => [...prev, { ...emptyCategory(), sort_order: prev.length }]);
+    setActiveSection('menu');
+  }
+
+  function removeCategory(categoryId: string) {
+    setCategories((prev) => {
+      const next = prev.filter((category) => category.id !== categoryId);
+      return next.length > 0 ? next.map((category, index) => ({ ...category, sort_order: index })) : [emptyCategory()];
+    });
+  }
+
+  function addItem(categoryId: string) {
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+              items: [...category.items, { ...emptyMenuItem(), sort_order: category.items.length }],
+            },
+      ),
+    );
+  }
+
+  function removeItem(categoryId: string, itemId: string) {
+    delete pendingItemFiles.current[itemId];
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+              items:
+                category.items.filter((item) => item.id !== itemId).length > 0
+                  ? category.items
+                      .filter((item) => item.id !== itemId)
+                      .map((item, index) => ({ ...item, sort_order: index }))
+                  : [emptyMenuItem()],
+            },
+      ),
+    );
+  }
+
+  function addGroup(categoryId: string, itemId: string) {
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+              items: category.items.map((item) =>
+                item.id !== itemId
+                  ? item
+                  : {
+                      ...item,
+                      option_groups: [...item.option_groups, { ...emptyGroup(), sort_order: item.option_groups.length }],
+                    },
+              ),
+            },
+      ),
+    );
+  }
+
+  function removeGroup(categoryId: string, itemId: string, groupId: string) {
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+              items: category.items.map((item) =>
+                item.id !== itemId
+                  ? item
+                  : {
+                      ...item,
+                      option_groups:
+                        item.option_groups.filter((group) => group.id !== groupId).length > 0
+                          ? item.option_groups
+                              .filter((group) => group.id !== groupId)
+                              .map((group, index) => ({ ...group, sort_order: index }))
+                          : [emptyGroup()],
+                    },
+              ),
+            },
+      ),
+    );
+  }
+
+  function addChoice(categoryId: string, itemId: string, groupId: string) {
+    setCategories((prev) =>
+      prev.map((category) =>
         category.id !== categoryId
           ? category
           : {
@@ -637,957 +775,1041 @@ export default function OwnerBuilderPage() {
                           ? group
                           : {
                               ...group,
-                              choices: group.choices
-                                .filter((choice) => choice.id !== choiceId)
-                                .map((choice, index) => ({ ...choice, sort_order: index })),
-                            }
+                              choices: [...group.choices, { ...emptyChoice(), sort_order: group.choices.length }],
+                            },
                       ),
-                    }
+                    },
               ),
-            }
-      )
+            },
+      ),
     );
-  };
+  }
 
-  const applyPlaceholder = (categoryId: string, itemId: string, url: string) => {
-    updateItem(categoryId, itemId, {
-      image_file: url,
-      image_source: 'placeholder',
-    });
-  };
+  function removeChoice(categoryId: string, itemId: string, groupId: string, choiceId: string) {
+    setCategories((prev) =>
+      prev.map((category) =>
+        category.id !== categoryId
+          ? category
+          : {
+              ...category,
+              items: category.items.map((item) =>
+                item.id !== itemId
+                  ? item
+                  : {
+                      ...item,
+                      option_groups: item.option_groups.map((group) =>
+                        group.id !== groupId
+                          ? group
+                          : {
+                              ...group,
+                              choices:
+                                group.choices.filter((choice) => choice.id !== choiceId).length > 0
+                                  ? group.choices
+                                      .filter((choice) => choice.id !== choiceId)
+                                      .map((choice, index) => ({ ...choice, sort_order: index }))
+                                  : [emptyChoice()],
+                            },
+                      ),
+                    },
+              ),
+            },
+      ),
+    );
+  }
 
-  const uploadImage = async (file: File, target: UploadTarget) => {
-    const bucket = target.type === 'hero' ? 'heroes' : target.type === 'logo' ? 'logos' : 'menu-items';
-    const ext = file.name.split('.').pop() || 'jpg';
-    const path = `${userId || 'owner'}/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
-    const targetKey = target.type === 'item' ? `${target.type}:${target.itemId}` : target.type;
-
-    setUploadingTarget(targetKey);
-    setError('');
-    setSuccess('');
-
-    try {
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-      const publicUrl = data.publicUrl;
-
-      if (target.type === 'hero') setHeroImage(publicUrl);
-      if (target.type === 'logo') setLogoImage(publicUrl);
-      if (target.type === 'item' && target.categoryId && target.itemId) {
-        updateItem(target.categoryId, target.itemId, {
-          image_file: publicUrl,
-          image_source: 'upload',
-        });
-      }
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Image upload failed.');
-    } finally {
-      setUploadingTarget('');
-    }
-  };
-
-  const onImageChange = async (event: ChangeEvent<HTMLInputElement>, target: UploadTarget) => {
+  async function onHeroUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    await uploadImage(file, target);
-    event.target.value = '';
-  };
+    setHeroFile(file);
+    setRestaurant((prev) => ({ ...prev, hero_image: URL.createObjectURL(file) }));
+  }
 
-  const saveBuilder = async () => {
+  async function onLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setRestaurant((prev) => ({ ...prev, logo_image: URL.createObjectURL(file) }));
+  }
+
+  async function onItemImageUpload(
+    event: ChangeEvent<HTMLInputElement>,
+    categoryId: string,
+    itemId: string,
+  ) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    pendingItemFiles.current[itemId] = file;
+    updateItem(categoryId, itemId, {
+      image_file: URL.createObjectURL(file),
+    });
+  }
+
+  async function saveBuilder() {
+    if (!ownerId) {
+      setSaveError('No signed-in owner found.');
+      return;
+    }
+
     setSaving(true);
-    setError('');
-    setSuccess('');
+    setSaveError('');
+    setSaveSuccess('');
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      let ensuredRestaurantId = restaurantId;
 
-      if (userError) throw userError;
-      if (!user) throw new Error('You must be signed in to save.');
-
-      const cleanStoreName = storeName.trim();
-      const cleanSlug = slugify(slug || storeName);
-
-      if (!cleanStoreName) throw new Error('Store name is required.');
-      if (!cleanSlug) throw new Error('Slug is required.');
-
-      const restaurantPayload = {
-        owner_id: user.id,
-        user_id: user.id,
-        name: cleanStoreName,
-        slug: cleanSlug,
-        phone: phone.trim(),
-        address: address.trim(),
-        hero_image: heroImage || null,
-        logo_image: logoImage || null,
-        storefront_theme: storefrontTheme,
-        storefront_language: storefrontLanguage,
-        order_language: orderLanguage,
-        pickup_enabled: pickupEnabled,
-        delivery_enabled: deliveryEnabled,
-        delivery_fee: safeNumberString(deliveryFee),
-        delivery_radius: safeNumberString(deliveryRadius),
-        delivery_minimum: safeNumberString(deliveryMinimum),
-        hours: hours.trim(),
-        plan,
-      };
-
-      let nextRestaurantId = restaurantId;
-
-      if (restaurantId) {
-        const { error: updateError } = await supabase
+      if (!ensuredRestaurantId) {
+        const inserted = await supabase
           .from('restaurants')
-          .update(restaurantPayload)
-          .eq('id', restaurantId);
+          .insert({
+            owner_id: ownerId,
+            user_id: ownerId,
+            name: restaurant.name,
+            slug: restaurant.slug,
+            phone: restaurant.phone,
+            address: restaurant.address,
+            hero_image: '',
+            logo_image: '',
+            storefront_theme: restaurant.storefront_theme,
+            storefront_language: restaurant.storefront_language,
+            order_language: restaurant.order_language,
+            pickup_enabled: restaurant.pickup_enabled,
+            delivery_enabled: restaurant.delivery_enabled,
+            delivery_fee: parseNumber(restaurant.delivery_fee),
+            delivery_radius: parseNumber(restaurant.delivery_radius),
+            delivery_minimum: parseNumber(restaurant.delivery_minimum),
+            hours: restaurant.hours,
+            plan: restaurant.plan,
+          })
+          .select('*')
+          .single();
 
-        if (updateError) throw updateError;
-      } else {
-        const { data: insertRows, error: insertError } = await supabase
-          .from('restaurants')
-          .insert(restaurantPayload)
-          .select('id')
-          .limit(1);
+        if (inserted.error) {
+          throw inserted.error;
+        }
 
-        if (insertError) throw insertError;
-        nextRestaurantId = insertRows?.[0]?.id ?? '';
-        if (!nextRestaurantId) throw new Error('Restaurant row was not created.');
-        setRestaurantId(nextRestaurantId);
+        ensuredRestaurantId = (inserted.data as RestaurantRow).id;
+        setRestaurantId(ensuredRestaurantId);
       }
 
-      const currentCategories = categories.map((category, categoryIndex) => ({
-        ...category,
-        sort_order: categoryIndex,
-        items: category.items.map((item, itemIndex) => ({
-          ...item,
-          sort_order: itemIndex,
-          option_groups: item.option_groups.map((group, groupIndex) => ({
-            ...group,
-            sort_order: groupIndex,
-            choices: group.choices.map((choice, choiceIndex) => ({
-              ...choice,
-              sort_order: choiceIndex,
-            })),
-          })),
-        })),
-      }));
+      let heroUrl = restaurant.hero_image;
+      let logoUrl = restaurant.logo_image;
 
-      await supabase.from('menu_option_choices').delete().eq('option_group_id', '__none__');
+      if (heroFile) {
+        heroUrl = await uploadImageFile(heroFile, 'heroes', ownerId);
+      }
 
-      const { data: existingItemsRows } = await supabase
+      if (logoFile) {
+        logoUrl = await uploadImageFile(logoFile, 'logos', ownerId);
+      }
+
+      const restaurantUpdate = await supabase
+        .from('restaurants')
+        .update({
+          owner_id: ownerId,
+          user_id: ownerId,
+          name: restaurant.name,
+          slug: restaurant.slug,
+          phone: restaurant.phone,
+          address: restaurant.address,
+          hero_image: heroUrl,
+          logo_image: logoUrl,
+          storefront_theme: restaurant.storefront_theme,
+          storefront_language: restaurant.storefront_language,
+          order_language: restaurant.order_language,
+          pickup_enabled: restaurant.pickup_enabled,
+          delivery_enabled: restaurant.delivery_enabled,
+          delivery_fee: parseNumber(restaurant.delivery_fee),
+          delivery_radius: parseNumber(restaurant.delivery_radius),
+          delivery_minimum: parseNumber(restaurant.delivery_minimum),
+          hours: restaurant.hours,
+          plan: restaurant.plan,
+        })
+        .eq('id', ensuredRestaurantId);
+
+      if (restaurantUpdate.error) {
+        throw restaurantUpdate.error;
+      }
+
+      const existingItemsResult = await supabase
         .from('menu_items')
         .select('id')
-        .eq('restaurant_id', nextRestaurantId);
-      const existingItemIds = (existingItemsRows ?? []).map((row: { id: string }) => row.id);
+        .eq('restaurant_id', ensuredRestaurantId);
 
-      if (existingItemIds.length) {
-        const { data: existingGroupsRows } = await supabase
+      if (existingItemsResult.error) {
+        throw existingItemsResult.error;
+      }
+
+      const existingItemIds = (existingItemsResult.data || []).map((row) => row.id);
+
+      if (existingItemIds.length > 0) {
+        const existingGroupsResult = await supabase
           .from('menu_option_groups')
           .select('id')
           .in('item_id', existingItemIds);
-        const existingGroupIds = (existingGroupsRows ?? []).map((row: { id: string }) => row.id);
 
-        if (existingGroupIds.length) {
-          const { error: deleteChoicesError } = await supabase
+        if (existingGroupsResult.error) {
+          throw existingGroupsResult.error;
+        }
+
+        const existingGroupIds = (existingGroupsResult.data || []).map((row) => row.id);
+
+        if (existingGroupIds.length > 0) {
+          const deleteChoices = await supabase
             .from('menu_option_choices')
             .delete()
             .in('option_group_id', existingGroupIds);
-          if (deleteChoicesError) throw deleteChoicesError;
+
+          if (deleteChoices.error) {
+            throw deleteChoices.error;
+          }
         }
 
-        const { error: deleteGroupsError } = await supabase
+        const deleteGroups = await supabase
           .from('menu_option_groups')
           .delete()
           .in('item_id', existingItemIds);
-        if (deleteGroupsError) throw deleteGroupsError;
+
+        if (deleteGroups.error) {
+          throw deleteGroups.error;
+        }
+
+        const deleteItems = await supabase
+          .from('menu_items')
+          .delete()
+          .eq('restaurant_id', ensuredRestaurantId);
+
+        if (deleteItems.error) {
+          throw deleteItems.error;
+        }
       }
 
-      const { error: deleteItemsError } = await supabase
-        .from('menu_items')
-        .delete()
-        .eq('restaurant_id', nextRestaurantId);
-      if (deleteItemsError) throw deleteItemsError;
-
-      const { error: deleteCategoriesError } = await supabase
+      const deleteCategories = await supabase
         .from('menu_categories')
         .delete()
-        .eq('restaurant_id', nextRestaurantId);
-      if (deleteCategoriesError) throw deleteCategoriesError;
+        .eq('restaurant_id', ensuredRestaurantId);
 
-      if (currentCategories.length) {
-        const categoryPayload = currentCategories.map((category) => ({
-          id: category.id,
-          restaurant_id: nextRestaurantId,
-          name: category.name.trim() || 'Category',
-          sort_order: category.sort_order,
-        }));
+      if (deleteCategories.error) {
+        throw deleteCategories.error;
+      }
 
-        const { error: categoryInsertError } = await supabase.from('menu_categories').insert(categoryPayload);
-        if (categoryInsertError) throw categoryInsertError;
+      for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex += 1) {
+        const category = categories[categoryIndex];
+        const categoryInsert = await supabase
+          .from('menu_categories')
+          .insert({
+            restaurant_id: ensuredRestaurantId,
+            name: category.name || `Category ${categoryIndex + 1}`,
+            sort_order: categoryIndex,
+          })
+          .select('*')
+          .single();
 
-        const itemPayload = currentCategories.flatMap((category) =>
-          category.items.map((item) => ({
-            id: item.id,
-            restaurant_id: nextRestaurantId,
-            category_id: category.id,
-            name: item.name.trim() || 'Menu Item',
-            description: item.description.trim(),
-            base_price: safeNumberString(item.base_price),
-            image_file: item.image_file || null,
-            availability: item.availability,
-            sort_order: item.sort_order,
-          }))
-        );
-
-        if (itemPayload.length) {
-          const { error: itemInsertError } = await supabase.from('menu_items').insert(itemPayload);
-          if (itemInsertError) throw itemInsertError;
+        if (categoryInsert.error) {
+          throw categoryInsert.error;
         }
 
-        const groupPayload = currentCategories.flatMap((category) =>
-          category.items.flatMap((item) =>
-            item.option_groups.map((group) => ({
-              id: group.id,
-              item_id: item.id,
-              name: group.name.trim() || 'Option Group',
-              is_required: group.is_required,
-              selection_mode: group.selection_mode,
-              sort_order: group.sort_order,
-            }))
-          )
-        );
+        const savedCategory = categoryInsert.data as CategoryRow;
 
-        if (groupPayload.length) {
-          const { error: groupInsertError } = await supabase.from('menu_option_groups').insert(groupPayload);
-          if (groupInsertError) throw groupInsertError;
-        }
+        for (let itemIndex = 0; itemIndex < category.items.length; itemIndex += 1) {
+          const item = category.items[itemIndex];
+          let itemImage = item.image_file;
+          const pendingFile = pendingItemFiles.current[item.id];
 
-        const choicePayload = currentCategories.flatMap((category) =>
-          category.items.flatMap((item) =>
-            item.option_groups.flatMap((group) =>
-              group.choices.map((choice) => ({
-                id: choice.id,
-                option_group_id: group.id,
-                name: choice.name.trim() || 'Choice',
-                price_delta: safeNumberString(choice.price_delta) ?? 0,
-                sort_order: choice.sort_order,
-              }))
-            )
-          )
-        );
+          if (pendingFile) {
+            itemImage = await uploadImageFile(pendingFile, 'menu-items', ownerId);
+          }
 
-        if (choicePayload.length) {
-          const { error: choiceInsertError } = await supabase.from('menu_option_choices').insert(choicePayload);
-          if (choiceInsertError) throw choiceInsertError;
+          const itemInsert = await supabase
+            .from('menu_items')
+            .insert({
+              restaurant_id: ensuredRestaurantId,
+              category_id: savedCategory.id,
+              name: item.name || `Item ${itemIndex + 1}`,
+              description: item.description,
+              base_price: parseNumber(item.base_price),
+              image_file: itemImage,
+              availability: item.availability,
+              sort_order: itemIndex,
+            })
+            .select('*')
+            .single();
+
+          if (itemInsert.error) {
+            throw itemInsert.error;
+          }
+
+          const savedItem = itemInsert.data as ItemRow;
+
+          for (let groupIndex = 0; groupIndex < item.option_groups.length; groupIndex += 1) {
+            const group = item.option_groups[groupIndex];
+            const groupInsert = await supabase
+              .from('menu_option_groups')
+              .insert({
+                item_id: savedItem.id,
+                name: group.name || `Options ${groupIndex + 1}`,
+                is_required: group.is_required,
+                selection_mode: group.selection_mode,
+                sort_order: groupIndex,
+              })
+              .select('*')
+              .single();
+
+            if (groupInsert.error) {
+              throw groupInsert.error;
+            }
+
+            const savedGroup = groupInsert.data as OptionGroupRow;
+
+            for (let choiceIndex = 0; choiceIndex < group.choices.length; choiceIndex += 1) {
+              const choice = group.choices[choiceIndex];
+              const choiceInsert = await supabase.from('menu_option_choices').insert({
+                option_group_id: savedGroup.id,
+                name: choice.name || `Choice ${choiceIndex + 1}`,
+                price_delta: parseNumber(choice.price_delta),
+                sort_order: choiceIndex,
+              });
+
+              if (choiceInsert.error) {
+                throw choiceInsert.error;
+              }
+            }
+          }
         }
       }
 
-      setSlug(cleanSlug);
-      setSuccess('Builder saved.');
-      await loadBuilder();
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to save builder data.');
+      pendingItemFiles.current = {};
+      setHeroFile(null);
+      setLogoFile(null);
+      setSaveSuccess('Builder saved successfully.');
+      await bootstrap();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save builder data.';
+      setSaveError(message);
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const previewPrimaryItem = useMemo(() => {
-    for (const category of categories) {
-      if (category.items.length) return category.items[0];
-    }
-    return null;
-  }, [categories]);
+  const heroInputRef = useRef<HTMLInputElement | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#f3f5fb] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[#3f74ea]">Owner Control Center</p>
-              <h1 className="mt-4 text-5xl font-black tracking-tight text-[#0d1733] sm:text-6xl">MENUFLOW BUILDER</h1>
-              <p className="mt-4 max-w-2xl text-xl leading-10 text-[#6b7280]">
+    <div className="min-h-screen bg-[#eef1f7] p-4 md:p-8">
+      <div className="mx-auto max-w-[1600px] overflow-hidden rounded-[36px] border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 px-6 py-5 md:px-8">
+          <div className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-950">
+            <span>MENUFLOW</span>
+            <span className="font-medium text-slate-500">BUILDER</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-700">
+              {restaurant.storefront_language.toUpperCase()} | {restaurant.order_language.toUpperCase()}
+            </div>
+            <Link
+              className="rounded-xl bg-slate-950 px-5 py-3 text-base font-semibold text-white"
+              href={restaurant.slug ? `/store/${restaurant.slug}` : '#'}
+              prefetch={false}
+            >
+              Open Store
+            </Link>
+            <button
+              className="rounded-xl bg-slate-950 px-5 py-3 text-base font-semibold text-white"
+              disabled={saving || loading}
+              onClick={() => void saveBuilder()}
+              type="button"
+            >
+              {saving ? 'Saving…' : 'Save Builder'}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-0 xl:grid-cols-[720px_minmax(0,1fr)]">
+          <div className="border-r border-slate-200">
+            <div className="border-b border-slate-200 px-6 py-8 md:px-8">
+              <p className="text-lg font-semibold uppercase tracking-[0.35em] text-blue-600">
+                Owner Control Center
+              </p>
+              <h1 className="mt-4 text-5xl font-black leading-none text-slate-950 md:text-7xl">
+                MENUFLOW
+                <br />
+                BUILDER
+              </h1>
+              <p className="mt-6 max-w-3xl text-2xl leading-relaxed text-slate-500">
                 One trusted source of truth for your store setup, branding, menu, options, and storefront data.
               </p>
-            </div>
 
-            <div className="grid w-full gap-4 sm:grid-cols-2 lg:w-[430px]">
-              <div className="rounded-[28px] bg-[#f4f5fb] p-5">
-                <p className="text-[15px] font-semibold text-[#0d1733]">Store URL</p>
-                <p className="mt-2 break-all text-[18px] font-semibold text-[#7a8090]">{storeUrl}</p>
-              </div>
-              <button
-                type="button"
-                onClick={saveBuilder}
-                disabled={saving || loading}
-                className="rounded-[28px] bg-[#2f67eb] px-6 py-5 text-[18px] font-bold text-white shadow-[0_18px_30px_rgba(47,103,235,0.25)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : 'Save Builder'}
-              </button>
-            </div>
-          </div>
+              <div className="mt-8 grid gap-4 md:grid-cols-[1fr_1.1fr]">
+                <div className="rounded-[28px] bg-slate-100 px-5 py-5">
+                  <div className="text-2xl font-black text-slate-950">Store URL</div>
+                  <div className="mt-2 text-2xl font-semibold text-slate-500">{storeUrl}</div>
+                </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            {(Object.keys(sectionLabels) as SectionKey[]).map((key) => {
-              const active = activeSection === key;
-              return (
                 <button
-                  key={key}
+                  className="rounded-[28px] bg-blue-600 px-6 py-5 text-3xl font-bold text-white shadow-lg shadow-blue-600/20"
+                  disabled={saving || loading}
+                  onClick={() => void saveBuilder()}
                   type="button"
-                  onClick={() => setActiveSection(key)}
-                  className={`rounded-[24px] px-7 py-4 text-[17px] font-bold transition ${
-                    active ? 'bg-[#0a1536] text-white' : 'bg-[#f4f5fb] text-[#111827]'
-                  }`}
                 >
-                  {sectionLabels[key]}
+                  {saving ? 'Saving…' : 'Save Builder'}
                 </button>
-              );
-            })}
-          </div>
-
-          {error ? (
-            <div className="mt-6 rounded-[24px] bg-[#fff1f1] px-6 py-5 text-[18px] font-semibold text-[#a52828]">{error}</div>
-          ) : null}
-          {success ? (
-            <div className="mt-6 rounded-[24px] bg-[#eef9f1] px-6 py-5 text-[18px] font-semibold text-[#166534]">{success}</div>
-          ) : null}
-        </section>
-
-        {activeSection === 'store' ? (
-          <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-            <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Store setup</h2>
-            <p className="mt-4 max-w-3xl text-xl leading-10 text-[#6b7280]">
-              This section controls the restaurant row in your final schema. No legacy fields. No URL paste logic.
-            </p>
-
-            <div className="mt-8 grid gap-5 lg:grid-cols-2">
-              <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="CJ Moore Kitchen" />
-              <Field label="Slug" value={slug} onChange={setSlug} placeholder="cj-moore-kitchen" />
-              <Field label="Phone" value={phone} onChange={setPhone} placeholder="(323) 812-7102" />
-              <Field label="Address" value={address} onChange={setAddress} placeholder="123 Main St, Los Angeles, CA" />
-              <Field label="Delivery fee" value={deliveryFee} onChange={setDeliveryFee} placeholder="0" />
-              <Field label="Delivery radius (miles)" value={deliveryRadius} onChange={setDeliveryRadius} placeholder="0" />
-              <Field label="Delivery minimum" value={deliveryMinimum} onChange={setDeliveryMinimum} placeholder="0" />
-              <Field label="Plan" value={plan} onChange={setPlan} placeholder="starter" />
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <ToggleCard title="Pickup" value={pickupEnabled} onClick={() => setPickupEnabled((value) => !value)} />
-              <ToggleCard title="Delivery" value={deliveryEnabled} onClick={() => setDeliveryEnabled((value) => !value)} />
-            </div>
-
-            <div className="mt-6">
-              <label className="mb-3 block text-[18px] font-bold text-[#0d1733]">Business hours</label>
-              <textarea
-                value={hours}
-                onChange={(event) => setHours(event.target.value)}
-                placeholder={'Mon-Fri: 8:00 AM - 8:00 PM\nSat-Sun: 9:00 AM - 6:00 PM'}
-                className="min-h-[140px] w-full rounded-[26px] border border-[#e7e9f2] bg-white px-6 py-5 text-[18px] font-medium text-[#111827] outline-none transition placeholder:text-[#a0a5b4] focus:border-[#2f67eb]"
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {activeSection === 'branding' ? (
-          <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-            <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Branding</h2>
-            <p className="mt-4 text-xl leading-10 text-[#6b7280]">File upload only. Owners pick images from gallery or files. No image URL paste.</p>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <UploadCard
-                title="Hero image"
-                imageUrl={heroImage}
-                uploading={uploadingTarget === 'hero'}
-                onChange={(event) => void onImageChange(event, { type: 'hero' })}
-              />
-              <UploadCard
-                title="Logo image"
-                imageUrl={logoImage}
-                uploading={uploadingTarget === 'logo'}
-                onChange={(event) => void onImageChange(event, { type: 'logo' })}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {activeSection === 'theme' ? (
-          <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-            <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Theme & language</h2>
-            <p className="mt-4 text-xl leading-10 text-[#6b7280]">These controls affect the storefront and storefront preview only. The admin builder stays clean and consistent.</p>
-
-            <div className="mt-8 grid gap-6 lg:grid-cols-3">
-              <PickerCard
-                title="Storefront theme"
-                options={[
-                  { label: 'Light', value: 'light' },
-                  { label: 'Dark', value: 'dark' },
-                ]}
-                selected={storefrontTheme}
-                onSelect={(value) => setStorefrontTheme(value as StorefrontTheme)}
-              />
-              <PickerCard
-                title="Storefront language"
-                options={[
-                  { label: 'EN', value: 'en' },
-                  { label: 'ES', value: 'es' },
-                ]}
-                selected={storefrontLanguage}
-                onSelect={(value) => setStorefrontLanguage(value as LanguageMode)}
-              />
-              <PickerCard
-                title="Incoming order language"
-                options={[
-                  { label: 'EN', value: 'en' },
-                  { label: 'ES', value: 'es' },
-                ]}
-                selected={orderLanguage}
-                onSelect={(value) => setOrderLanguage(value as LanguageMode)}
-              />
-            </div>
-          </section>
-        ) : null}
-
-        {activeSection === 'menu' ? (
-          <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Menu builder</h2>
-                <p className="mt-4 text-xl leading-10 text-[#6b7280]">Built to save categories, items, option groups, and choices into the final clean schema.</p>
               </div>
-              <button
-                type="button"
-                onClick={addCategory}
-                className="rounded-[24px] bg-[#f4f5fb] px-6 py-4 text-[18px] font-bold text-[#111827]"
-              >
-                Add Category
-              </button>
+
+              <div className="mt-8 flex flex-wrap gap-4">
+                {(Object.keys(SECTION_LABELS) as ActiveSection[]).map((sectionKey) => (
+                  <button
+                    key={sectionKey}
+                    className={buttonClass(activeSection === sectionKey)}
+                    onClick={() => setActiveSection(sectionKey)}
+                    type="button"
+                  >
+                    {SECTION_LABELS[sectionKey]}
+                  </button>
+                ))}
+              </div>
+
+              {loadError ? (
+                <div className="mt-8 rounded-[28px] bg-red-50 px-5 py-5 text-2xl font-bold text-red-700">
+                  {loadError}
+                </div>
+              ) : null}
+
+              {saveError ? (
+                <div className="mt-4 rounded-[28px] bg-red-50 px-5 py-5 text-2xl font-bold text-red-700">
+                  {saveError}
+                </div>
+              ) : null}
+
+              {saveSuccess ? (
+                <div className="mt-4 rounded-[28px] bg-emerald-50 px-5 py-5 text-2xl font-bold text-emerald-700">
+                  {saveSuccess}
+                </div>
+              ) : null}
             </div>
 
-            <div className="mt-8 space-y-6">
-              {categories.map((category) => {
-                const categoryKey = category.name.toLowerCase();
-                const placeholders =
-                  Object.entries(placeholderLibrary).find(([key]) => categoryKey.includes(key))?.[1] ?? placeholderLibrary.default;
+            <div className="space-y-8 px-6 py-8 md:px-8">
+              {activeSection === 'store' && (
+                <div className="rounded-[32px] bg-white">
+                  <h2 className="text-6xl font-black text-slate-950">Store setup</h2>
+                  <p className="mt-6 text-3xl leading-relaxed text-slate-500">
+                    This section controls the restaurant row in your final schema. No legacy fields. No URL paste logic.
+                  </p>
 
-                return (
-                  <div key={category.id} className="rounded-[28px] border border-[#edf0f7] bg-[#fbfcff] p-5 sm:p-6">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex-1">
-                        <label className="mb-3 block text-[16px] font-bold text-[#0d1733]">Category name</label>
-                        <input
-                          value={category.name}
-                          onChange={(event) => updateCategory(category.id, { name: event.target.value })}
-                          className="w-full rounded-[22px] border border-[#e7e9f2] bg-white px-5 py-4 text-[18px] font-semibold text-[#111827] outline-none focus:border-[#2f67eb]"
-                          placeholder="Tacos"
-                        />
+                  <div className="mt-10 space-y-6">
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Store name</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.name}
+                        onChange={(e) => updateRestaurant('name', e.target.value)}
+                        placeholder="CJ Moore Kitchen"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Slug</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.slug}
+                        onChange={(e) => updateRestaurant('slug', slugify(e.target.value))}
+                        placeholder="cj-moore-kitchen"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Phone</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.phone}
+                        onChange={(e) => updateRestaurant('phone', e.target.value)}
+                        placeholder="(323) 812-7102"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Address</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.address}
+                        onChange={(e) => updateRestaurant('address', e.target.value)}
+                        placeholder="123 Main St, Los Angeles, CA"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Delivery fee</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.delivery_fee}
+                        onChange={(e) => updateRestaurant('delivery_fee', sanitizeMoneyString(e.target.value))}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Delivery radius (miles)</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.delivery_radius}
+                        onChange={(e) => updateRestaurant('delivery_radius', sanitizeMoneyString(e.target.value))}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Delivery minimum</label>
+                      <input
+                        className={fieldClass()}
+                        value={restaurant.delivery_minimum}
+                        onChange={(e) => updateRestaurant('delivery_minimum', sanitizeMoneyString(e.target.value))}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Plan</label>
+                      <select
+                        className={fieldClass()}
+                        value={restaurant.plan}
+                        onChange={(e) => updateRestaurant('plan', e.target.value)}
+                      >
+                        <option value="starter">Starter</option>
+                        <option value="growth">Growth</option>
+                        <option value="premium">Premium</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <button
+                        type="button"
+                        className={restaurant.pickup_enabled ? 'rounded-[28px] border border-blue-600 bg-blue-50 px-6 py-6 text-left' : 'rounded-[28px] border border-slate-200 bg-white px-6 py-6 text-left'}
+                        onClick={() => updateRestaurant('pickup_enabled', !restaurant.pickup_enabled)}
+                      >
+                        <div className="text-3xl font-black text-slate-950">Pickup</div>
+                        <div className="mt-2 text-xl text-slate-500">
+                          {restaurant.pickup_enabled ? 'Enabled' : 'Disabled'}
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={restaurant.delivery_enabled ? 'rounded-[28px] border border-blue-600 bg-blue-50 px-6 py-6 text-left' : 'rounded-[28px] border border-slate-200 bg-white px-6 py-6 text-left'}
+                        onClick={() => updateRestaurant('delivery_enabled', !restaurant.delivery_enabled)}
+                      >
+                        <div className="text-3xl font-black text-slate-950">Delivery</div>
+                        <div className="mt-2 text-xl text-slate-500">
+                          {restaurant.delivery_enabled ? 'Enabled' : 'Disabled'}
+                        </div>
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="mb-3 block text-xl font-bold text-slate-950">Business hours</label>
+                      <textarea
+                        className={`${fieldClass()} min-h-[160px]`}
+                        value={restaurant.hours}
+                        onChange={(e) => updateRestaurant('hours', e.target.value)}
+                        placeholder={'Mon–Fri: 8:00 AM - 8:00 PM\nSat–Sun: 9:00 AM - 6:00 PM'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'branding' && (
+                <div className="rounded-[32px] bg-white">
+                  <h2 className="text-6xl font-black text-slate-950">Branding</h2>
+                  <p className="mt-6 text-3xl leading-relaxed text-slate-500">
+                    Upload from gallery or file picker only. No image URLs.
+                  </p>
+
+                  <div className="mt-10 grid gap-6 md:grid-cols-2">
+                    <button
+                      type="button"
+                      className="rounded-[24px] border border-slate-200 px-6 py-5 text-xl font-semibold text-slate-950"
+                      onClick={() => heroInputRef.current?.click()}
+                    >
+                      Upload Hero Image
+                    </button>
+
+                    <button
+                      type="button"
+                      className="rounded-[24px] border border-slate-200 px-6 py-5 text-xl font-semibold text-slate-950"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      Upload Logo
+                    </button>
+
+                    <input ref={heroInputRef} hidden type="file" accept="image/*" onChange={onHeroUpload} />
+                    <input ref={logoInputRef} hidden type="file" accept="image/*" onChange={onLogoUpload} />
+                  </div>
+
+                  <div className="mt-8 grid gap-6 md:grid-cols-2">
+                    <div className="overflow-hidden rounded-[28px] border border-slate-200">
+                      <div className="bg-slate-50 px-5 py-4 text-xl font-bold text-slate-950">Hero image</div>
+                      <div className="aspect-[1.3/1] bg-slate-100">
+                        {restaurant.hero_image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt="Hero" className="h-full w-full object-cover" src={restaurant.hero_image} />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-lg text-slate-500">
+                            No hero image uploaded yet
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-3">
+                    </div>
+
+                    <div className="overflow-hidden rounded-[28px] border border-slate-200">
+                      <div className="bg-slate-50 px-5 py-4 text-xl font-bold text-slate-950">Logo</div>
+                      <div className="aspect-[1.3/1] bg-slate-100">
+                        {restaurant.logo_image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt="Logo" className="h-full w-full object-contain p-8" src={restaurant.logo_image} />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-lg text-slate-500">
+                            No logo uploaded yet
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'theme' && (
+                <div className="rounded-[32px] bg-white">
+                  <h2 className="text-6xl font-black text-slate-950">Theme & Language</h2>
+                  <p className="mt-6 text-3xl leading-relaxed text-slate-500">
+                    This affects the storefront and preview only. The admin builder stays clean and consistent.
+                  </p>
+
+                  <div className="mt-10 space-y-8">
+                    <div>
+                      <div className="mb-4 text-xl font-bold text-slate-950">Storefront theme</div>
+                      <div className="flex flex-wrap gap-4">
                         <button
                           type="button"
-                          onClick={() => addItem(category.id)}
-                          className="rounded-[22px] bg-[#0a1536] px-5 py-4 text-[16px] font-bold text-white"
+                          className={buttonClass(restaurant.storefront_theme === 'light')}
+                          onClick={() => updateRestaurant('storefront_theme', 'light')}
                         >
-                          Add Item
+                          Light
                         </button>
                         <button
                           type="button"
-                          onClick={() => removeCategory(category.id)}
-                          className="rounded-[22px] bg-[#fff1f1] px-5 py-4 text-[16px] font-bold text-[#a52828]"
+                          className={buttonClass(restaurant.storefront_theme === 'dark')}
+                          onClick={() => updateRestaurant('storefront_theme', 'dark')}
                         >
-                          Remove
+                          Dark
                         </button>
                       </div>
                     </div>
 
-                    <div className="mt-5 space-y-5">
-                      {category.items.map((item) => (
-                        <div key={item.id} className="rounded-[26px] bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)]">
-                          <div className="grid gap-5 xl:grid-cols-[1.2fr_1fr]">
-                            <div className="space-y-4">
-                              <div className="grid gap-4 md:grid-cols-2">
-                                <Field
-                                  label="Item name"
-                                  value={item.name}
-                                  onChange={(value) => updateItem(category.id, item.id, { name: value })}
-                                  placeholder="Birria taco"
-                                />
-                                <Field
-                                  label="Price"
-                                  value={item.base_price}
-                                  onChange={(value) => updateItem(category.id, item.id, { base_price: value })}
-                                  placeholder="12.99"
-                                />
-                              </div>
+                    <div>
+                      <div className="mb-4 text-xl font-bold text-slate-950">Storefront language</div>
+                      <div className="flex flex-wrap gap-4">
+                        <button
+                          type="button"
+                          className={buttonClass(restaurant.storefront_language === 'en')}
+                          onClick={() => updateRestaurant('storefront_language', 'en')}
+                        >
+                          EN
+                        </button>
+                        <button
+                          type="button"
+                          className={buttonClass(restaurant.storefront_language === 'es')}
+                          onClick={() => updateRestaurant('storefront_language', 'es')}
+                        >
+                          ES
+                        </button>
+                      </div>
+                    </div>
 
-                              <div>
-                                <label className="mb-3 block text-[16px] font-bold text-[#0d1733]">Description</label>
-                                <textarea
-                                  value={item.description}
-                                  onChange={(event) => updateItem(category.id, item.id, { description: event.target.value })}
-                                  placeholder="Fresh food made to order"
-                                  className="min-h-[120px] w-full rounded-[22px] border border-[#e7e9f2] bg-white px-5 py-4 text-[18px] font-medium text-[#111827] outline-none placeholder:text-[#a0a5b4] focus:border-[#2f67eb]"
-                                />
-                              </div>
+                    <div>
+                      <div className="mb-4 text-xl font-bold text-slate-950">Order language received by owner</div>
+                      <div className="flex flex-wrap gap-4">
+                        <button
+                          type="button"
+                          className={buttonClass(restaurant.order_language === 'en')}
+                          onClick={() => updateRestaurant('order_language', 'en')}
+                        >
+                          EN
+                        </button>
+                        <button
+                          type="button"
+                          className={buttonClass(restaurant.order_language === 'es')}
+                          onClick={() => updateRestaurant('order_language', 'es')}
+                        >
+                          ES
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                              <div className="flex flex-wrap gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateItem(category.id, item.id, {
-                                      availability: item.availability === 'available' ? 'sold_out' : 'available',
-                                    })
-                                  }
-                                  className={`rounded-[18px] px-5 py-3 text-[15px] font-bold ${
-                                    item.availability === 'available'
-                                      ? 'bg-[#eef7ee] text-[#166534]'
-                                      : 'bg-[#fff1f1] text-[#a52828]'
-                                  }`}
-                                >
-                                  {item.availability === 'available' ? 'Available' : 'Sold Out'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => addGroup(category.id, item.id)}
-                                  className="rounded-[18px] bg-[#f4f5fb] px-5 py-3 text-[15px] font-bold text-[#111827]"
-                                >
-                                  Add Option Group
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => removeItem(category.id, item.id)}
-                                  className="rounded-[18px] bg-[#fff1f1] px-5 py-3 text-[15px] font-bold text-[#a52828]"
-                                >
-                                  Delete Item
-                                </button>
-                              </div>
-                            </div>
+              {activeSection === 'menu' && (
+                <div className="rounded-[32px] bg-white">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-6xl font-black text-slate-950">Menu builder</h2>
+                      <p className="mt-6 text-3xl leading-relaxed text-slate-500">
+                        Built to save categories, items, option groups, and choices into the final clean schema.
+                      </p>
+                    </div>
 
-                            <div className="space-y-4 rounded-[24px] bg-[#fbfcff] p-4">
-                              <p className="text-[16px] font-bold text-[#0d1733]">Item image</p>
-                              <div className="overflow-hidden rounded-[24px] border border-dashed border-[#d7dceb] bg-[#f2f4fa]">
-                                {item.image_file ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={item.image_file} alt={item.name || 'Menu item'} className="h-56 w-full object-cover" />
-                                ) : (
-                                  <div className="flex h-56 items-center justify-center text-[20px] font-semibold text-[#81889a]">No image yet</div>
-                                )}
-                              </div>
-                              <label className="flex cursor-pointer items-center justify-center rounded-[18px] bg-[#2f67eb] px-5 py-4 text-center text-[16px] font-bold text-white">
-                                {uploadingTarget === `item:${item.id}` ? 'Uploading...' : 'Upload item image'}
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  className="hidden"
-                                  onChange={(event) => void onImageChange(event, { type: 'item', categoryId: category.id, itemId: item.id })}
-                                />
-                              </label>
+                    <div className="flex flex-wrap gap-4">
+                      <button
+                        type="button"
+                        className="rounded-[24px] bg-slate-100 px-6 py-5 text-2xl font-bold text-slate-950"
+                        onClick={addCategory}
+                      >
+                        Add Category
+                      </button>
+                    </div>
+                  </div>
 
-                              <div>
-                                <p className="mb-3 text-[15px] font-semibold text-[#4b5563]">Quick placeholders</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                  {placeholders.map((placeholder) => (
+                  <div className="mt-10 space-y-8">
+                    {categories.map((category, categoryIndex) => (
+                      <div key={category.id} className="rounded-[28px] border border-slate-200 p-6">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <input
+                            className={fieldClass()}
+                            value={category.name}
+                            onChange={(e) =>
+                              updateCategory(category.id, {
+                                name: e.target.value,
+                                sort_order: categoryIndex,
+                              })
+                            }
+                            placeholder="Category name"
+                          />
+                          <button
+                            type="button"
+                            className="rounded-[20px] bg-red-50 px-5 py-4 text-lg font-semibold text-red-700"
+                            onClick={() => removeCategory(category.id)}
+                          >
+                            Remove Category
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-[20px] bg-slate-950 px-5 py-4 text-lg font-semibold text-white"
+                            onClick={() => addItem(category.id)}
+                          >
+                            Add Item
+                          </button>
+                        </div>
+
+                        <div className="mt-6 space-y-6">
+                          {category.items.map((item, itemIndex) => (
+                            <div key={item.id} className="rounded-[24px] bg-slate-50 p-5">
+                              <div className="grid gap-5 md:grid-cols-2">
+                                <div>
+                                  <label className="mb-3 block text-lg font-bold text-slate-950">Item name</label>
+                                  <input
+                                    className={fieldClass()}
+                                    value={item.name}
+                                    onChange={(e) =>
+                                      updateItem(category.id, item.id, {
+                                        name: e.target.value,
+                                        sort_order: itemIndex,
+                                      })
+                                    }
+                                    placeholder="Chicken Taco"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-3 block text-lg font-bold text-slate-950">Base price</label>
+                                  <input
+                                    className={fieldClass()}
+                                    value={item.base_price}
+                                    onChange={(e) =>
+                                      updateItem(category.id, item.id, {
+                                        base_price: sanitizeMoneyString(e.target.value),
+                                      })
+                                    }
+                                    placeholder="12.00"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <label className="mb-3 block text-lg font-bold text-slate-950">Description</label>
+                                  <textarea
+                                    className={`${fieldClass()} min-h-[120px]`}
+                                    value={item.description}
+                                    onChange={(e) =>
+                                      updateItem(category.id, item.id, {
+                                        description: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Grilled chicken, lettuce, pico de gallo, and cheese."
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-3 block text-lg font-bold text-slate-950">Availability</label>
+                                  <div className="flex flex-wrap gap-4">
                                     <button
-                                      key={placeholder.url}
                                       type="button"
-                                      onClick={() => applyPlaceholder(category.id, item.id, placeholder.url)}
-                                      className="overflow-hidden rounded-[18px] border border-[#e7e9f2] bg-white text-left"
+                                      className={buttonClass(item.availability === 'available')}
+                                      onClick={() =>
+                                        updateItem(category.id, item.id, {
+                                          availability: 'available',
+                                        })
+                                      }
                                     >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={placeholder.url} alt={placeholder.label} className="h-24 w-full object-cover" />
-                                      <div className="px-3 py-2 text-[13px] font-semibold text-[#111827]">{placeholder.label}</div>
+                                      Available
                                     </button>
-                                  ))}
+                                    <button
+                                      type="button"
+                                      className={buttonClass(item.availability === 'sold_out')}
+                                      onClick={() =>
+                                        updateItem(category.id, item.id, {
+                                          availability: 'sold_out',
+                                        })
+                                      }
+                                    >
+                                      Sold Out
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="mb-3 block text-lg font-bold text-slate-950">Item image</label>
+                                  <input
+                                    className="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-4"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => void onItemImageUpload(e, category.id, item.id)}
+                                  />
                                 </div>
                               </div>
-                            </div>
-                          </div>
 
-                          {item.option_groups.length ? (
-                            <div className="mt-5 space-y-4">
-                              {item.option_groups.map((group) => (
-                                <div key={group.id} className="rounded-[22px] border border-[#edf0f7] bg-[#fbfcff] p-4">
-                                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                    <Field
-                                      label="Group name"
-                                      value={group.name}
-                                      onChange={(value) => updateGroup(category.id, item.id, group.id, { name: value })}
-                                      placeholder="Choose a size"
+                              <div className="mt-5 rounded-[20px] border border-slate-200 bg-white p-4">
+                                <div className="aspect-[1.4/1] overflow-hidden rounded-[18px] bg-slate-100">
+                                  {item.image_file ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      alt={item.name || 'Menu item image'}
+                                      className="h-full w-full object-cover"
+                                      src={item.image_file}
                                     />
-                                    <PickerInline
-                                      label="Selection"
-                                      selected={group.selection_mode}
-                                      options={[
-                                        { label: 'Single', value: 'single' },
-                                        { label: 'Multiple', value: 'multiple' },
-                                      ]}
-                                      onSelect={(value) => updateGroup(category.id, item.id, group.id, { selection_mode: value as 'single' | 'multiple' })}
-                                    />
-                                    <ToggleInline
-                                      label="Required"
-                                      value={group.is_required}
-                                      onToggle={() => updateGroup(category.id, item.id, group.id, { is_required: !group.is_required })}
-                                    />
-                                    <div className="flex items-end">
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-base text-slate-500">
+                                      No image uploaded yet
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-6 space-y-5">
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                  <div className="text-2xl font-black text-slate-950">Option groups</div>
+                                  <button
+                                    type="button"
+                                    className="rounded-[18px] bg-slate-950 px-5 py-4 text-lg font-semibold text-white"
+                                    onClick={() => addGroup(category.id, item.id)}
+                                  >
+                                    Add Option Group
+                                  </button>
+                                </div>
+
+                                {item.option_groups.map((group, groupIndex) => (
+                                  <div key={group.id} className="rounded-[20px] border border-slate-200 bg-white p-4">
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                      <div>
+                                        <label className="mb-2 block text-base font-bold text-slate-950">
+                                          Group name
+                                        </label>
+                                        <input
+                                          className={fieldClass()}
+                                          value={group.name}
+                                          onChange={(e) =>
+                                            updateGroup(category.id, item.id, group.id, {
+                                              name: e.target.value,
+                                              sort_order: groupIndex,
+                                            })
+                                          }
+                                          placeholder="Choose Your Protein"
+                                        />
+                                      </div>
+
+                                      <div className="flex flex-wrap items-end gap-3">
+                                        <button
+                                          type="button"
+                                          className={buttonClass(group.selection_mode === 'single')}
+                                          onClick={() =>
+                                            updateGroup(category.id, item.id, group.id, {
+                                              selection_mode: 'single',
+                                            })
+                                          }
+                                        >
+                                          Single
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={buttonClass(group.selection_mode === 'multiple')}
+                                          onClick={() =>
+                                            updateGroup(category.id, item.id, group.id, {
+                                              selection_mode: 'multiple',
+                                            })
+                                          }
+                                        >
+                                          Multiple
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={
+                                            group.is_required
+                                              ? 'rounded-full bg-blue-600 px-6 py-4 text-lg font-semibold text-white'
+                                              : 'rounded-full bg-slate-100 px-6 py-4 text-lg font-semibold text-slate-900'
+                                          }
+                                          onClick={() =>
+                                            updateGroup(category.id, item.id, group.id, {
+                                              is_required: !group.is_required,
+                                            })
+                                          }
+                                        >
+                                          {group.is_required ? 'Required' : 'Optional'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="rounded-full bg-red-50 px-6 py-4 text-lg font-semibold text-red-700"
+                                          onClick={() => removeGroup(category.id, item.id, group.id)}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="mt-5 space-y-4">
+                                      {group.choices.map((choice, choiceIndex) => (
+                                        <div key={choice.id} className="grid gap-4 md:grid-cols-[1fr_220px_180px]">
+                                          <input
+                                            className={fieldClass()}
+                                            value={choice.name}
+                                            onChange={(e) =>
+                                              updateChoice(category.id, item.id, group.id, choice.id, {
+                                                name: e.target.value,
+                                                sort_order: choiceIndex,
+                                              })
+                                            }
+                                            placeholder="Chicken"
+                                          />
+                                          <input
+                                            className={fieldClass()}
+                                            value={choice.price_delta}
+                                            onChange={(e) =>
+                                              updateChoice(category.id, item.id, group.id, choice.id, {
+                                                price_delta: sanitizeMoneyString(e.target.value),
+                                              })
+                                            }
+                                            placeholder="0"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="rounded-[20px] bg-red-50 px-5 py-4 text-lg font-semibold text-red-700"
+                                            onClick={() => removeChoice(category.id, item.id, group.id, choice.id)}
+                                          >
+                                            Remove Choice
+                                          </button>
+                                        </div>
+                                      ))}
+
                                       <button
                                         type="button"
-                                        onClick={() => removeGroup(category.id, item.id, group.id)}
-                                        className="w-full rounded-[18px] bg-[#fff1f1] px-4 py-4 text-[15px] font-bold text-[#a52828]"
+                                        className="rounded-[18px] bg-slate-100 px-5 py-4 text-lg font-semibold text-slate-950"
+                                        onClick={() => addChoice(category.id, item.id, group.id)}
                                       >
-                                        Remove group
+                                        Add Choice
                                       </button>
                                     </div>
                                   </div>
+                                ))}
+                              </div>
 
-                                  <div className="mt-4 space-y-3">
-                                    {group.choices.map((choice) => (
-                                      <div key={choice.id} className="grid gap-3 md:grid-cols-[1fr_180px_160px]">
-                                        <Field
-                                          label="Choice"
-                                          value={choice.name}
-                                          onChange={(value) => updateChoice(category.id, item.id, group.id, choice.id, { name: value })}
-                                          placeholder="Large"
-                                        />
-                                        <Field
-                                          label="Price delta"
-                                          value={choice.price_delta}
-                                          onChange={(value) => updateChoice(category.id, item.id, group.id, choice.id, { price_delta: value })}
-                                          placeholder="0"
-                                        />
-                                        <div className="flex items-end">
-                                          <button
-                                            type="button"
-                                            onClick={() => removeChoice(category.id, item.id, group.id, choice.id)}
-                                            className="w-full rounded-[18px] bg-[#f4f5fb] px-4 py-4 text-[15px] font-bold text-[#111827]"
-                                          >
-                                            Remove choice
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    <button
-                                      type="button"
-                                      onClick={() => addChoice(category.id, item.id, group.id)}
-                                      className="rounded-[16px] bg-[#0a1536] px-4 py-3 text-[15px] font-bold text-white"
-                                    >
-                                      Add choice
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
+                              <div className="mt-6">
+                                <button
+                                  type="button"
+                                  className="rounded-[18px] bg-red-50 px-5 py-4 text-lg font-semibold text-red-700"
+                                  onClick={() => removeItem(category.id, item.id)}
+                                >
+                                  Remove Item
+                                </button>
+                              </div>
                             </div>
-                          ) : null}
+                          ))}
                         </div>
-                      ))}
-
-                      {!category.items.length ? (
-                        <div className="rounded-[22px] border border-dashed border-[#d9dfec] px-5 py-8 text-[17px] font-semibold text-[#7a8090]">
-                          No items yet in this category.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        {activeSection === 'flyers' ? (
-          <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-            <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Flyers</h2>
-            <p className="mt-4 text-xl leading-10 text-[#6b7280]">
-              Free white digital QR flyer included. Custom flyer previews stay tied to your restaurant branding, category look, and storefront theme.
-            </p>
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <div className="rounded-[28px] bg-[#fbfcff] p-6">
-                <p className="text-[20px] font-bold text-[#0d1733]">Included digital flyer</p>
-                <div className="mt-5 rounded-[28px] bg-white p-8 text-center shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                  <p className="text-[14px] font-semibold uppercase tracking-[0.28em] text-[#2f67eb]">Scan to order</p>
-                  <p className="mt-4 text-3xl font-black text-[#0d1733]">{storeName || 'Your Store'}</p>
-                  <div className="mx-auto mt-6 flex h-40 w-40 items-center justify-center rounded-[22px] border-2 border-dashed border-[#cfd6e8] text-[18px] font-bold text-[#7a8090]">
-                    QR
-                  </div>
-                  <p className="mt-6 text-[16px] font-semibold text-[#6b7280]">{storeUrl}</p>
-                </div>
-              </div>
-              <div className="rounded-[28px] bg-[#0a1536] p-6 text-white">
-                <p className="text-[20px] font-bold">Custom flyer upgrade</p>
-                <div className="mt-5 space-y-3 text-[17px] font-semibold text-white/85">
-                  <p>100 flyers — $120</p>
-                  <p>250 flyers — $250</p>
-                  <p>500 flyers — $500</p>
-                </div>
-                <div className="mt-6 rounded-[24px] bg-white/10 p-5 text-[16px] leading-8 text-white/85">
-                  Strong food visuals, bold scan-to-order headline, centered QR, brand-first styling, and category-driven flyer themes.
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="rounded-[34px] bg-white p-6 shadow-[0_10px_40px_rgba(15,23,42,0.06)] sm:p-8">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <h2 className="text-4xl font-black tracking-tight text-[#0d1733]">Storefront preview</h2>
-              <p className="mt-4 max-w-2xl text-xl leading-10 text-[#6b7280]">This preview follows storefront theme and language only.</p>
-            </div>
-            <Link href={storeUrl} className="rounded-[24px] bg-[#0a1536] px-6 py-5 text-[18px] font-bold text-white">
-              Open Slug Page
-            </Link>
-          </div>
-
-          <div className={`mt-8 overflow-hidden rounded-[30px] border ${storefrontTheme === 'dark' ? 'border-[#111827] bg-[#0a1536] text-white' : 'border-[#edf0f7] bg-[#fbfcff] text-[#111827]'}`}>
-            <div className="h-72 overflow-hidden bg-[#e5e7eb]">
-              {heroImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImage} alt="Hero preview" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-[22px] font-semibold text-[#7a8090]">Hero image preview</div>
-              )}
-            </div>
-            <div className="p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-24 w-24 overflow-hidden rounded-[26px] bg-[#eef1f8]">
-                    {logoImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={logoImage} alt="Logo preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-[18px] font-bold text-[#111827]">Logo</div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-4xl font-black">{storeName || 'Your Store'}</p>
-                    <p className={`mt-2 text-xl ${storefrontTheme === 'dark' ? 'text-white/70' : 'text-[#6b7280]'}`}>{address || 'Store address'}</p>
-                    <p className={`text-xl ${storefrontTheme === 'dark' ? 'text-white/70' : 'text-[#6b7280]'}`}>{phone || 'Store phone'}</p>
-                  </div>
-                </div>
-                <div className={`rounded-[20px] px-5 py-3 text-[18px] font-black ${storefrontTheme === 'dark' ? 'bg-white/10 text-white' : 'bg-[#f4f5fb] text-[#0d1733]'}`}>
-                  {storefrontLanguage.toUpperCase()}
-                </div>
-              </div>
-
-              <div className="mt-6 inline-flex rounded-[20px] bg-[#f4f5fb] px-5 py-3 text-[18px] font-bold text-[#111827]">Featured</div>
-
-              {previewPrimaryItem ? (
-                <div className={`mt-6 overflow-hidden rounded-[28px] ${storefrontTheme === 'dark' ? 'bg-white/5' : 'bg-white'} border ${storefrontTheme === 'dark' ? 'border-white/10' : 'border-[#edf0f7]'}`}>
-                  <div className="grid gap-0 md:grid-cols-[220px_1fr]">
-                    <div className="h-56 overflow-hidden bg-[#e5e7eb]">
-                      {previewPrimaryItem.image_file ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewPrimaryItem.image_file} alt={previewPrimaryItem.name || 'Preview item'} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-[18px] font-semibold text-[#7a8090]">Food image</div>
-                      )}
-                    </div>
-                    <div className="p-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-3xl font-black">{previewPrimaryItem.name || 'Your first menu item'}</p>
-                          <p className={`mt-3 text-lg leading-8 ${storefrontTheme === 'dark' ? 'text-white/70' : 'text-[#6b7280]'}`}>
-                            {previewPrimaryItem.description || 'Your live storefront preview will populate as soon as you add menu items.'}
-                          </p>
-                        </div>
-                        <p className="text-2xl font-black">{previewPrimaryItem.base_price ? `$${previewPrimaryItem.base_price}` : '$0.00'}</p>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              ) : (
-                <div className={`mt-6 rounded-[28px] border border-dashed p-8 text-[20px] font-semibold ${storefrontTheme === 'dark' ? 'border-white/15 text-white/70' : 'border-[#d9dfec] text-[#7a8090]'}`}>
-                  Your live storefront preview will populate as soon as you add menu items.
+              )}
+
+              {activeSection === 'flyers' && (
+                <div className="rounded-[32px] bg-white">
+                  <h2 className="text-6xl font-black text-slate-950">Flyers</h2>
+                  <p className="mt-6 text-3xl leading-relaxed text-slate-500">
+                    Free white digital QR flyer included. Custom flyer previews stay tied to your restaurant branding, category look, and storefront theme.
+                  </p>
+
+                  <div className="mt-10 rounded-[28px] bg-slate-50 p-6">
+                    <div className="text-3xl font-black text-slate-950">Included digital flyer</div>
+                    <div className="mx-auto mt-6 max-w-[440px] rounded-[32px] bg-white p-6 text-center shadow-sm">
+                      <div className="text-2xl font-black uppercase tracking-[0.5em] text-blue-600">Scan to Order</div>
+                      <div className="mx-auto mt-6 flex h-64 w-64 items-center justify-center rounded-[28px] border-4 border-dashed border-slate-300 text-5xl font-black text-slate-400">
+                        QR
+                      </div>
+                      <div className="mt-6 text-5xl font-black text-slate-950">
+                        {restaurant.name || 'Your Store'}
+                      </div>
+                      <div className="mt-4 text-3xl font-semibold text-slate-500">{storeUrl}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-8 grid gap-6 md:grid-cols-3">
+                    <div className="rounded-[24px] border border-slate-200 p-5">
+                      <div className="text-2xl font-black text-slate-950">100 Flyers</div>
+                      <div className="mt-2 text-xl text-slate-500">$120</div>
+                    </div>
+                    <div className="rounded-[24px] border border-slate-200 p-5">
+                      <div className="text-2xl font-black text-slate-950">250 Flyers</div>
+                      <div className="mt-2 text-xl text-slate-500">$250</div>
+                    </div>
+                    <div className="rounded-[24px] border border-slate-200 p-5">
+                      <div className="text-2xl font-black text-slate-950">500 Flyers</div>
+                      <div className="mt-2 text-xl text-slate-500">$500</div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        </section>
-      </div>
 
-      {loading ? (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[2px]">
-          <div className="rounded-[24px] bg-white px-6 py-4 text-[18px] font-bold text-[#0d1733] shadow-xl">Loading builder...</div>
+          <div className="bg-[#f7f9fc] p-6 md:p-8">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-lg font-semibold uppercase tracking-[0.3em] text-slate-500">
+                  Live Storefront Preview
+                </div>
+                <div className="mt-2 text-4xl font-black text-slate-950">What your customers will see</div>
+              </div>
+
+              <Link
+                href={restaurant.slug ? `/store/${restaurant.slug}` : '#'}
+                prefetch={false}
+                className="rounded-[20px] bg-slate-950 px-5 py-4 text-lg font-semibold text-white"
+              >
+                Open Slug Page
+              </Link>
+            </div>
+
+            <div className="mt-6">
+              <StorePreview restaurant={restaurant} categories={categories} />
+            </div>
+          </div>
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <div>
-      <label className="mb-3 block text-[16px] font-bold text-[#0d1733]">{label}</label>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-[24px] border border-[#e7e9f2] bg-white px-5 py-4 text-[18px] font-medium text-[#111827] outline-none placeholder:text-[#a0a5b4] focus:border-[#2f67eb]"
-      />
-    </div>
-  );
-}
-
-function ToggleCard({
-  title,
-  value,
-  onClick,
-}: {
-  title: string;
-  value: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-[28px] border px-6 py-5 text-left transition ${
-        value ? 'border-[#2f67eb] bg-[#f7f9ff]' : 'border-[#e7e9f2] bg-white'
-      }`}
-    >
-      <p className="text-[18px] font-black text-[#0d1733]">{title}</p>
-      <p className="mt-2 text-[18px] font-medium text-[#6b7280]">{value ? 'Enabled' : 'Disabled'}</p>
-    </button>
-  );
-}
-
-function PickerCard({
-  title,
-  options,
-  selected,
-  onSelect,
-}: {
-  title: string;
-  options: { label: string; value: string }[];
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <div className="rounded-[28px] bg-[#fbfcff] p-5">
-      <p className="text-[18px] font-black text-[#0d1733]">{title}</p>
-      <div className="mt-5 flex gap-3">
-        {options.map((option) => {
-          const active = option.value === selected;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onSelect(option.value)}
-              className={`flex-1 rounded-[22px] px-5 py-4 text-[18px] font-bold ${
-                active ? 'bg-[#2f67eb] text-white' : 'bg-white text-[#6b7280]'
-              }`}
-            >
-              {option.label}
-            </button>
-          );
-        })}
       </div>
     </div>
   );
 }
-
-function UploadCard({
-  title,
-  imageUrl,
-  uploading,
-  onChange,
-}: {
-  title: string;
-  imageUrl: string;
-  uploading: boolean;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="rounded-[28px] bg-[#fbfcff] p-5">
-      <p className="text-[20px] font-black text-[#0d1733]">{title}</p>
-      <div className="mt-5 overflow-hidden rounded-[28px] bg-[#eef1f8]">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={title} className="h-72 w-full object-cover" />
-        ) : (
-          <div className="flex h-72 items-center justify-center text-[20px] font-semibold text-[#7a8090]">No image selected</div>
-        )}
-      </div>
-      <label className="mt-5 flex cursor-pointer items-center justify-center rounded-[20px] bg-[#2f67eb] px-5 py-4 text-[17px] font-bold text-white">
-        {uploading ? 'Uploading...' : 'Choose image'}
-        <input type="file" accept="image/*" className="hidden" onChange={onChange} />
-      </label>
-    </div>
-  );
-}
-
-function PickerInline({
-  label,
-  selected,
-  options,
-  onSelect,
-}: {
-  label: string;
-  selected: string;
-  options: { label: string; value: string }[];
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label className="mb-3 block text-[16px] font-bold text-[#0d1733]">{label}</label>
-      <div className="flex rounded-[18px] bg-[#f4f5fb] p-1">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onSelect(option.value)}
-            className={`flex-1 rounded-[14px] px-4 py-3 text-[14px] font-bold ${
-              selected === option.value ? 'bg-[#2f67eb] text-white' : 'text-[#6b7280]'
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ToggleInline({
-  label,
-  value,
-  onToggle,
-}: {
-  label: string;
-  value: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div>
-      <label className="mb-3 block text-[16px] font-bold text-[#0d1733]">{label}</label>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full rounded-[18px] px-4 py-4 text-[15px] font-bold ${
-          value ? 'bg-[#eef7ee] text-[#166534]' : 'bg-[#f4f5fb] text-[#6b7280]'
-        }`}
-      >
-        {value ? 'Required' : 'Optional'}
-      </button>
-    </div>
-  );
-}
-
