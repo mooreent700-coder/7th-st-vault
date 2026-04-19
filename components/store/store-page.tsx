@@ -1,77 +1,72 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
-type MenuItem = {
-  id: string;
-  name: string;
-  price: number;
-};
+export default function CategorySection({ categories, items, renderItem }: any) {
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-type StoreData = {
-  id: string;
-  slug: string;
-  name: string;
-  items: MenuItem[];
-};
+  // Build categories + include ALL
+  const allCategories = useMemo(() => {
+    const map = new Map();
 
-export default function StorePage({ data }: { data: StoreData }) {
-  const [cart, setCart] = useState<MenuItem[]>([]);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+    categories?.forEach((cat: any) => {
+      if (!cat?.name) return;
+      map.set(cat.id || cat.name.toLowerCase(), cat.name);
+    });
 
-  const addToCart = (item: MenuItem) => {
-    setCart((prev) => [...prev, item]);
-  };
+    return [
+      { key: 'all', label: 'All' },
+      ...Array.from(map.entries()).map(([key, label]) => ({
+        key,
+        label,
+      })),
+    ];
+  }, [categories]);
 
-  const checkout = async () => {
-    if (!cart.length) {
-      alert("Cart empty");
-      return;
-    }
+  // FILTER LOGIC
+  const filteredItems = useMemo(() => {
+    if (selectedCategory === 'all') return items;
 
-    try {
-      setCheckoutLoading(true);
-
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cart, restaurantId: data.id, slug: data.slug }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        alert(json.error || 'Checkout failed');
-        return;
-      }
-
-      window.location.href = json.url;
-    } catch (err) {
-      console.error(err);
-      alert('Error');
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
+    return items.filter((item: any) => {
+      return (
+        item.category_id === selectedCategory ||
+        item.category?.toLowerCase() === selectedCategory
+      );
+    });
+  }, [items, selectedCategory]);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>{data.name}</h1>
+    <>
+      {/* CATEGORY BUTTONS */}
+      <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginBottom: 20 }}>
+        {allCategories.map((cat: any) => (
+          <button
+            key={cat.key}
+            onClick={() => setSelectedCategory(cat.key)}
+            style={{
+              padding: '10px 18px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: selectedCategory === cat.key ? '#fff' : 'transparent',
+              color: selectedCategory === cat.key ? '#000' : '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
-      {data.items?.map((item) => (
-        <div key={item.id} style={{ marginBottom: 10 }}>
-          <span>{item.name} - ${item.price}</span>
-          <button onClick={() => addToCart(item)}>Add</button>
-        </div>
-      ))}
-
-      <hr />
-
-      <h3>Cart ({cart.length})</h3>
-
-      <button onClick={checkout} disabled={checkoutLoading}>
-        {checkoutLoading ? 'Loading...' : 'Checkout'}
-      </button>
-    </div>
+      {/* MENU ITEMS */}
+      <div style={{ display: 'grid', gap: 16 }}>
+        {filteredItems.map((item: any) => (
+          <div key={item.id}>
+            {renderItem(item)}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

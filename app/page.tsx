@@ -1,9 +1,8 @@
 
 'use client';
-
 import Link from 'next/link';
 import { useState } from 'react';
-
+import AdminHoldLogin from '@/components/AdminHoldLogin';
 type Lang = 'en' | 'es';
 
 const content = {
@@ -181,10 +180,29 @@ export default function HomePage() {
     <main className="page">
       <header className="header">
         <div className="headerInner">
-          <Link href="/" className="logoWrap">
-            <div className="logoMark">M</div>
-            <div className="logoText">MenuFlow</div>
-          </Link>
+       <div className="logoWrap">
+  <AdminHoldLogin>
+  <div
+    className="logoWrap"
+    onClick={() => window.location.href = '/'}
+    style={{ cursor: 'pointer' }}
+  >
+    <div className="logoMark">M</div>
+    <div className="logoText">MenuFlow</div>
+  </div>
+</AdminHoldLogin>
+
+  <AdminHoldLogin>
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 5,
+        background: 'transparent'
+      }}
+    />
+  </AdminHoldLogin>
+</div>
 
           <div className="headerRight">
             <a href="#how" className="navLink">

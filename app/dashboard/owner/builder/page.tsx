@@ -4,19 +4,12 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { ensureOwnerRestaurant, saveRestaurant, getStoreUrl } from '@/lib/owner-restaurant';
 
 type ThemeMode = 'light' | 'dark';
 type LanguageMode = 'en' | 'es';
 type Availability = 'available' | 'sold_out';
-type SectionKey =
-  | 'store'
-  | 'branding'
-  | 'controls'
-  | 'hours'
-  | 'categories'
-  | 'items'
-  | 'options'
-  | 'preview';
+type SectionKey = 'store' | 'branding' | 'controls' | 'hours' | 'menu' | 'preview';
 
 type HoursDayKey =
   | 'monday'
@@ -81,7 +74,6 @@ type OptionGroupRow = {
   item_id?: string | null;
   name?: string | null;
   is_required?: boolean | null;
-  is_multiple?: boolean | null;
   selection_mode?: string | null;
   sort_order?: number | null;
 };
@@ -157,9 +149,7 @@ type CopyBlock = {
   branding: string;
   storeControls: string;
   operatingHours: string;
-  categories: string;
-  itemBuilder: string;
-  optionGroups: string;
+  menuBuilder: string;
   storefrontReflection: string;
   storeName: string;
   storeUrl: string;
@@ -210,13 +200,12 @@ type CopyBlock = {
   multiple: string;
   addChoice: string;
   choiceName: string;
+  deleteOptionBox: string;
   noCategories: string;
   noItems: string;
   noOptions: string;
   noImage: string;
   addToCart: string;
-  chooseCategory: string;
-  chooseItem: string;
   monday: string;
   tuesday: string;
   wednesday: string;
@@ -231,14 +220,14 @@ type CopyBlock = {
   fullCombo: string;
   familyCombo: string;
   itemOnly: string;
-  previewPopup: string;
+  optionBoxes: string;
 };
 
 const COPY: Record<LanguageMode, CopyBlock> = {
   en: {
     appTitle: 'MENUFLOW BUILDER',
     subtitle:
-      'Owner control center for store setup, branding, hours, combo-first menu building, and storefront reflection.',
+      'Owner control center for store setup, branding, hours, menu building, and storefront reflection.',
     loading: 'Loading builder...',
     saving: 'Saving...',
     save: 'Save',
@@ -254,9 +243,7 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     branding: 'Branding',
     storeControls: 'Store Controls',
     operatingHours: 'Operating Hours',
-    categories: 'Categories',
-    itemBuilder: 'Item Builder',
-    optionGroups: 'Option Boxes',
+    menuBuilder: 'Menu Builder',
     storefrontReflection: 'Storefront Reflection',
     storeName: 'Store Name',
     storeUrl: 'Store URL',
@@ -307,13 +294,12 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     multiple: 'Multiple',
     addChoice: 'Add Choice',
     choiceName: 'Choice Name',
+    deleteOptionBox: 'Delete Option Box',
     noCategories: 'No categories yet.',
     noItems: 'No items yet.',
     noOptions: 'No option boxes yet.',
     noImage: 'No Image',
     addToCart: 'Add to Cart',
-    chooseCategory: 'Choose Category',
-    chooseItem: 'Choose Item',
     monday: 'Monday',
     tuesday: 'Tuesday',
     wednesday: 'Wednesday',
@@ -328,12 +314,12 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     fullCombo: 'Full Combo',
     familyCombo: 'Family Combo',
     itemOnly: 'Item Only',
-    previewPopup: 'Popup Preview',
+    optionBoxes: 'Option Boxes',
   },
   es: {
     appTitle: 'MENUFLOW BUILDER',
     subtitle:
-      'Centro de control del dueño para tienda, branding, horario, menú combo-first y reflejo de tienda.',
+      'Centro de control del dueño para tienda, branding, horario, menú y reflejo de tienda.',
     loading: 'Cargando builder...',
     saving: 'Guardando...',
     save: 'Guardar',
@@ -349,9 +335,7 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     branding: 'Branding',
     storeControls: 'Controles',
     operatingHours: 'Horario',
-    categories: 'Categorías',
-    itemBuilder: 'Editor de Producto',
-    optionGroups: 'Cajas de Opciones',
+    menuBuilder: 'Menu Builder',
     storefrontReflection: 'Reflejo de la Tienda',
     storeName: 'Nombre',
     storeUrl: 'URL de Tienda',
@@ -402,13 +386,12 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     multiple: 'Múltiples',
     addChoice: 'Agregar Opción',
     choiceName: 'Nombre de Opción',
+    deleteOptionBox: 'Eliminar Caja',
     noCategories: 'Todavía no hay categorías.',
     noItems: 'Todavía no hay productos.',
     noOptions: 'Todavía no hay cajas de opciones.',
     noImage: 'Sin Imagen',
     addToCart: 'Agregar al Carrito',
-    chooseCategory: 'Elegir Categoría',
-    chooseItem: 'Elegir Producto',
     monday: 'Lunes',
     tuesday: 'Martes',
     wednesday: 'Miércoles',
@@ -423,7 +406,7 @@ const COPY: Record<LanguageMode, CopyBlock> = {
     fullCombo: 'Combo Completo',
     familyCombo: 'Combo Familiar',
     itemOnly: 'Solo Producto',
-    previewPopup: 'Vista del Popup',
+    optionBoxes: 'Cajas de Opciones',
   },
 };
 
@@ -446,12 +429,6 @@ const DEFAULT_HOURS: HoursState = {
   saturday: { isOpen: false, open: '09:00', close: '17:00' },
   sunday: { isOpen: false, open: '09:00', close: '17:00' },
 };
-
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-  const hour = Math.floor(index / 2);
-  const minute = index % 2 === 0 ? '00' : '30';
-  return `${String(hour).padStart(2, '0')}:${minute}`;
-});
 
 const CATEGORY_FOLDER_MAP: Record<string, string> = {
   bbq: 'bbq',
@@ -499,13 +476,19 @@ function slugify(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\\s-]/g, '')
-    .replace(/\\s+/g, '-')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 }
 
 function sanitizeNumber(value: string) {
   return value.replace(/[^0-9.]/g, '');
+}
+
+function formatMoney(value: string) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) return '$0.00';
+  return `$${numeric.toFixed(2)}`;
 }
 
 function serializeHours(hours: HoursState) {
@@ -536,8 +519,8 @@ function normalizeCategoryFolder(name: string) {
     .trim()
     .toLowerCase()
     .replace(/&/g, 'and')
-    .replace(/[^a-z0-9\\s-]/g, '')
-    .replace(/\\s+/g, ' ');
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ');
   return CATEGORY_FOLDER_MAP[key] || CATEGORY_FOLDER_MAP[key.replace(/s$/, '')] || null;
 }
 
@@ -548,12 +531,6 @@ function pickDeterministic(items: string[], seed: string) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
   return items[hash % items.length];
-}
-
-function formatMoney(value: string) {
-  const numeric = Number(value || 0);
-  if (!Number.isFinite(numeric)) return '$0';
-  return `$${numeric.toFixed(2).replace(/\\.00$/, '')}`;
 }
 
 function defaultGroup(type: BuilderGroupType, copy: CopyBlock): BuilderGroup {
@@ -691,7 +668,6 @@ export default function BuilderPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [builderLanguage, setBuilderLanguage] = useState<LanguageMode>('en');
-
   const copy = COPY[builderLanguage];
 
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -717,8 +693,6 @@ export default function BuilderPage() {
   const [deliveryMinimum, setDeliveryMinimum] = useState('0');
 
   const [categories, setCategories] = useState<BuilderCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
-  const [selectedItemId, setSelectedItemId] = useState('');
   const [previewCategoryId, setPreviewCategoryId] = useState('');
   const [previewItemId, setPreviewItemId] = useState('');
   const [openSection, setOpenSection] = useState<SectionKey>('store');
@@ -732,17 +706,7 @@ export default function BuilderPage() {
   const [success, setSuccess] = useState('');
 
   const computedSlug = useMemo(() => slugify(name), [name]);
-  const allItems = useMemo(() => categories.flatMap((category) => category.items), [categories]);
-
-  const selectedCategory = useMemo(
-    () => categories.find((category) => category.id === selectedCategoryId) || categories[0] || null,
-    [categories, selectedCategoryId]
-  );
-
-  const selectedItem = useMemo(
-    () => allItems.find((item) => item.id === selectedItemId) || allItems[0] || null,
-    [allItems, selectedItemId]
-  );
+  const resolvedSlug = useMemo(() => slugify(slug || computedSlug || name), [slug, computedSlug, name]);
 
   const previewCategory = useMemo(
     () => categories.find((category) => category.id === previewCategoryId) || categories[0] || null,
@@ -776,148 +740,115 @@ export default function BuilderPage() {
         setError('');
         setSuccess('');
 
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError) throw authError;
-        if (!user) {
-          router.replace('/login');
-          return;
-        }
-
+        const restaurant = (await ensureOwnerRestaurant()) as RestaurantRow;
         if (!mounted) return;
-        setOwnerId(user.id);
 
-        const { data: restaurantData, error: restaurantError } = await supabase
-          .from('restaurants')
-          .select(
-            'id, owner_id, name, slug, phone, address, hero_image, logo_image, storefront_theme, storefront_language, order_language, pickup_enabled, delivery_enabled, delivery_fee, delivery_radius, delivery_minimum, hours'
-          )
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        setOwnerId(restaurant.owner_id || null);
+        setRestaurantId(restaurant.id);
+        setName(restaurant.name || '');
+        setSlug(restaurant.slug || '');
+        setPhone(restaurant.phone || '');
+        setAddress(restaurant.address || '');
+        setHeroImage(restaurant.hero_image || '');
+        setLogoImage(restaurant.logo_image || '');
+        setTheme((restaurant.storefront_theme as ThemeMode) || 'light');
+        setStorefrontLanguage((restaurant.storefront_language || 'en').toLowerCase() === 'es' ? 'es' : 'en');
+        setOwnerLanguage((restaurant.order_language || 'en').toLowerCase() === 'es' ? 'es' : 'en');
+        setPickupEnabled(restaurant.pickup_enabled ?? true);
+        setDeliveryEnabled(restaurant.delivery_enabled ?? false);
+        setDeliveryFee(String(restaurant.delivery_fee ?? 0));
+        setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
+        setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
+        setHours(parseHours(restaurant.hours));
 
-        if (restaurantError) throw restaurantError;
+        const { data: categoryRows, error: categoryError } = await supabase
+          .from('menu_categories')
+          .select('id, restaurant_id, name, sort_order')
+          .eq('restaurant_id', restaurant.id)
+          .order('sort_order', { ascending: true });
 
-        let currentRestaurantId: string | null = null;
+        if (categoryError) throw categoryError;
 
-        if (restaurantData) {
-          const restaurant = restaurantData as RestaurantRow;
-          currentRestaurantId = restaurant.id;
+        const { data: itemRows, error: itemError } = await supabase
+          .from('menu_items')
+          .select('id, restaurant_id, category_id, name, description, price, base_price, image_url, availability, is_available, sort_order')
+          .eq('restaurant_id', restaurant.id)
+          .order('sort_order', { ascending: true });
 
-          setRestaurantId(restaurant.id);
-          setName(restaurant.name || '');
-          setSlug(restaurant.slug || '');
-          setPhone(restaurant.phone || '');
-          setAddress(restaurant.address || '');
-          setHeroImage(restaurant.hero_image || '');
-          setLogoImage(restaurant.logo_image || '');
-          setTheme((restaurant.storefront_theme as ThemeMode) || 'light');
-          setStorefrontLanguage((restaurant.storefront_language || 'en').toLowerCase() === 'es' ? 'es' : 'en');
-          setOwnerLanguage((restaurant.order_language || 'en').toLowerCase() === 'es' ? 'es' : 'en');
-          setPickupEnabled(restaurant.pickup_enabled ?? true);
-          setDeliveryEnabled(restaurant.delivery_enabled ?? false);
-          setDeliveryFee(String(restaurant.delivery_fee ?? 0));
-          setDeliveryRadius(String(restaurant.delivery_radius ?? 5));
-          setDeliveryMinimum(String(restaurant.delivery_minimum ?? 0));
-          setHours(parseHours(restaurant.hours));
-        }
+        if (itemError) throw itemError;
 
-        if (currentRestaurantId) {
-          const { data: categoryRows, error: categoryError } = await supabase
-            .from('menu_categories')
-            .select('id, restaurant_id, name, sort_order')
-            .eq('restaurant_id', currentRestaurantId)
+        const loadedItems = safeArray(itemRows) as ItemRow[];
+        const itemIds = loadedItems.map((item) => item.id);
+
+        let groupRows: OptionGroupRow[] = [];
+        let choiceRows: OptionChoiceRow[] = [];
+
+        if (itemIds.length) {
+          const { data: rawGroups, error: groupError } = await supabase
+            .from('menu_option_groups')
+            .select('id, item_id, name, is_required, selection_mode, sort_order')
+            .in('item_id', itemIds)
             .order('sort_order', { ascending: true });
 
-          if (categoryError) throw categoryError;
+          if (groupError) throw groupError;
+          groupRows = safeArray(rawGroups) as OptionGroupRow[];
 
-          const { data: itemRows, error: itemError } = await supabase
-            .from('menu_items')
-            .select('id, restaurant_id, category_id, name, description, price, base_price, image_url, availability, is_available, sort_order')
-            .eq('restaurant_id', currentRestaurantId)
-            .order('sort_order', { ascending: true });
+          const groupIds = groupRows.map((group) => group.id);
 
-          if (itemError) throw itemError;
-
-          const loadedItems = safeArray(itemRows) as ItemRow[];
-          const itemIds = loadedItems.map((item) => item.id);
-
-          let groupRows: OptionGroupRow[] = [];
-          let choiceRows: OptionChoiceRow[] = [];
-
-          if (itemIds.length) {
-            const { data: rawGroups, error: groupError } = await supabase
-              .from('menu_option_groups')
-              .select('id, item_id, name, is_required, is_multiple, selection_mode, sort_order')
-              .in('item_id', itemIds)
+          if (groupIds.length) {
+            const { data: rawChoices, error: choiceError } = await supabase
+              .from('menu_option_choices')
+              .select('id, option_group_id, name, price, price_delta, sort_order')
+              .in('option_group_id', groupIds)
               .order('sort_order', { ascending: true });
 
-            if (groupError) throw groupError;
-            groupRows = safeArray(rawGroups) as OptionGroupRow[];
-
-            const groupIds = groupRows.map((group) => group.id);
-
-            if (groupIds.length) {
-              const { data: rawChoices, error: choiceError } = await supabase
-                .from('menu_option_choices')
-                .select('id, option_group_id, name, price, price_delta, sort_order')
-                .in('option_group_id', groupIds)
-                .order('sort_order', { ascending: true });
-
-              if (choiceError) throw choiceError;
-              choiceRows = safeArray(rawChoices) as OptionChoiceRow[];
-            }
+            if (choiceError) throw choiceError;
+            choiceRows = safeArray(rawChoices) as OptionChoiceRow[];
           }
+        }
 
-          const builtCategories: BuilderCategory[] = safeArray(categoryRows).map((category, categoryIndex) => ({
-            id: category.id,
-            name: category.name || `Category ${categoryIndex + 1}`,
-            sortOrder: category.sort_order ?? categoryIndex,
-            items: loadedItems
-              .filter((item) => item.category_id === category.id)
-              .map((item) => ({
-                id: item.id,
-                categoryId: category.id,
-                name: item.name || '',
-                description: item.description || '',
-                basePrice: String(item.base_price ?? item.price ?? 0),
-                imageUrl: item.image_url || '',
-                availability:
-                  item.availability === 'sold_out' || item.is_available === false ? 'sold_out' : 'available',
-                groups: groupRows
-                  .filter((group) => group.item_id === item.id)
-                  .map((group) => ({
-                    id: group.id,
-                    name: group.name || copy.custom,
-                    required: !!group.is_required,
-                    selection: group.selection_mode === 'multiple' || group.is_multiple ? 'multiple' : 'single',
-                    type: 'custom',
-                    choices: choiceRows
-                      .filter((choice) => choice.option_group_id === group.id)
-                      .map((choice) => ({
-                        id: choice.id,
-                        name: choice.name || '',
-                        price: String(choice.price_delta ?? choice.price ?? 0),
-                      })),
-                  })),
-              })),
-          }));
+        const builtCategories: BuilderCategory[] = safeArray(categoryRows).map((category, categoryIndex) => ({
+          id: category.id,
+          name: category.name || `Category ${categoryIndex + 1}`,
+          sortOrder: category.sort_order ?? categoryIndex,
+          items: loadedItems
+            .filter((item) => item.category_id === category.id)
+            .map((item) => ({
+              id: item.id,
+              categoryId: category.id,
+              name: item.name || '',
+              description: item.description || '',
+              basePrice: String(item.base_price ?? item.price ?? 0),
+              imageUrl: item.image_url || '',
+              availability:
+                item.availability === 'sold_out' || item.is_available === false ? 'sold_out' : 'available',
+              groups: groupRows
+                .filter((group) => group.item_id === item.id)
+                .map((group) => ({
+                  id: group.id,
+                  name: group.name || copy.custom,
+                  required: !!group.is_required,
+                  selection: group.selection_mode === 'multiple' ? 'multiple' : 'single',
+                  type: 'custom' as BuilderGroupType,
+                  choices: choiceRows
+                    .filter((choice) => choice.option_group_id === group.id)
+                    .map((choice) => ({
+                      id: choice.id,
+                      name: choice.name || '',
+                      price: String(choice.price_delta ?? choice.price ?? 0),
+                    })),
+                })),
+            })),
+        }));
 
-          if (mounted) {
-            setCategories(builtCategories);
+        if (!mounted) return;
 
-            const firstCategory = builtCategories[0] || null;
-            const firstItem = firstCategory?.items[0] || null;
-
-            setSelectedCategoryId(firstCategory?.id || '');
-            setSelectedItemId(firstItem?.id || '');
-            setPreviewCategoryId(firstCategory?.id || '');
-            setPreviewItemId(firstItem?.id || '');
-          }
+        if (builtCategories.length) {
+          setCategories(builtCategories);
+          const firstCategory = builtCategories[0] || null;
+          const firstItem = firstCategory?.items[0] || null;
+          setPreviewCategoryId(firstCategory?.id || '');
+          setPreviewItemId(firstItem?.id || '');
         } else {
           const categoryId = makeTempId('cat');
           const itemId = makeTempId('item');
@@ -942,15 +873,12 @@ export default function BuilderPage() {
             },
           ];
 
-          if (mounted) {
-            setCategories(starter);
-            setSelectedCategoryId(categoryId);
-            setSelectedItemId(itemId);
-            setPreviewCategoryId(categoryId);
-            setPreviewItemId(itemId);
-          }
+          setCategories(starter);
+          setPreviewCategoryId(categoryId);
+          setPreviewItemId(itemId);
         }
       } catch (err: any) {
+        if (!mounted) return;
         setError(err?.message || copy.saveFail);
       } finally {
         if (mounted) setLoading(false);
@@ -1065,7 +993,7 @@ export default function BuilderPage() {
     }
   }
 
-  async function handleItemUpload(itemId: string, file: File | null) {
+  async function handleItemUpload(categoryId: string, itemId: string, file: File | null) {
     if (!file) return;
 
     try {
@@ -1074,10 +1002,14 @@ export default function BuilderPage() {
       const url = await uploadImage(file, 'menu-items', 'item');
 
       setCategories((current) =>
-        current.map((category) => ({
-          ...category,
-          items: category.items.map((item) => (item.id === itemId ? { ...item, imageUrl: url } : item)),
-        }))
+        current.map((category) =>
+          category.id === categoryId
+            ? {
+                ...category,
+                items: category.items.map((item) => (item.id === itemId ? { ...item, imageUrl: url } : item)),
+              }
+            : category
+        )
       );
     } catch (err: any) {
       setError(err?.message || copy.saveFail);
@@ -1119,11 +1051,6 @@ export default function BuilderPage() {
     };
 
     setCategories((current) => [...current, nextCategory]);
-    setSelectedCategoryId(categoryId);
-    setSelectedItemId(itemId);
-    setPreviewCategoryId(categoryId);
-    setPreviewItemId(itemId);
-    setOpenSection('categories');
   }
 
   function updateCategory(categoryId: string, nameValue: string) {
@@ -1134,14 +1061,10 @@ export default function BuilderPage() {
 
   function deleteCategory(categoryId: string) {
     const next = categories.filter((category) => category.id !== categoryId);
-
     setCategories(next);
 
     const firstCategory = next[0] || null;
     const firstItem = firstCategory?.items[0] || null;
-
-    setSelectedCategoryId(firstCategory?.id || '');
-    setSelectedItemId(firstItem?.id || '');
     setPreviewCategoryId(firstCategory?.id || '');
     setPreviewItemId(firstItem?.id || '');
   }
@@ -1171,20 +1094,18 @@ export default function BuilderPage() {
           : category
       )
     );
-
-    setSelectedCategoryId(categoryId);
-    setSelectedItemId(itemId);
-    setPreviewCategoryId(categoryId);
-    setPreviewItemId(itemId);
-    setOpenSection('items');
   }
 
-  function updateItem(itemId: string, patch: Partial<BuilderItem>) {
+  function updateItem(categoryId: string, itemId: string, patch: Partial<BuilderItem>) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
+            }
+          : category
+      )
     );
   }
 
@@ -1199,116 +1120,143 @@ export default function BuilderPage() {
 
     const category = next.find((entry) => entry.id === categoryId && entry.items.length) || next[0] || null;
     const item = category?.items[0] || null;
-
-    setSelectedCategoryId(category?.id || '');
-    setSelectedItemId(item?.id || '');
     setPreviewCategoryId(category?.id || '');
     setPreviewItemId(item?.id || '');
   }
 
-  function addGroup(itemId: string, type: BuilderGroupType) {
+  function addGroup(categoryId: string, itemId: string, type: BuilderGroupType) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId ? { ...item, groups: [...item.groups, defaultGroup(type, copy)] } : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId ? { ...item, groups: [...item.groups, defaultGroup(type, copy)] } : item
+              ),
+            }
+          : category
+      )
     );
   }
 
-  function updateGroup(itemId: string, groupId: string, patch: Partial<BuilderGroup>) {
+  function updateGroup(categoryId: string, itemId: string, groupId: string, patch: Partial<BuilderGroup>) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                groups: item.groups.map((group) => (group.id === groupId ? { ...group, ...patch } : group)),
-              }
-            : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      groups: item.groups.map((group) => (group.id === groupId ? { ...group, ...patch } : group)),
+                    }
+                  : item
+              ),
+            }
+          : category
+      )
     );
   }
 
-  function deleteGroup(itemId: string, groupId: string) {
+  function deleteGroup(categoryId: string, itemId: string, groupId: string) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId ? { ...item, groups: item.groups.filter((group) => group.id !== groupId) } : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId ? { ...item, groups: item.groups.filter((group) => group.id !== groupId) } : item
+              ),
+            }
+          : category
+      )
     );
   }
 
-  function addChoice(itemId: string, groupId: string) {
+  function addChoice(categoryId: string, itemId: string, groupId: string) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                groups: item.groups.map((group) =>
-                  group.id === groupId
-                    ? {
-                        ...group,
-                        choices: [...group.choices, { id: makeTempId('choice'), name: 'New Choice', price: '0' }],
-                      }
-                    : group
-                ),
-              }
-            : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      groups: item.groups.map((group) =>
+                        group.id === groupId
+                          ? {
+                              ...group,
+                              choices: [...group.choices, { id: makeTempId('choice'), name: 'New Choice', price: '0' }],
+                            }
+                          : group
+                      ),
+                    }
+                  : item
+              ),
+            }
+          : category
+      )
     );
   }
 
-  function updateChoice(itemId: string, groupId: string, choiceId: string, patch: Partial<BuilderChoice>) {
+  function updateChoice(
+    categoryId: string,
+    itemId: string,
+    groupId: string,
+    choiceId: string,
+    patch: Partial<BuilderChoice>
+  ) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                groups: item.groups.map((group) =>
-                  group.id === groupId
-                    ? {
-                        ...group,
-                        choices: group.choices.map((choice) =>
-                          choice.id === choiceId ? { ...choice, ...patch } : choice
-                        ),
-                      }
-                    : group
-                ),
-              }
-            : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      groups: item.groups.map((group) =>
+                        group.id === groupId
+                          ? {
+                              ...group,
+                              choices: group.choices.map((choice) =>
+                                choice.id === choiceId ? { ...choice, ...patch } : choice
+                              ),
+                            }
+                          : group
+                      ),
+                    }
+                  : item
+              ),
+            }
+          : category
+      )
     );
   }
 
-  function deleteChoice(itemId: string, groupId: string, choiceId: string) {
+  function deleteChoice(categoryId: string, itemId: string, groupId: string, choiceId: string) {
     setCategories((current) =>
-      current.map((category) => ({
-        ...category,
-        items: category.items.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                groups: item.groups.map((group) =>
-                  group.id === groupId
-                    ? { ...group, choices: group.choices.filter((choice) => choice.id !== choiceId) }
-                    : group
-                ),
-              }
-            : item
-        ),
-      }))
+      current.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === itemId
+                  ? {
+                      ...item,
+                      groups: item.groups.map((group) =>
+                        group.id === groupId
+                          ? { ...group, choices: group.choices.filter((choice) => choice.id !== choiceId) }
+                          : group
+                      ),
+                    }
+                  : item
+              ),
+            }
+          : category
+      )
     );
   }
 
@@ -1323,12 +1271,9 @@ export default function BuilderPage() {
       setError('');
       setSuccess('');
 
-      const finalSlug = slugify(slug || name);
-
-      const restaurantPayload = {
-        owner_id: ownerId,
+      const updatedRestaurant = (await saveRestaurant({
         name: name.trim() || null,
-        slug: finalSlug || null,
+        slug: resolvedSlug || null,
         phone: phone.trim() || null,
         address: address.trim() || null,
         hero_image: heroImage.trim() || null,
@@ -1342,30 +1287,16 @@ export default function BuilderPage() {
         delivery_radius: Number(deliveryRadius || 0),
         delivery_minimum: Number(deliveryMinimum || 0),
         hours: serializeHours(hours),
-      };
+      })) as RestaurantRow;
 
-      let currentRestaurantId = restaurantId;
-
-      if (restaurantId && isUuid(restaurantId)) {
-        const { error: updateError } = await supabase.from('restaurants').update(restaurantPayload).eq('id', restaurantId);
-        if (updateError) throw updateError;
-      } else {
-        const { data: inserted, error: insertError } = await supabase
-          .from('restaurants')
-          .insert(restaurantPayload)
-          .select('id')
-          .single();
-
-        if (insertError) throw insertError;
-        currentRestaurantId = inserted.id;
-        setRestaurantId(inserted.id);
-      }
-
-      if (!currentRestaurantId) throw new Error(copy.saveFail);
+      const currentRestaurantId = updatedRestaurant.id;
+      setRestaurantId(currentRestaurantId);
+      setSlug(updatedRestaurant.slug || resolvedSlug);
 
       const categoryIdMap = new Map<string, string>();
       const itemIdMap = new Map<string, string>();
       const groupIdMap = new Map<string, string>();
+      const choiceIdMap = new Map<string, string>();
 
       categories.forEach((category) => {
         categoryIdMap.set(category.id, isUuid(category.id) ? category.id : makeUuid());
@@ -1376,73 +1307,12 @@ export default function BuilderPage() {
           itemIdMap.set(item.id, isUuid(item.id) ? item.id : makeUuid());
           item.groups.forEach((group) => {
             groupIdMap.set(group.id, isUuid(group.id) ? group.id : makeUuid());
+            group.choices.forEach((choice) => {
+              choiceIdMap.set(choice.id, isUuid(choice.id) ? choice.id : makeUuid());
+            });
           });
         });
       });
-
-      const { data: existingCategories, error: existingCategoryError } = await supabase
-        .from('menu_categories')
-        .select('id')
-        .eq('restaurant_id', currentRestaurantId);
-
-      if (existingCategoryError) throw existingCategoryError;
-
-      const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
-
-      let existingItemIds: string[] = [];
-
-      if (existingCategoryIds.length) {
-        const { data: existingItems, error: existingItemError } = await supabase
-          .from('menu_items')
-          .select('id')
-          .in('category_id', existingCategoryIds);
-
-        if (existingItemError) throw existingItemError;
-        existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
-      }
-
-      if (existingItemIds.length) {
-        const { data: existingGroups, error: existingGroupError } = await supabase
-          .from('menu_option_groups')
-          .select('id')
-          .in('item_id', existingItemIds);
-
-        if (existingGroupError) throw existingGroupError;
-
-        const existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
-
-        if (existingGroupIds.length) {
-          const { error: deleteChoicesError } = await supabase
-            .from('menu_option_choices')
-            .delete()
-            .in('option_group_id', existingGroupIds);
-
-          if (deleteChoicesError) throw deleteChoicesError;
-        }
-
-        const { error: deleteGroupsError } = await supabase
-          .from('menu_option_groups')
-          .delete()
-          .in('item_id', existingItemIds);
-
-        if (deleteGroupsError) throw deleteGroupsError;
-
-        const { error: deleteItemsError } = await supabase
-          .from('menu_items')
-          .delete()
-          .in('id', existingItemIds);
-
-        if (deleteItemsError) throw deleteItemsError;
-      }
-
-      if (existingCategoryIds.length) {
-        const { error: deleteCategoriesError } = await supabase
-          .from('menu_categories')
-          .delete()
-          .in('id', existingCategoryIds);
-
-        if (deleteCategoriesError) throw deleteCategoriesError;
-      }
 
       const categoryRows = categories.map((category, index) => ({
         id: categoryIdMap.get(category.id)!,
@@ -1452,8 +1322,10 @@ export default function BuilderPage() {
       }));
 
       if (categoryRows.length) {
-        const { error: insertCategoryError } = await supabase.from('menu_categories').insert(categoryRows);
-        if (insertCategoryError) throw insertCategoryError;
+        const { error: categoryUpsertError } = await supabase
+          .from('menu_categories')
+          .upsert(categoryRows, { onConflict: 'id' });
+        if (categoryUpsertError) throw categoryUpsertError;
       }
 
       const itemRows = categories.flatMap((category, categoryIndex) =>
@@ -1474,8 +1346,10 @@ export default function BuilderPage() {
       );
 
       if (itemRows.length) {
-        const { error: insertItemError } = await supabase.from('menu_items').insert(itemRows);
-        if (insertItemError) throw insertItemError;
+        const { error: itemUpsertError } = await supabase
+          .from('menu_items')
+          .upsert(itemRows, { onConflict: 'id' });
+        if (itemUpsertError) throw itemUpsertError;
       }
 
       const groupRows = categories.flatMap((category) =>
@@ -1485,7 +1359,6 @@ export default function BuilderPage() {
             item_id: itemIdMap.get(item.id)!,
             name: group.name.trim() || copy.custom,
             is_required: group.required,
-            is_multiple: group.selection === 'multiple',
             selection_mode: group.selection,
             sort_order: groupIndex,
           }))
@@ -1493,15 +1366,17 @@ export default function BuilderPage() {
       );
 
       if (groupRows.length) {
-        const { error: insertGroupError } = await supabase.from('menu_option_groups').insert(groupRows);
-        if (insertGroupError) throw insertGroupError;
+        const { error: groupUpsertError } = await supabase
+          .from('menu_option_groups')
+          .upsert(groupRows, { onConflict: 'id' });
+        if (groupUpsertError) throw groupUpsertError;
       }
 
       const choiceRows = categories.flatMap((category) =>
         category.items.flatMap((item) =>
           item.groups.flatMap((group) =>
             group.choices.map((choice, choiceIndex) => ({
-              id: isUuid(choice.id) ? choice.id : makeUuid(),
+              id: choiceIdMap.get(choice.id)!,
               option_group_id: groupIdMap.get(group.id)!,
               name: choice.name.trim() || 'New Choice',
               price: Number(choice.price || 0),
@@ -1513,11 +1388,111 @@ export default function BuilderPage() {
       );
 
       if (choiceRows.length) {
-        const { error: insertChoiceError } = await supabase.from('menu_option_choices').insert(choiceRows);
-        if (insertChoiceError) throw insertChoiceError;
+        const { error: choiceUpsertError } = await supabase
+          .from('menu_option_choices')
+          .upsert(choiceRows, { onConflict: 'id' });
+        if (choiceUpsertError) throw choiceUpsertError;
       }
 
-      setSlug(finalSlug);
+      const { data: existingCategories, error: existingCategoryError } = await supabase
+        .from('menu_categories')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+      if (existingCategoryError) throw existingCategoryError;
+
+      const existingCategoryIds = safeArray(existingCategories).map((row: { id: string }) => row.id);
+      const currentCategoryIds = categoryRows.map((row) => row.id);
+
+      const { data: existingItems, error: existingItemError } = await supabase
+        .from('menu_items')
+        .select('id')
+        .eq('restaurant_id', currentRestaurantId);
+      if (existingItemError) throw existingItemError;
+
+      const existingItemIds = safeArray(existingItems).map((row: { id: string }) => row.id);
+      const currentItemIds = itemRows.map((row) => row.id);
+
+      let existingGroupIds: string[] = [];
+      if (existingItemIds.length) {
+        const { data: existingGroups, error: existingGroupError } = await supabase
+          .from('menu_option_groups')
+          .select('id')
+          .in('item_id', existingItemIds);
+        if (existingGroupError) throw existingGroupError;
+        existingGroupIds = safeArray(existingGroups).map((row: { id: string }) => row.id);
+      }
+
+      const currentGroupIds = groupRows.map((row) => row.id);
+
+      let existingChoiceIds: string[] = [];
+      if (existingGroupIds.length) {
+        const { data: existingChoices, error: existingChoiceError } = await supabase
+          .from('menu_option_choices')
+          .select('id')
+          .in('option_group_id', existingGroupIds);
+        if (existingChoiceError) throw existingChoiceError;
+        existingChoiceIds = safeArray(existingChoices).map((row: { id: string }) => row.id);
+      }
+
+      const currentChoiceIds = choiceRows.map((row) => row.id);
+
+      const staleChoiceIds = existingChoiceIds.filter((id) => !currentChoiceIds.includes(id));
+      const staleGroupIds = existingGroupIds.filter((id) => !currentGroupIds.includes(id));
+      const staleItemIds = existingItemIds.filter((id) => !currentItemIds.includes(id));
+      const staleCategoryIds = existingCategoryIds.filter((id) => !currentCategoryIds.includes(id));
+
+      if (staleChoiceIds.length) {
+        const { error: deleteChoicesError } = await supabase
+          .from('menu_option_choices')
+          .delete()
+          .in('id', staleChoiceIds);
+        if (deleteChoicesError) throw deleteChoicesError;
+      }
+
+      if (staleGroupIds.length) {
+        const { error: deleteGroupsError } = await supabase
+          .from('menu_option_groups')
+          .delete()
+          .in('id', staleGroupIds);
+        if (deleteGroupsError) throw deleteGroupsError;
+      }
+
+      if (staleItemIds.length) {
+        const { error: deleteItemsError } = await supabase
+          .from('menu_items')
+          .delete()
+          .in('id', staleItemIds);
+        if (deleteItemsError) throw deleteItemsError;
+      }
+
+      if (staleCategoryIds.length) {
+        const { error: deleteCategoriesError } = await supabase
+          .from('menu_categories')
+          .delete()
+          .in('id', staleCategoryIds);
+        if (deleteCategoriesError) throw deleteCategoriesError;
+      }
+
+      setCategories((current) =>
+        current.map((category) => ({
+          ...category,
+          id: categoryIdMap.get(category.id)!,
+          items: category.items.map((item) => ({
+            ...item,
+            id: itemIdMap.get(item.id)!,
+            categoryId: categoryIdMap.get(category.id)!,
+            groups: item.groups.map((group) => ({
+              ...group,
+              id: groupIdMap.get(group.id)!,
+              choices: group.choices.map((choice) => ({
+                ...choice,
+                id: choiceIdMap.get(choice.id)!,
+              })),
+            })),
+          })),
+        }))
+      );
+
       setSuccess(copy.saveSuccess);
     } catch (err: any) {
       setError(err?.message || copy.saveFail);
@@ -1526,8 +1501,10 @@ export default function BuilderPage() {
       setSaving(false);
     }
   }
-  
-    if (loading) {
+
+  const storeHref = resolvedSlug ? getStoreUrl(resolvedSlug) : '#';
+
+  if (loading) {
     return (
       <main className="builder-page">
         <div className="builder-shell">
@@ -1567,10 +1544,7 @@ export default function BuilderPage() {
               {copy.dashboard}
             </Link>
 
-            <Link
-              href={(slug || computedSlug) ? `/store/${slug || computedSlug}` : '#'}
-              className={`tool-button ${!(slug || computedSlug) ? 'disabled' : ''}`}
-            >
+            <Link href={storeHref} className={`tool-button ${!resolvedSlug ? 'disabled' : ''}`}>
               {copy.storefront}
             </Link>
 
@@ -1611,11 +1585,6 @@ export default function BuilderPage() {
           </div>
         </section>
 
-        <section className="intro-card">
-          <h2>Build Your Store</h2>
-          <p>{copy.subtitle}</p>
-        </section>
-
         <section className="accordion-card">
           <button type="button" className="accordion-toggle" onClick={() => setOpenSection('store')}>
             <span>01</span>
@@ -1632,7 +1601,7 @@ export default function BuilderPage() {
 
               <label>
                 <span>{copy.storeUrl}</span>
-                <input value={`/${slug || computedSlug ? `store/${slug || computedSlug}` : 'store/your-store'}`} readOnly />
+                <input value={resolvedSlug ? `/store/${resolvedSlug}` : '/store/your-store'} readOnly />
               </label>
 
               <label>
@@ -1839,40 +1808,40 @@ export default function BuilderPage() {
           {openSection === 'hours' ? (
             <div className="accordion-body">
               {DAY_KEYS.map((day) => (
-                <div key={day} className="hours-row">
+                <div key={day} className="hours-card">
                   <div className="hours-day">{dayLabels[day]}</div>
 
-                  <button
-                    type="button"
-                    className={`chip ${hours[day].isOpen ? 'active' : ''}`}
-                    onClick={() => updateHours(day, { isOpen: !hours[day].isOpen })}
-                  >
-                    {hours[day].isOpen ? copy.open : copy.closed}
-                  </button>
+                  <div className="hours-actions">
+                    <button
+                      type="button"
+                      className={`chip hours-toggle ${hours[day].isOpen ? 'active' : ''}`}
+                      onClick={() => updateHours(day, { isOpen: !hours[day].isOpen })}
+                    >
+                      {hours[day].isOpen ? copy.open : copy.closed}
+                    </button>
 
-                  <select
-                    value={hours[day].open}
-                    disabled={!hours[day].isOpen}
-                    onChange={(e) => updateHours(day, { open: e.target.value })}
-                  >
-                    {TIME_OPTIONS.map((time) => (
-                      <option key={time} value={time}>
-                        {time}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="time-grid">
+                      <label className="time-wrap">
+                        <span>{copy.openLabel}</span>
+                        <input
+                          type="time"
+                          value={hours[day].open}
+                          disabled={!hours[day].isOpen}
+                          onChange={(e) => updateHours(day, { open: e.target.value })}
+                        />
+                      </label>
 
-                  <select
-                    value={hours[day].close}
-                    disabled={!hours[day].isOpen}
-                    onChange={(e) => updateHours(day, { close: e.target.value })}
-                  >
-                    {TIME_OPTIONS.map((time) => (
-                      <option key={time} value={time}>
-                        {time}
-                      </option>
-                    ))}
-                  </select>
+                      <label className="time-wrap">
+                        <span>{copy.closeLabel}</span>
+                        <input
+                          type="time"
+                          value={hours[day].close}
+                          disabled={!hours[day].isOpen}
+                          onChange={(e) => updateHours(day, { close: e.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               ))}
 
@@ -1884,55 +1853,275 @@ export default function BuilderPage() {
         </section>
 
         <section className="accordion-card">
-          <button type="button" className="accordion-toggle" onClick={() => setOpenSection('categories')}>
+          <button type="button" className="accordion-toggle" onClick={() => setOpenSection('menu')}>
             <span>05</span>
-            <strong>{copy.categories}</strong>
+            <strong>{copy.menuBuilder}</strong>
             <em>›</em>
           </button>
 
-          {openSection === 'categories' ? (
+          {openSection === 'menu' ? (
             <div className="accordion-body">
-              <button type="button" className="black-button" onClick={addCategory}>
-                {copy.addCategory}
-              </button>
+              <div className="menu-builder-actions">
+                <button type="button" className="black-button" onClick={addCategory}>
+                  {copy.addCategory}
+                </button>
+              </div>
 
               {!categories.length ? <div className="empty-block">{copy.noCategories}</div> : null}
 
               {categories.map((category) => (
-                <div key={category.id} className="nested-card">
-                  <label>
-                    <span>{copy.categoryName}</span>
-                    <input value={category.name} onChange={(e) => updateCategory(category.id, e.target.value)} />
-                  </label>
+                <div key={category.id} className="menu-category-card">
+                  <div className="menu-category-head">
+                    <label>
+                      <span>{copy.categoryName}</span>
+                      <input value={category.name} onChange={(e) => updateCategory(category.id, e.target.value)} />
+                    </label>
 
-                  <div className="nested-actions">
-                    <button type="button" className="black-button" onClick={() => addItem(category.id)}>
-                      {copy.addItem}
-                    </button>
+                    <div className="nested-actions">
+                      <button type="button" className="black-button" onClick={() => addItem(category.id)}>
+                        {copy.addItem}
+                      </button>
 
-                    <button type="button" className="danger-button" onClick={() => deleteCategory(category.id)}>
-                      {copy.deleteCategory}
-                    </button>
+                      <button type="button" className="danger-button" onClick={() => deleteCategory(category.id)}>
+                        {copy.deleteCategory}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="item-list">
-                    {category.items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`item-pill ${selectedItemId === item.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setSelectedCategoryId(category.id);
-                          setSelectedItemId(item.id);
-                          setPreviewCategoryId(category.id);
-                          setPreviewItemId(item.id);
-                          setOpenSection('items');
-                        }}
-                      >
-                        <span>{item.name || 'New Item'}</span>
-                        <strong>{formatMoney(item.basePrice)}</strong>
-                      </button>
-                    ))}
+                  {!category.items.length ? <div className="empty-block">{copy.noItems}</div> : null}
+
+                  <div className="item-stack">
+                    {category.items.map((item) => {
+                      const resolvedImage = getResolvedImage(item, category.name);
+
+                      return (
+                        <div key={item.id} className="menu-item-card">
+                          <div className="menu-item-top">
+                            <div className="menu-item-preview">
+                              {resolvedImage ? (
+                                <img src={resolvedImage} alt={item.name} className="item-preview-image" />
+                              ) : (
+                                <div className="upload-empty">{copy.noImage}</div>
+                              )}
+                            </div>
+
+                            <div className="menu-item-fields">
+                              <label>
+                                <span>{copy.itemName}</span>
+                                <input
+                                  value={item.name}
+                                  onChange={(e) => updateItem(category.id, item.id, { name: e.target.value })}
+                                />
+                              </label>
+
+                              <label>
+                                <span>{copy.description}</span>
+                                <textarea
+                                  value={item.description}
+                                  onChange={(e) => updateItem(category.id, item.id, { description: e.target.value })}
+                                />
+                              </label>
+
+                              <div className="two-col">
+                                <label>
+                                  <span>{copy.basePrice}</span>
+                                  <input
+                                    value={item.basePrice}
+                                    onChange={(e) =>
+                                      updateItem(category.id, item.id, { basePrice: sanitizeNumber(e.target.value) })
+                                    }
+                                  />
+                                </label>
+
+                                <div>
+                                  <span className="field-label small-gap">Status</span>
+                                  <div className="chip-row">
+                                    <button
+                                      type="button"
+                                      className={`chip ${item.availability === 'available' ? 'active' : ''}`}
+                                      onClick={() => updateItem(category.id, item.id, { availability: 'available' })}
+                                    >
+                                      {copy.available}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className={`chip ${item.availability === 'sold_out' ? 'active' : ''}`}
+                                      onClick={() => updateItem(category.id, item.id, { availability: 'sold_out' })}
+                                    >
+                                      {copy.soldOut}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="nested-actions">
+                                <label className="black-button">
+                                  {itemUploadingId === item.id ? copy.saving : copy.uploadItemImage}
+                                  <input
+                                    type="file"
+                                    hidden
+                                    accept="image/*"
+                                    onChange={(e) => void handleItemUpload(category.id, item.id, e.target.files?.[0] || null)}
+                                  />
+                                </label>
+
+                                <button
+                                  type="button"
+                                  className="white-button"
+                                  onClick={() => updateItem(category.id, item.id, { imageUrl: '' })}
+                                >
+                                  {copy.removeItemImage}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="danger-button"
+                                  onClick={() => deleteItem(category.id, item.id)}
+                                >
+                                  {copy.deleteItem}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="option-builder">
+                            <div className="option-builder-head">
+                              <h4>{copy.optionBoxes}</h4>
+                              <div className="chip-grid">
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'combo_type')}>
+                                  {copy.comboType}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'protein')}>
+                                  {copy.protein}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'patty')}>
+                                  {copy.patty}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'size')}>
+                                  {copy.size}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'drink')}>
+                                  {copy.drink}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'side')}>
+                                  {copy.side}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'extras')}>
+                                  {copy.extras}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'removals')}>
+                                  {copy.removals}
+                                </button>
+                                <button type="button" className="chip" onClick={() => addGroup(category.id, item.id, 'custom')}>
+                                  {copy.custom}
+                                </button>
+                              </div>
+                            </div>
+
+                            {!item.groups.length ? <div className="empty-block">{copy.noOptions}</div> : null}
+
+                            <div className="group-stack">
+                              {item.groups.map((group) => (
+                                <div key={group.id} className="nested-card">
+                                  <label>
+                                    <span>{copy.optionBoxes}</span>
+                                    <input
+                                      value={group.name}
+                                      onChange={(e) =>
+                                        updateGroup(category.id, item.id, group.id, { name: e.target.value })
+                                      }
+                                    />
+                                  </label>
+
+                                  <div className="chip-row">
+                                    <button
+                                      type="button"
+                                      className={`chip ${group.required ? 'active' : ''}`}
+                                      onClick={() =>
+                                        updateGroup(category.id, item.id, group.id, { required: !group.required })
+                                      }
+                                    >
+                                      {group.required ? copy.required : copy.optional}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className={`chip ${group.selection === 'single' ? 'active' : ''}`}
+                                      onClick={() =>
+                                        updateGroup(category.id, item.id, group.id, { selection: 'single' })
+                                      }
+                                    >
+                                      {copy.single}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className={`chip ${group.selection === 'multiple' ? 'active' : ''}`}
+                                      onClick={() =>
+                                        updateGroup(category.id, item.id, group.id, { selection: 'multiple' })
+                                      }
+                                    >
+                                      {copy.multiple}
+                                    </button>
+                                  </div>
+
+                                  <div className="choice-list">
+                                    {group.choices.map((choice) => (
+                                      <div key={choice.id} className="choice-row">
+                                        <input
+                                          value={choice.name}
+                                          onChange={(e) =>
+                                            updateChoice(category.id, item.id, group.id, choice.id, { name: e.target.value })
+                                          }
+                                          placeholder={copy.choiceName}
+                                        />
+
+                                        <input
+                                          value={choice.price}
+                                          onChange={(e) =>
+                                            updateChoice(category.id, item.id, group.id, choice.id, {
+                                              price: sanitizeNumber(e.target.value),
+                                            })
+                                          }
+                                          placeholder="0"
+                                        />
+
+                                        <button
+                                          type="button"
+                                          className="choice-delete"
+                                          onClick={() => deleteChoice(category.id, item.id, group.id, choice.id)}
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  <div className="nested-actions">
+                                    <button
+                                      type="button"
+                                      className="black-button"
+                                      onClick={() => addChoice(category.id, item.id, group.id)}
+                                    >
+                                      {copy.addChoice}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      className="danger-button"
+                                      onClick={() => deleteGroup(category.id, item.id, group.id)}
+                                    >
+                                      {copy.deleteOptionBox}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -1940,258 +2129,13 @@ export default function BuilderPage() {
               <button type="button" className="black-button" onClick={handleSave} disabled={saving}>
                 {saving ? copy.saving : copy.saveSection}
               </button>
-            </div>
-          ) : null}
-        </section>
-
-        <section className="accordion-card">
-          <button type="button" className="accordion-toggle" onClick={() => setOpenSection('items')}>
-            <span>06</span>
-            <strong>{copy.itemBuilder}</strong>
-            <em>›</em>
-          </button>
-
-          {openSection === 'items' ? (
-            <div className="accordion-body">
-              {!selectedItem ? (
-                <div className="empty-block">{copy.noItems}</div>
-              ) : (
-                <>
-                  <div className="preview-card">
-                    {getResolvedImage(selectedItem, selectedCategory?.name || '') ? (
-                      <img
-                        src={getResolvedImage(selectedItem, selectedCategory?.name || '')}
-                        alt="item"
-                        className="item-preview-image"
-                      />
-                    ) : (
-                      <div className="upload-empty">{copy.noImage}</div>
-                    )}
-
-                    <div className="item-preview-bar">
-                      <span>{selectedItem.name || 'New Item'}</span>
-                      <strong>{formatMoney(selectedItem.basePrice)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="upload-block">
-                    <div className="upload-title">{copy.uploadItemImage}</div>
-
-                    <label className="black-button">
-                      {itemUploadingId === selectedItem.id ? copy.saving : copy.uploadItemImage}
-                      <input
-                        type="file"
-                        hidden
-                        accept="image/*"
-                        onChange={(e) => void handleItemUpload(selectedItem.id, e.target.files?.[0] || null)}
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      className="white-button"
-                      onClick={() => updateItem(selectedItem.id, { imageUrl: '' })}
-                    >
-                      {copy.removeItemImage}
-                    </button>
-                  </div>
-
-                  <label>
-                    <span>{copy.itemName}</span>
-                    <input
-                      value={selectedItem.name}
-                      onChange={(e) => updateItem(selectedItem.id, { name: e.target.value })}
-                    />
-                  </label>
-
-                  <label>
-                    <span>{copy.description}</span>
-                    <textarea
-                      value={selectedItem.description}
-                      onChange={(e) => updateItem(selectedItem.id, { description: e.target.value })}
-                    />
-                  </label>
-
-                  <label>
-                    <span>{copy.basePrice}</span>
-                    <input
-                      value={selectedItem.basePrice}
-                      onChange={(e) => updateItem(selectedItem.id, { basePrice: sanitizeNumber(e.target.value) })}
-                    />
-                  </label>
-
-                  <div className="chip-row">
-                    <button
-                      type="button"
-                      className={`chip ${selectedItem.availability === 'available' ? 'active' : ''}`}
-                      onClick={() => updateItem(selectedItem.id, { availability: 'available' })}
-                    >
-                      {copy.available}
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`chip ${selectedItem.availability === 'sold_out' ? 'active' : ''}`}
-                      onClick={() => updateItem(selectedItem.id, { availability: 'sold_out' })}
-                    >
-                      {copy.soldOut}
-                    </button>
-                  </div>
-
-                  {selectedCategory ? (
-                    <button
-                      type="button"
-                      className="danger-button"
-                      onClick={() => deleteItem(selectedCategory.id, selectedItem.id)}
-                    >
-                      {copy.deleteItem}
-                    </button>
-                  ) : null}
-
-                  <button type="button" className="black-button" onClick={handleSave} disabled={saving}>
-                    {saving ? copy.saving : copy.saveSection}
-                  </button>
-                </>
-              )}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="accordion-card">
-          <button type="button" className="accordion-toggle" onClick={() => setOpenSection('options')}>
-            <span>07</span>
-            <strong>{copy.optionGroups}</strong>
-            <em>›</em>
-          </button>
-
-          {openSection === 'options' ? (
-            <div className="accordion-body">
-              {!selectedItem ? (
-                <div className="empty-block">{copy.chooseItem}</div>
-              ) : (
-                <>
-                  <div className="chip-grid">
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'combo_type')}>
-                      {copy.comboType}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'protein')}>
-                      {copy.protein}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'patty')}>
-                      {copy.patty}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'size')}>
-                      {copy.size}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'drink')}>
-                      {copy.drink}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'side')}>
-                      {copy.side}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'extras')}>
-                      {copy.extras}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'removals')}>
-                      {copy.removals}
-                    </button>
-                    <button type="button" className="chip" onClick={() => addGroup(selectedItem.id, 'custom')}>
-                      {copy.custom}
-                    </button>
-                  </div>
-
-                  {!selectedItem.groups.length ? <div className="empty-block">{copy.noOptions}</div> : null}
-
-                  {selectedItem.groups.map((group) => (
-                    <div key={group.id} className="nested-card">
-                      <label>
-                        <span>{copy.optionGroups}</span>
-                        <input
-                          value={group.name}
-                          onChange={(e) => updateGroup(selectedItem.id, group.id, { name: e.target.value })}
-                        />
-                      </label>
-
-                      <div className="chip-row">
-                        <button
-                          type="button"
-                          className={`chip ${group.required ? 'active' : ''}`}
-                          onClick={() => updateGroup(selectedItem.id, group.id, { required: !group.required })}
-                        >
-                          {group.required ? copy.required : copy.optional}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`chip ${group.selection === 'single' ? 'active' : ''}`}
-                          onClick={() => updateGroup(selectedItem.id, group.id, { selection: 'single' })}
-                        >
-                          {copy.single}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`chip ${group.selection === 'multiple' ? 'active' : ''}`}
-                          onClick={() => updateGroup(selectedItem.id, group.id, { selection: 'multiple' })}
-                        >
-                          {copy.multiple}
-                        </button>
-                      </div>
-
-                      {group.choices.map((choice) => (
-                        <div key={choice.id} className="choice-row">
-                          <input
-                            value={choice.name}
-                            onChange={(e) =>
-                              updateChoice(selectedItem.id, group.id, choice.id, { name: e.target.value })
-                            }
-                            placeholder={copy.choiceName}
-                          />
-
-                          <input
-                            value={choice.price}
-                            onChange={(e) =>
-                              updateChoice(selectedItem.id, group.id, choice.id, {
-                                price: sanitizeNumber(e.target.value),
-                              })
-                            }
-                            placeholder="0"
-                          />
-
-                          <button
-                            type="button"
-                            className="choice-delete"
-                            onClick={() => deleteChoice(selectedItem.id, group.id, choice.id)}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-
-                      <div className="nested-actions">
-                        <button type="button" className="black-button" onClick={() => addChoice(selectedItem.id, group.id)}>
-                          {copy.addChoice}
-                        </button>
-
-                        <button type="button" className="danger-button" onClick={() => deleteGroup(selectedItem.id, group.id)}>
-                          {copy.deleteCategory}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  <button type="button" className="black-button" onClick={handleSave} disabled={saving}>
-                    {saving ? copy.saving : copy.saveSection}
-                  </button>
-                </>
-              )}
             </div>
           ) : null}
         </section>
 
         <section className="accordion-card">
           <button type="button" className="accordion-toggle" onClick={() => setOpenSection('preview')}>
-            <span>08</span>
+            <span>06</span>
             <strong>{copy.storefrontReflection}</strong>
             <em>›</em>
           </button>
@@ -2215,7 +2159,7 @@ export default function BuilderPage() {
 
                     <div className="reflection-copy">
                       <h3>{name || 'Your Store'}</h3>
-                      <p>{(slug || computedSlug) ? `/store/${slug || computedSlug}` : '/store/your-store'}</p>
+                      <p>{resolvedSlug ? `/store/${resolvedSlug}` : '/store/your-store'}</p>
                     </div>
                   </div>
                 </div>
@@ -2234,25 +2178,6 @@ export default function BuilderPage() {
                     <span>{copy.phone}</span>
                     <strong>{phone || '—'}</strong>
                   </div>
-                  <div className="info-row">
-                    <span>Pickup</span>
-                    <strong>{pickupEnabled ? 'On' : 'Off'}</strong>
-                  </div>
-                  <div className="info-row">
-                    <span>Delivery</span>
-                    <strong>{deliveryEnabled ? 'On' : 'Off'}</strong>
-                  </div>
-                </div>
-
-                <div className="hours-preview-card">
-                  {DAY_KEYS.map((day) => (
-                    <div key={day} className="hours-preview-row">
-                      <span>{dayLabels[day]}</span>
-                      <strong>
-                        {hours[day].isOpen ? `${hours[day].open} - ${hours[day].close}` : copy.closed}
-                      </strong>
-                    </div>
-                  ))}
                 </div>
 
                 <div className="reflection-tabs">
@@ -2316,7 +2241,7 @@ export default function BuilderPage() {
                         <strong>{formatMoney(previewItem.basePrice)}</strong>
                       </div>
 
-                      <p>{previewItem.description || ''}</p>
+                      <p>{previewItem.description || 'Customize this item before adding it to your order.'}</p>
 
                       {previewItem.groups.length ? (
                         <div className="popup-groups">
@@ -2331,7 +2256,7 @@ export default function BuilderPage() {
                                 {group.choices.map((choice) => (
                                   <div key={choice.id} className="popup-choice-pill">
                                     <span>{choice.name}</span>
-                                    <strong>{Number(choice.price) > 0 ? `+${formatMoney(choice.price)}` : '$0'}</strong>
+                                    <strong>{Number(choice.price) > 0 ? `+${formatMoney(choice.price)}` : '$0.00'}</strong>
                                   </div>
                                 ))}
                               </div>
@@ -2365,13 +2290,12 @@ const styles = `
   }
 
   .builder-shell {
-    max-width: 860px;
+    max-width: 980px;
     margin: 0 auto;
   }
 
   .loading-card,
   .quick-tools-card,
-  .intro-card,
   .accordion-card {
     background: #fff;
     border: 1px solid #e8e8e2;
@@ -2409,7 +2333,6 @@ const styles = `
   .white-button,
   .chip,
   .accordion-toggle,
-  .item-pill,
   .choice-delete,
   .reflection-tabs button,
   .reflection-toolbar button,
@@ -2578,23 +2501,6 @@ const styles = `
     font-weight: 800;
   }
 
-  .intro-card h2 {
-    margin: 0 0 10px;
-    font-size: 56px;
-    line-height: 0.95;
-    font-weight: 900;
-    color: #101019;
-    letter-spacing: -0.05em;
-  }
-
-  .intro-card p {
-    margin: 0;
-    font-size: 24px;
-    line-height: 1.35;
-    color: #6a6a72;
-    font-weight: 800;
-  }
-
   .accordion-toggle {
     width: 100%;
     background: transparent;
@@ -2648,9 +2554,13 @@ const styles = `
     text-transform: uppercase;
   }
 
+  .small-gap {
+    display: block;
+    margin-bottom: 10px;
+  }
+
   .accordion-body input,
-  .accordion-body textarea,
-  .accordion-body select {
+  .accordion-body textarea {
     width: 100%;
     border: 1px solid #e5e5df;
     background: #fff;
@@ -2663,7 +2573,7 @@ const styles = `
   }
 
   .accordion-body textarea {
-    min-height: 130px;
+    min-height: 120px;
     resize: vertical;
   }
 
@@ -2699,7 +2609,8 @@ const styles = `
 
   .upload-block,
   .nested-card,
-  .preview-card {
+  .menu-category-card,
+  .menu-item-card {
     background: #fff;
     border: 1px solid #ecece6;
     border-radius: 24px;
@@ -2733,10 +2644,9 @@ const styles = `
     font-weight: 900;
   }
 
+  .menu-builder-actions,
   .nested-actions,
-  .chip-row,
-  .chip-grid,
-  .item-list {
+  .chip-row {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
@@ -2745,6 +2655,7 @@ const styles = `
   .chip-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .chip {
@@ -2754,25 +2665,10 @@ const styles = `
   }
 
   .chip.active,
-  .item-pill.active,
   .reflection-tabs button.active,
   .reflection-toolbar button.active {
     background: #111;
     color: #fff;
-  }
-
-  .item-pill {
-    background: #fff;
-    color: #111;
-    border: 1px solid #e5e5df;
-    border-radius: 18px;
-    padding: 14px 16px;
-    min-width: 180px;
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 18px;
-    font-weight: 900;
   }
 
   .empty-block {
@@ -2786,30 +2682,116 @@ const styles = `
     text-align: center;
   }
 
-  .preview-card {
-    overflow: hidden;
-    padding: 0;
+  .hours-card {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid #ecece6;
+    background: #fff;
   }
 
-  .item-preview-image {
-    min-height: 300px;
-    border-radius: 24px 24px 0 0;
-  }
-
-  .item-preview-bar {
-    background: #111;
-    color: #fff;
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 20px;
-    font-size: 20px;
+  .hours-day {
+    font-size: 24px;
     font-weight: 900;
+    color: #111;
+  }
+
+  .hours-actions {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 16px;
+    align-items: end;
+  }
+
+  .hours-toggle {
+    width: 100%;
+  }
+
+  .time-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .time-wrap {
+    display: grid;
+    gap: 10px;
+  }
+
+  .time-wrap input[type='time'] {
+    min-height: 62px;
+    border: 1px solid #e5e5df;
+    border-radius: 22px;
+    padding: 0 18px;
+    font-size: 20px;
+    font-weight: 800;
+    background: #fff;
+    color: #111;
+  }
+
+  .menu-category-head {
+    display: grid;
+    gap: 14px;
+  }
+
+  .item-stack,
+  .group-stack {
+    display: grid;
+    gap: 18px;
+  }
+
+  .menu-item-top {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .menu-item-preview {
+    display: grid;
+    gap: 12px;
+  }
+
+  .menu-item-fields {
+    display: grid;
+    gap: 14px;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: end;
+  }
+
+  .option-builder {
+    display: grid;
+    gap: 14px;
+    padding-top: 8px;
+    border-top: 1px solid #efefe9;
+  }
+
+  .option-builder-head {
+    display: grid;
+    gap: 12px;
+  }
+
+  .option-builder-head h4 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 900;
+    color: #111;
+  }
+
+  .choice-list {
+    display: grid;
+    gap: 10px;
   }
 
   .choice-row {
     display: grid;
-    grid-template-columns: 1fr 120px 62px;
+    grid-template-columns: 1fr 160px 62px;
     gap: 10px;
   }
 
@@ -2819,19 +2801,6 @@ const styles = `
     border-radius: 18px;
     font-size: 30px;
     font-weight: 900;
-  }
-
-  .hours-row {
-    display: grid;
-    grid-template-columns: 1.2fr 140px 1fr 1fr;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .hours-day {
-    font-size: 18px;
-    font-weight: 900;
-    color: #111;
   }
 
   .reflection-shell {
@@ -2964,39 +2933,6 @@ const styles = `
   }
 
   .info-row strong {
-    color: #767680;
-    font-size: 18px;
-    font-weight: 800;
-    text-align: right;
-  }
-
-  .hours-preview-card {
-    margin: 0 18px 18px;
-    background: #fff;
-    border: 1px solid #ecece5;
-    border-radius: 22px;
-    overflow: hidden;
-  }
-
-  .hours-preview-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 20px;
-    border-bottom: 1px solid #efefe9;
-  }
-
-  .hours-preview-row:last-child {
-    border-bottom: none;
-  }
-
-  .hours-preview-row span {
-    color: #111;
-    font-size: 18px;
-    font-weight: 900;
-  }
-
-  .hours-preview-row strong {
     color: #767680;
     font-size: 18px;
     font-weight: 800;
@@ -3158,6 +3094,18 @@ const styles = `
     font-weight: 900;
   }
 
+  @media (max-width: 900px) {
+    .menu-item-top {
+      grid-template-columns: 1fr;
+    }
+
+    .two-col,
+    .hours-actions,
+    .time-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   @media (max-width: 760px) {
     .builder-page {
       padding: 14px 10px 50px;
@@ -3182,14 +3130,6 @@ const styles = `
       grid-template-columns: 1fr;
     }
 
-    .intro-card h2 {
-      font-size: 34px;
-    }
-
-    .intro-card p {
-      font-size: 18px;
-    }
-
     .hero-name {
       font-size: 32px;
     }
@@ -3202,8 +3142,7 @@ const styles = `
       font-size: 22px;
     }
 
-    .choice-row,
-    .hours-row {
+    .choice-row {
       grid-template-columns: 1fr;
     }
   }
