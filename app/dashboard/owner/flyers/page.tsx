@@ -814,20 +814,17 @@ const styles = `
   }
 
   .flyerImageWrap {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 9 / 16;
-    background: #111827;
-    overflow: hidden;
-  }
+  position: relative;
+  width: 100%;
+  background: #111827;
+}
 
-  .flyerImage {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center center;
-    display: block;
-  }
+.flyerImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
 
   .imageShade {
     position: absolute;
