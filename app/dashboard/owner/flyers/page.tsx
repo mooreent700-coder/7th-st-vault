@@ -185,9 +185,20 @@ function FlyerCard({
       <div className="styleBadge">{title.toUpperCase()}</div>
 
       {!broken ? (
-        <div className="flyerFrame">
-          <img src={src} alt={title} className="flyerImage" onError={onError} />
-          <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
+        <div className="flyerCardInner">
+          <div className="flyerImageWrap">
+            <img
+              src={src}
+              alt={title}
+              className="flyerImage"
+              onError={onError}
+            />
+          </div>
+
+          <div className="flyerQrSection">
+            <img src={qrSrc} alt="Store QR code" className="flyerQrImage" />
+            <div className="flyerQrText">SCAN TO ORDER</div>
+          </div>
         </div>
       ) : (
         <div className="flyerMissing">
@@ -198,7 +209,6 @@ function FlyerCard({
     </button>
   );
 }
-
 /* =========================
    PREVIEW MODAL
 ========================= */
@@ -738,17 +748,52 @@ const styles = `
     gap: 16px;
   }
 
-  .flyerCard {
-    position: relative;
-    width: 100%;
-    background: #ffffff;
-    border: 2px solid #e2e8f0;
-    border-radius: 22px;
-    overflow: hidden;
-    padding: 0;
-    text-align: left;
-    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  }
+  .flyerCardInner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.flyerImageWrap {
+  width: 100%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flyerImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.flyerQrSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+
+.flyerQrImage {
+  width: 74px;
+  height: 74px;
+  display: block;
+  background: #ffffff;
+}
+
+.flyerQrText {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #0f172a;
+}
 
   .flyerCard:hover {
     transform: translateY(-2px);
@@ -774,7 +819,7 @@ const styles = `
     letter-spacing: 0.03em;
   }
 
-  .flyerFrame {
+  
     position: relative;
     width: 100%;
     aspect-ratio: 9 / 16;
@@ -820,50 +865,52 @@ const styles = `
     word-break: break-word;
   }
 
-  .qrOverlay {
-    position: absolute;
-    right: 14px;
-    bottom: 14px;
-    z-index: 6;
-    background: transparent;
-    padding: 0;
-  }
+  .flyerCardInner {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
 
-  .qrOverlayInner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255, 255, 255, 0.96);
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
-    border-radius: 16px;
-    padding: 8px 10px;
-    backdrop-filter: blur(6px);
-  }
+.flyerImageWrap {
+  width: 100%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  .qrImage {
-    width: 58px;
-    height: 58px;
-    border-radius: 10px;
-    display: block;
-    background: #ffffff;
-    flex-shrink: 0;
-  }
+.flyerImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  background: #ffffff;
+}
 
-  .qrOverlayText {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
+.flyerQrSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 12px 16px;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
 
-  .qrTitle {
-    font-size: 11px;
-    line-height: 1.1;
-    font-weight: 900;
-    color: #081b52;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
-  }
+.flyerQrImage {
+  width: 74px;
+  height: 74px;
+  display: block;
+  background: #ffffff;
+}
+
+.flyerQrText {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: #0f172a;
+}
 
   .packList {
     display: grid;
