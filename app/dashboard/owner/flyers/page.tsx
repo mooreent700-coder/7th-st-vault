@@ -309,12 +309,12 @@ export default function Page() {
 
   async function saveFlyerOrder() {
     if (tab === 'free') {
-      window.open(storeUrl, '_blank', 'noopener,noreferrer');
+     window.location.href = storeUrl;
       return;
     }
 
     if (!store?.id) {
-      window.open(PACKS[pack].url, '_blank', 'noopener,noreferrer');
+      window.location.href = PACKS[pack].url;
       return;
     }
 
