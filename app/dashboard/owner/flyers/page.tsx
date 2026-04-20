@@ -100,22 +100,10 @@ function getAddress(s: StoreRecord | null) {
   return s?.address?.trim() || '';
 }
 
-function normalizeText(value: string) {
-  return value.toLowerCase().replace(/_/g, ' ').trim();
-}
-
 function getCategoryMeta(category: FlyerCategoryKey) {
   return CATEGORIES.find((item) => item.key === category) || CATEGORIES[0];
 }
 
-/* =========================
-   FLYER PATHS
-   IMPORTANT:
-   Put your images here:
-   /public/flyers/<folder>/<folder>_1.png
-   /public/flyers/<folder>/<folder>_2.png
-   /public/flyers/<folder>/<folder>_3.png
-========================= */
 function getFlyerPaths(category: FlyerCategoryKey) {
   const meta = getCategoryMeta(category);
   const folder = meta.folder;
@@ -139,6 +127,32 @@ function getFlyerPaths(category: FlyerCategoryKey) {
   ];
 }
 
+function buildQrImageUrl(value: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&data=${encodeURIComponent(value)}`;
+}
+
+/* =========================
+   QR OVERLAY
+========================= */
+function FlyerQrOverlay({
+  qrSrc,
+  onOpenStore,
+}: {
+  qrSrc: string;
+  onOpenStore: () => void;
+}) {
+  return (
+    <button type="button" className="qrOverlay" onClick={onOpenStore} aria-label="Open store">
+      <div className="qrOverlayInner">
+        <img src={qrSrc} alt="Store QR code" className="qrImage" />
+        <div className="qrOverlayText">
+          <div className="qrTitle">SCAN TO ORDER</div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 /* =========================
    IMAGE CARD
 ========================= */
@@ -149,6 +163,8 @@ function FlyerCard({
   onSelect,
   broken,
   onError,
+  qrSrc,
+  onOpenStore,
 }: {
   src: string;
   title: string;
@@ -156,6 +172,8 @@ function FlyerCard({
   onSelect: () => void;
   broken: boolean;
   onError: () => void;
+  qrSrc: string;
+  onOpenStore: () => void;
 }) {
   return (
     <button
@@ -167,7 +185,10 @@ function FlyerCard({
       <div className="styleBadge">{title.toUpperCase()}</div>
 
       {!broken ? (
-        <img src={src} alt={title} className="flyerImage" onError={onError} />
+        <div className="flyerFrame">
+          <img src={src} alt={title} className="flyerImage" onError={onError} />
+          <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
+        </div>
       ) : (
         <div className="flyerMissing">
           <div className="missingTitle">Missing flyer image</div>
@@ -185,12 +206,16 @@ function PreviewModal({
   open,
   imageSrc,
   title,
+  qrSrc,
   onClose,
+  onOpenStore,
 }: {
   open: boolean;
   imageSrc: string;
   title: string;
+  qrSrc: string;
   onClose: () => void;
+  onOpenStore: () => void;
 }) {
   if (!open) return null;
 
@@ -203,7 +228,11 @@ function PreviewModal({
             ✕
           </button>
         </div>
-        <img src={imageSrc} alt={title} className="modalImage" />
+
+        <div className="modalImageWrap">
+          <img src={imageSrc} alt={title} className="modalImage" />
+          <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
+        </div>
       </div>
     </div>
   );
@@ -258,7 +287,6 @@ export default function Page() {
   }, [category, tab]);
 
   const flyerOptions = useMemo(() => getFlyerPaths(category), [category]);
-
   const selectedFlyer = flyerOptions[selectedFlyerIndex] || flyerOptions[0];
 
   const slug = getSlug(store);
@@ -267,19 +295,16 @@ export default function Page() {
       ? `${window.location.origin}/store/${slug}`
       : `https://menuflow.app/store/${slug}`;
 
-  const qrUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/store/${slug}`
-      : `https://menuflow.app/store/${slug}`;
+  const qrImageUrl = useMemo(() => buildQrImageUrl(storeUrl), [storeUrl]);
 
   async function saveFlyerOrder() {
     if (tab === 'free') {
-      window.open(storeUrl, '_blank');
+      window.open(storeUrl, '_blank', 'noopener,noreferrer');
       return;
     }
 
     if (!store?.id) {
-      window.open(PACKS[pack].url, '_blank');
+      window.open(PACKS[pack].url, '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -296,17 +321,17 @@ export default function Page() {
       store_name: getName(store),
       store_phone: getPhone(store),
       store_address: getAddress(store),
-      qr_url: qrUrl,
+      qr_url: storeUrl,
       checkout_url: PACKS[pack].url,
     };
 
     try {
       await supabase.from('flyer_orders').insert(payload);
     } catch {
-      // do nothing, still send owner to checkout
+      // keep checkout moving even if logging fails
     }
 
-    window.open(PACKS[pack].url, '_blank');
+    window.open(PACKS[pack].url, '_blank', 'noopener,noreferrer');
   }
 
   function copyLink() {
@@ -318,6 +343,10 @@ export default function Page() {
       ...prev,
       [src]: true,
     }));
+  }
+
+  function openStore() {
+    window.open(storeUrl, '_blank', 'noopener,noreferrer');
   }
 
   if (loading) {
@@ -335,7 +364,7 @@ export default function Page() {
         <div className="heroIcon">📣</div>
         <div>
           <h1>Custom QR Flyers</h1>
-          <p>Choose a category and use your real flyer images from your public flyers folders.</p>
+          <p>Choose a category, preview real flyer images, and overlay the live QR linked to the current store slug.</p>
         </div>
       </div>
 
@@ -352,11 +381,7 @@ export default function Page() {
           <button type="button" className="secondaryBtn" onClick={copyLink}>
             Copy Link
           </button>
-          <button
-            type="button"
-            className="primaryBtn"
-            onClick={() => window.open(storeUrl, '_blank')}
-          >
+          <button type="button" className="primaryBtn" onClick={openStore}>
             Open Store
           </button>
         </div>
@@ -417,6 +442,8 @@ export default function Page() {
                 }}
                 broken={!!brokenImages[flyer.src]}
                 onError={() => markImageBroken(flyer.src)}
+                qrSrc={qrImageUrl}
+                onOpenStore={openStore}
               />
             ))}
           </div>
@@ -458,10 +485,13 @@ export default function Page() {
             <div className="freeHeader">Free White Flyer</div>
             <div className="freeStoreName">{getName(store)}</div>
             <div className="freeStoreUrl">{storeUrl}</div>
+            <div className="freeQrWrap">
+              <img src={qrImageUrl} alt="Store QR code" className="freeQrImage" />
+            </div>
             <div className="freeScanText">SCAN TO ORDER</div>
           </div>
 
-          <button type="button" className="checkoutBtn" onClick={saveFlyerOrder}>
+          <button type="button" className="checkoutBtn" onClick={openStore}>
             OPEN STORE
           </button>
         </div>
@@ -471,7 +501,9 @@ export default function Page() {
         open={previewOpen}
         imageSrc={selectedFlyer.src}
         title={`${getCategoryMeta(category).label} — ${selectedFlyer.title}`}
+        qrSrc={qrImageUrl}
         onClose={() => setPreviewOpen(false)}
+        onOpenStore={openStore}
       />
 
       <style jsx>{styles}</style>
@@ -485,7 +517,7 @@ export default function Page() {
 const styles = `
   .page {
     width: 100%;
-    max-width: 1280px;
+    max-width: 1320px;
     margin: 0 auto;
     padding: 20px 16px 120px;
     background: #f7f7fb;
@@ -593,7 +625,8 @@ const styles = `
   .packCard,
   .checkoutBtn,
   .modalClose,
-  .flyerCard {
+  .flyerCard,
+  .qrOverlay {
     appearance: none;
     border: none;
     outline: none;
@@ -731,7 +764,7 @@ const styles = `
     position: absolute;
     top: 12px;
     left: 12px;
-    z-index: 3;
+    z-index: 5;
     background: rgba(8, 27, 82, 0.95);
     color: #ffffff;
     border-radius: 10px;
@@ -741,12 +774,24 @@ const styles = `
     letter-spacing: 0.03em;
   }
 
-  .flyerImage {
+  .flyerFrame {
+    position: relative;
     width: 100%;
     aspect-ratio: 9 / 16;
-    object-fit: cover;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .flyerImage {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center center;
     display: block;
-    background: #e5e7eb;
+    background: #ffffff;
   }
 
   .flyerMissing {
@@ -773,6 +818,51 @@ const styles = `
     line-height: 1.45;
     color: #475569;
     word-break: break-word;
+  }
+
+  .qrOverlay {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 6;
+    background: transparent;
+    padding: 0;
+  }
+
+  .qrOverlayInner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+    border-radius: 16px;
+    padding: 8px 10px;
+    backdrop-filter: blur(6px);
+  }
+
+  .qrImage {
+    width: 58px;
+    height: 58px;
+    border-radius: 10px;
+    display: block;
+    background: #ffffff;
+    flex-shrink: 0;
+  }
+
+  .qrOverlayText {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .qrTitle {
+    font-size: 11px;
+    line-height: 1.1;
+    font-weight: 900;
+    color: #081b52;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
 
   .packList {
@@ -888,6 +978,23 @@ const styles = `
     word-break: break-word;
   }
 
+  .freeQrWrap {
+    width: 180px;
+    height: 180px;
+    border-radius: 20px;
+    padding: 12px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    margin-bottom: 16px;
+  }
+
+  .freeQrImage {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 12px;
+  }
+
   .freeScanText {
     font-size: 34px;
     font-weight: 900;
@@ -906,7 +1013,7 @@ const styles = `
   }
 
   .modalCard {
-    width: min(100%, 460px);
+    width: min(100%, 520px);
     background: #ffffff;
     border-radius: 24px;
     overflow: hidden;
@@ -933,12 +1040,24 @@ const styles = `
     font-weight: 900;
   }
 
+  .modalImageWrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
   .modalImage {
     width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center center;
+    background: #ffffff;
     display: block;
-    aspect-ratio: 9 / 16;
-    object-fit: cover;
-    background: #e5e7eb;
   }
 
   @media (max-width: 980px) {
@@ -968,6 +1087,26 @@ const styles = `
 
     .packPrice {
       font-size: 20px;
+    }
+
+    .qrOverlay {
+      right: 10px;
+      bottom: 10px;
+    }
+
+    .qrOverlayInner {
+      padding: 6px 8px;
+      gap: 8px;
+      border-radius: 14px;
+    }
+
+    .qrImage {
+      width: 50px;
+      height: 50px;
+    }
+
+    .qrTitle {
+      font-size: 10px;
     }
   }
 `;
