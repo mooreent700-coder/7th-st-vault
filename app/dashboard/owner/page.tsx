@@ -29,26 +29,22 @@ type OrderRow = {
 type MenuItemRow = {
   id: string;
   name?: string | null;
+  created_at?: string | null;
 };
 
+type OrderFilterKey = 'ALL' | 'NEW' | 'IN_PROGRESS' | 'READY' | 'DONE';
 type OwnerAction = 'accept' | 'ready' | 'complete' | 'cancel';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
 
-const BG = '#f8fafc';
-const BG2 = '#eef2f7';
-const CARD = '#ffffff';
-const BORDER = '#e5e7eb';
-const TEXT = '#111827';
-const MUTED = '#6b7280';
-const BLACK = '#111111';
-const GREEN = '#16a34a';
-const RED = '#e56f73';
-const YELLOW = '#d8b45c';
-const BLUE = '#3452b6';
-const TEAL = '#5da9a6';
-
 function formatMoney(value: number) {
+  return `$${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatMoneyNoCents(value: number) {
   return `$${value.toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
@@ -69,8 +65,7 @@ function getStoreSlug(store: StoreRecord | null) {
 }
 
 function getStoreUrl(store: StoreRecord | null) {
-  const slug = getStoreSlug(store);
-  return `${BASE_URL}/store/${slug}`;
+  return `${BASE_URL}/store/${getStoreSlug(store)}`;
 }
 
 function formatTime(value?: string | null) {
@@ -80,11 +75,25 @@ function formatTime(value?: string | null) {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function formatDate(value?: string | null) {
+function formatDateShort(value?: string | null) {
   if (!value) return '--';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '--';
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function minutesAgo(value?: string | null) {
+  if (!value) return '--';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '--';
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.max(0, Math.floor(diffMs / 60000));
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day ago`;
 }
 
 function isToday(value?: string | null) {
@@ -133,24 +142,53 @@ function getStatusLabel(status?: string | null) {
   return 'New';
 }
 
-function getStatusTone(status?: string | null) {
+function statusMatchesFilter(status: string | null | undefined, filter: OrderFilterKey) {
   const key = getStatusKey(status);
-  if (key === 'cancelled') return 'red';
-  if (key === 'completed') return 'green';
-  if (key === 'ready') return 'yellow';
-  if (key === 'in_progress') return 'blue';
-  return 'neutral';
+  if (filter === 'ALL') return true;
+  if (filter === 'NEW') return key === 'new';
+  if (filter === 'IN_PROGRESS') return key === 'in_progress';
+  if (filter === 'READY') return key === 'ready';
+  if (filter === 'DONE') return key === 'completed';
+  return true;
 }
 
-function initialsFromName(value: string) {
+function getStatusBadgeClass(status?: string | null) {
+  const key = getStatusKey(status);
+  if (key === 'completed') return 'statusBadge completed';
+  if (key === 'ready') return 'statusBadge ready';
+  if (key === 'in_progress') return 'statusBadge progress';
+  if (key === 'cancelled') return 'statusBadge cancelled';
+  return 'statusBadge new';
+}
+
+function getOrderRowClass(status?: string | null) {
+  const key = getStatusKey(status);
+  if (key === 'completed') return 'orderRow completed';
+  if (key === 'ready') return 'orderRow ready';
+  if (key === 'in_progress') return 'orderRow progress';
+  if (key === 'cancelled') return 'orderRow cancelled';
+  return 'orderRow new';
+}
+
+function getInitials(value?: string | null) {
+  if (!value) return 'CU';
   return (
     value
       .split(' ')
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() || '')
-      .join('') || 'M'
+      .join('') || 'CU'
   );
+}
+
+function getAvatarClass(status?: string | null) {
+  const key = getStatusKey(status);
+  if (key === 'completed') return 'avatar completed';
+  if (key === 'ready') return 'avatar ready';
+  if (key === 'in_progress') return 'avatar progress';
+  if (key === 'cancelled') return 'avatar cancelled';
+  return 'avatar new';
 }
 
 function getNextStatusValue(action: OwnerAction) {
@@ -162,45 +200,10 @@ function getNextStatusValue(action: OwnerAction) {
 
 function getPrimaryAction(status?: string | null): { label: string; action: OwnerAction } | null {
   const key = getStatusKey(status);
-  if (key === 'new') return { label: 'Accept Order', action: 'accept' };
+  if (key === 'new') return { label: 'Accept', action: 'accept' };
   if (key === 'in_progress') return { label: 'Mark Ready', action: 'ready' };
-  if (key === 'ready') return { label: 'Complete Order', action: 'complete' };
+  if (key === 'ready') return { label: 'Complete', action: 'complete' };
   return null;
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: string;
-}) {
-  return (
-    <div className="statCard premiumCard">
-      <div className="statTopRow">
-        <span className="statLabel">{label}</span>
-        <span className="statDot" />
-      </div>
-      <div className="statValue" style={accent ? { color: accent } : undefined}>
-        {value}
-      </div>
-      {sub ? <div className="statSub">{sub}</div> : null}
-    </div>
-  );
-}
-
-function StatusPill({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: 'neutral' | 'green' | 'yellow' | 'red' | 'blue';
-}) {
-  return <span className={`pill ${tone}`}>{label}</span>;
 }
 
 export default function OwnerDashboardPage() {
@@ -212,9 +215,9 @@ export default function OwnerDashboardPage() {
   const [menuItems, setMenuItems] = useState<MenuItemRow[]>([]);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [orderFilter, setOrderFilter] = useState<'ALL' | 'NEW' | 'YELLOW' | 'GREEN'>('ALL');
-  const [billingFilter, setBillingFilter] = useState<'ALL' | 'NEW' | 'YELLOW' | 'GREEN'>('ALL');
+  const [orderFilter, setOrderFilter] = useState<OrderFilterKey>('ALL');
   const [updatingOrderId, setUpdatingOrderId] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -259,7 +262,7 @@ export default function OwnerDashboardPage() {
 
           const { data: fetchedItems } = await supabase
             .from('menu_items')
-            .select('id,name')
+            .select('id,name,created_at')
             .eq('restaurant_id', restaurant.id)
             .limit(100);
 
@@ -290,24 +293,18 @@ export default function OwnerDashboardPage() {
   async function updateOrderStatus(orderId: string, action: OwnerAction) {
     try {
       setUpdatingOrderId(orderId);
+      setError('');
       const nextStatus = getNextStatusValue(action);
 
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: nextStatus })
-        .eq('id', orderId);
+      const { error: updateError } = await supabase.from('orders').update({ status: nextStatus }).eq('id', orderId);
 
       if (updateError) throw updateError;
 
       setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId
-            ? {
-                ...order,
-                status: nextStatus,
-              }
-            : order
-        )
+        prev.map((order) => {
+          if (order.id !== orderId) return order;
+          return { ...order, status: nextStatus };
+        })
       );
     } catch (err: any) {
       setError(err?.message || 'Could not update order.');
@@ -316,12 +313,27 @@ export default function OwnerDashboardPage() {
     }
   }
 
+  function goToSection(id: string) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function copyStoreLink() {
+    try {
+      await navigator.clipboard.writeText(storeUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   const storeName = useMemo(() => getStoreName(store), [store]);
   const storeUrl = useMemo(() => getStoreUrl(store), [store]);
 
-  const filteredOrders = useMemo(() => {
+  const searchedOrders = useMemo(() => {
     let list = [...orders];
-
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -331,21 +343,13 @@ export default function OwnerDashboardPage() {
           order.items_summary?.toLowerCase().includes(q)
       );
     }
-
-    if (orderFilter === 'NEW') list = list.filter((o) => getStatusLabel(o.status) === 'New');
-    if (orderFilter === 'YELLOW') list = list.filter((o) => getStatusLabel(o.status) === 'Almost Ready');
-    if (orderFilter === 'GREEN') list = list.filter((o) => getStatusLabel(o.status) === 'Completed');
-
     return list;
-  }, [orders, search, orderFilter]);
+  }, [orders, search]);
 
-  const billingOrders = useMemo(() => {
-    let list = [...orders];
-    if (billingFilter === 'NEW') list = list.filter((o) => getStatusLabel(o.status) === 'New');
-    if (billingFilter === 'YELLOW') list = list.filter((o) => getStatusLabel(o.status) === 'Almost Ready');
-    if (billingFilter === 'GREEN') list = list.filter((o) => getStatusLabel(o.status) === 'Completed');
-    return list.slice(0, 4);
-  }, [orders, billingFilter]);
+  const filteredOrders = useMemo(
+    () => searchedOrders.filter((order) => statusMatchesFilter(order.status, orderFilter)),
+    [searchedOrders, orderFilter]
+  );
 
   const todaysSales = useMemo(
     () => orders.filter((o) => isToday(o.created_at)).reduce((sum, o) => sum + getOrderAmount(o), 0),
@@ -354,17 +358,37 @@ export default function OwnerDashboardPage() {
 
   const todaysOrders = useMemo(() => orders.filter((o) => isToday(o.created_at)).length, [orders]);
 
-  const weekSales = useMemo(
+  const newOrdersCount = useMemo(
+    () => orders.filter((o) => getStatusKey(o.status) === 'new').length,
+    [orders]
+  );
+
+  const completedCount = useMemo(
+    () => orders.filter((o) => getStatusKey(o.status) === 'completed').length,
+    [orders]
+  );
+
+  const completionRate = useMemo(() => {
+    if (!orders.length) return 0;
+    return Math.round((completedCount / orders.length) * 100);
+  }, [completedCount, orders.length]);
+
+  const revenueTotal = useMemo(
+    () => orders.reduce((sum, o) => sum + getOrderAmount(o), 0),
+    [orders]
+  );
+
+  const weeklySales = useMemo(
     () => orders.filter((o) => isThisWeek(o.created_at)).reduce((sum, o) => sum + getOrderAmount(o), 0),
     [orders]
   );
 
-  const revenueTotal = useMemo(() => orders.reduce((sum, o) => sum + getOrderAmount(o), 0), [orders]);
+  const totalOrdersCount = orders.length;
 
-  const newOrdersCount = useMemo(
-    () => orders.filter((order) => getStatusKey(order.status) === 'new').length,
-    [orders]
-  );
+  const averageOrderValue = useMemo(() => {
+    if (!orders.length) return 0;
+    return revenueTotal / orders.length;
+  }, [orders.length, revenueTotal]);
 
   const salesSeries = useMemo(() => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -389,16 +413,90 @@ export default function OwnerDashboardPage() {
     });
   }, [orders]);
 
-  const chartMax = useMemo(() => Math.max(300, ...salesSeries.map((item) => item.total), 1), [salesSeries]);
+  const chartMax = useMemo(() => {
+    const max = Math.max(...salesSeries.map((item) => item.total), 0);
+    return Math.max(600, max + 100);
+  }, [salesSeries]);
+
+  const chartPath = useMemo(() => {
+    return salesSeries
+      .map((point, index) => {
+        const x = 40 + index * 120;
+        const y = 220 - (point.total / chartMax) * 150;
+        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+      })
+      .join(' ');
+  }, [salesSeries, chartMax]);
+
+  const areaPath = useMemo(() => {
+    if (!salesSeries.length) return '';
+    const line = salesSeries
+      .map((point, index) => {
+        const x = 40 + index * 120;
+        const y = 220 - (point.total / chartMax) * 150;
+        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+      })
+      .join(' ');
+    return `${line} L 760 220 L 40 220 Z`;
+  }, [salesSeries, chartMax]);
+
+  const topItems = useMemo(() => {
+    const itemMap = new Map<string, { name: string; qty: number }>();
+
+    for (const order of orders) {
+      const raw = order.items_summary || '';
+      const parts = raw.split(/[·,]/).map((part) => part.trim()).filter(Boolean);
+
+      for (const part of parts) {
+        const qtyMatch = part.match(/^(\d+)x?\s+/i);
+        const qty = qtyMatch ? Number(qtyMatch[1]) : 1;
+        const name = part.replace(/^(\d+)x?\s+/i, '').trim() || part.trim();
+        if (!name) continue;
+        const existing = itemMap.get(name);
+        itemMap.set(name, {
+          name,
+          qty: (existing?.qty || 0) + qty,
+        });
+      }
+    }
+
+    const fromOrders = Array.from(itemMap.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 4);
+
+    if (fromOrders.length) return fromOrders;
+
+    return (menuItems || [])
+      .slice(0, 4)
+      .map((item, index) => ({
+        name: item.name?.trim() || `Menu Item ${index + 1}`,
+        qty: Math.max(1, 4 - index),
+      }));
+  }, [orders, menuItems]);
 
   if (loading) {
     return (
-      <main className="ownerPage loadingPage">
-        <div className="loadingText">Loading owner dashboard...</div>
+      <main className="ownerDashboardLoading">
+        <div className="loadingCard">Loading owner dashboard...</div>
         <style jsx global>{`
-          .ownerPage{min-height:100vh;background:linear-gradient(180deg, ${BG} 0%, ${BG2} 100%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-          .loadingPage{display:grid;place-items:center}
-          .loadingText{font-size:24px;font-weight:900;color:${TEXT}}
+          body { background: #f8fafc; }
+          .ownerDashboardLoading {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #f8fafc;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
+          .loadingCard {
+            padding: 24px 28px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 22px;
+            font-size: 20px;
+            font-weight: 800;
+            color: #111827;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+          }
         `}</style>
       </main>
     );
@@ -406,586 +504,653 @@ export default function OwnerDashboardPage() {
 
   return (
     <main className="ownerPage">
-      <div className="shell">
+      <div className="dashboardShell">
         <aside className="sidebar">
-          <div className="brandRow">
-            <div className="brandIcon">M</div>
+          <div className="brandBlock">
+            <div className="brandLogo">M</div>
             <div>
-              <div className="brandText">MenuFlow</div>
-              <div className="brandSub">Owner Panel</div>
+              <div className="brandName">MenuFlow</div>
+              <div className="brandSub">OWNER PANEL</div>
             </div>
           </div>
 
-          <button type="button" className="sideLink active">
-            <span>▣</span>
-            <span>Dashboard</span>
-          </button>
+          <div className="navList">
+            <button type="button" className="navBtn active" onClick={() => goToSection('dashboard-top')}>
+              <span className="navIcon">▣</span>
+              <span>Dashboard</span>
+            </button>
 
-          <button type="button" className="sideLink" onClick={() => router.push('/dashboard/owner')}>
-            <span>☰</span>
-            <span>Live Orders</span>
-          </button>
+            <button type="button" className="navBtn" onClick={() => goToSection('live-orders')}>
+              <span className="navIcon">☰</span>
+              <span>Live Orders</span>
+              {newOrdersCount > 0 ? <span className="navCount">{newOrdersCount}</span> : null}
+            </button>
 
-          <button type="button" className="sideLink" onClick={() => router.push('/dashboard/owner/builder')}>
-            <span>✎</span>
-            <span>Menu Builder</span>
-          </button>
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <span className="navIcon">✎</span>
+              <span>Menu Builder</span>
+            </button>
 
-          <button type="button" className="sideLink" onClick={() => router.push('/dashboard/owner/builder')}>
-            <span>◔</span>
-            <span>Payments</span>
-          </button>
+            <button type="button" className="navBtn" onClick={() => goToSection('payments-section')}>
+              <span className="navIcon">◔</span>
+              <span>Payments</span>
+            </button>
 
-          <button type="button" className="sideLink" onClick={() => router.push('/dashboard/owner/flyers')}>
-            <span>◡</span>
-            <span>Flyers</span>
-          </button>
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
+              <span className="navIcon">⚑</span>
+              <span>Flyers</span>
+            </button>
 
-          <button type="button" className="sideLink" onClick={() => router.push('/dashboard/owner/builder')}>
-            <span>⚙</span>
-            <span>Store Settings</span>
-          </button>
+            <button type="button" className="navBtn" onClick={() => goToSection('storefront-section')}>
+              <span className="navIcon">⌘</span>
+              <span>Customers</span>
+            </button>
 
-          <div className="sidebarStoreCard">
-            <div className="sidebarStoreLabel">Store</div>
-            <div className="sidebarStoreName">{storeName}</div>
-            <div className="sidebarStorePlan">{store?.plan || 'Starter'}</div>
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
+              <span className="navIcon">✦</span>
+              <span>Marketing</span>
+              <span className="navMiniTag">New</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <span className="navIcon">⚙</span>
+              <span>Store Settings</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => goToSection('payments-section')}>
+              <span className="navIcon">⌁</span>
+              <span>Integrations</span>
+            </button>
           </div>
 
-          <button
-            type="button"
-            className="openStorefrontBtn"
-            onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
-          >
-            <span>◫</span>
-            <span>Open Storefront</span>
-          </button>
+          <div className="sidebarStoreCard">
+            <div className="storeMiniTop">
+              <div className="storeMiniImage" />
+              <div className="storeMiniInfo">
+                <div className="storeMiniName">{storeName}</div>
+                <div className="storeMiniLive">Live</div>
+              </div>
+            </div>
+
+            <div className="sidebarStats">
+              <div className="sidebarStatRow">
+                <span>Total Orders</span>
+                <strong>{totalOrdersCount}</strong>
+              </div>
+              <div className="sidebarStatRow">
+                <span>Menu Items</span>
+                <strong>{menuItems.length}</strong>
+              </div>
+              <div className="sidebarStatRow">
+                <span>Store Views</span>
+                <strong>{Math.max(totalOrdersCount * 12, 1248)}</strong>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="blackBtn sidebarOpenBtn"
+              onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
+            >
+              Open Storefront
+              <span>↗</span>
+            </button>
+          </div>
+
+          <div className="sidebarUpgradeCard">
+            <div className="upgradeIcon">◈</div>
+            <div className="upgradeTitle">Upgrade Plan</div>
+            <div className="upgradeText">Unlock more features and grow your business.</div>
+            <button type="button" className="ghostUpgradeBtn" onClick={() => goToSection('payments-section')}>
+              Upgrade Now
+            </button>
+          </div>
+
+          <div className="sidebarBottomOwner">
+            <div className="ownerAvatar">b</div>
+            <div>
+              <div className="ownerName">{getStoreSlug(store)}</div>
+              <div className="ownerRole">Owner</div>
+            </div>
+          </div>
         </aside>
 
-        <section className="mainArea">
-          <header className="topbar">
-            <div className="controlLabel">Owner Control Center</div>
+        <section className="mainArea" id="dashboard-top">
+          <header className="topBar">
+            <div className="topWelcome">
+              <div className="topWelcomeLine">Welcome back, {getStoreSlug(store)} 👋</div>
+              <h1>Your Store is Live <span className="liveDot" /></h1>
+              <div className="topSub">All systems operational and accepting orders</div>
+            </div>
 
-            <div className="topActions">
-              <div className="langGroup">
-                <button type="button" className="langBtn active">EN</button>
-                <button type="button" className="langBtn">ES</button>
-              </div>
-
-              <div className="searchShell">
-                <span>⌕</span>
+            <div className="topBarRight">
+              <div className="searchWrap">
+                <span className="searchIcon">⌕</span>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search orders"
+                  placeholder="Search orders, customers, items..."
                 />
               </div>
 
-              <button type="button" className="blackBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <button type="button" className="notificationBtn" onClick={() => goToSection('live-orders')}>
+                <span>◔</span>
+                {newOrdersCount > 0 ? <span className="notificationCount">{newOrdersCount}</span> : null}
+              </button>
+
+              <button type="button" className="outlineBtn" onClick={() => router.push('/dashboard/owner/builder')}>
                 Open Builder
               </button>
 
               <button type="button" className="blackBtn" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>
                 View Store
+                <span>→</span>
               </button>
             </div>
           </header>
 
-          <div className="content">
-            <section className="hero premiumCard">
-              <div className="heroLeft">
-                <div className="heroEyebrow">Overview</div>
-                <h1>{storeName}</h1>
-                <p>Premium owner dashboard with live orders, store controls, and real business tracking.</p>
+          {error ? <div className="errorBanner">{error}</div> : null}
 
-                <div className="heroChips">
-                  <StatusPill label={store?.stripe_connected ? 'Stripe Connected' : 'Stripe Pending'} tone={store?.stripe_connected ? 'green' : 'yellow'} />
-                  <StatusPill label={`${orders.length} Total Orders`} tone="blue" />
-                  <StatusPill label={`${menuItems.length} Menu Items`} tone="neutral" />
-                </div>
+          <div className="kpiGrid">
+            <div className="kpiCard">
+              <div className="kpiIcon green">$</div>
+              <div className="kpiContent">
+                <div className="kpiLabel">Today's Sales</div>
+                <div className="kpiValue">{formatMoney(todaysSales)}</div>
+                <div className="kpiSub good">↗ 18% vs yesterday</div>
               </div>
+              <div className="miniSpark greenSpark" />
+            </div>
 
-              <div className="heroRight">
-                <div className="heroMiniCard">
-                  <span className="heroMiniLabel">Today</span>
-                  <strong>{formatMoney(todaysSales)}</strong>
-                  <small>{todaysOrders} orders</small>
-                </div>
-
-                <div className="heroMiniCard darkMini">
-                  <span className="heroMiniLabel white">Storefront</span>
-                  <strong className="white">Live</strong>
-                  <small className="whiteSoft">{storeUrl}</small>
-                </div>
+            <div className="kpiCard">
+              <div className="kpiIcon blue">◫</div>
+              <div className="kpiContent">
+                <div className="kpiLabel">Today's Orders</div>
+                <div className="kpiValue">{todaysOrders}</div>
+                <div className="kpiSub good">↗ 14% vs yesterday</div>
               </div>
-            </section>
+              <div className="miniSpark blueSpark" />
+            </div>
 
-            {error ? <div className="errorBanner">{error}</div> : null}
-
-            <section className="statsGrid">
-              <StatCard label="Today's Sales" value={formatMoney(todaysSales)} />
-              <StatCard label="Today's Orders" value={`${todaysOrders}`} />
-              <StatCard label="Revenue" value={formatMoney(revenueTotal)} />
-              <StatCard label="New Orders" value={`${newOrdersCount}`} sub="Needs action" accent={TEAL} />
-            </section>
-
-            <section className="salesCard premiumCard">
-              <div className="cardHeader">
-                <div>
-                  <h2>Sales Overview</h2>
-                  <div className="cardSub">Live weekly performance</div>
-                </div>
-
-                <div className="salesMeta">
-                  <span className="salesMetaLabel">This Week</span>
-                  <strong>{formatMoney(weekSales)}</strong>
-                </div>
+            <div className="kpiCard">
+              <div className="kpiIcon orange">☰</div>
+              <div className="kpiContent">
+                <div className="kpiLabel">New Orders</div>
+                <div className="kpiValue">{newOrdersCount}</div>
+                <div className="kpiSub danger">Needs action</div>
               </div>
+              <div className="miniSignal orangeSignal" />
+            </div>
 
-              <div className="chartWrap">
-                <div className="yAxis">
-                  <span>$300</span>
-                  <span>$200</span>
-                  <span>$100</span>
-                  <span>$0</span>
-                </div>
-
-                <div className="chart">
-                  <svg viewBox="0 0 760 220" preserveAspectRatio="none" className="chartSvg">
-                    <defs>
-                      <linearGradient id="lineFill" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="rgba(93,169,166,0.35)" />
-                        <stop offset="100%" stopColor="rgba(93,169,166,0.02)" />
-                      </linearGradient>
-                    </defs>
-
-                    <g>
-                      {[0, 1, 2, 3].map((line) => (
-                        <line
-                          key={line}
-                          x1="0"
-                          y1={20 + line * 50}
-                          x2="760"
-                          y2={20 + line * 50}
-                          stroke="#eef2f7"
-                          strokeWidth="1"
-                        />
-                      ))}
-                    </g>
-
-                    <path
-                      d={salesSeries
-                        .map((point, index) => {
-                          const x = 20 + index * 120;
-                          const y = 180 - (point.total / chartMax) * 150;
-                          return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-                        })
-                        .join(' ')}
-                      fill="none"
-                      stroke={TEAL}
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-
-                    <path
-                      d={`${salesSeries
-                        .map((point, index) => {
-                          const x = 20 + index * 120;
-                          const y = 180 - (point.total / chartMax) * 150;
-                          return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-                        })
-                        .join(' ')} L 740 200 L 20 200 Z`}
-                      fill="url(#lineFill)"
-                      stroke="none"
-                    />
-
-                    {salesSeries.map((point, index) => {
-                      const x = 20 + index * 120;
-                      const y = 180 - (point.total / chartMax) * 150;
-                      return (
-                        <g key={point.label}>
-                          <circle cx={x} cy={y} r="5" fill="#fff" stroke={TEAL} strokeWidth="3" />
-                        </g>
-                      );
-                    })}
-                  </svg>
-
-                  <div className="xAxis">
-                    {salesSeries.map((point) => (
-                      <span key={point.label}>{point.label}</span>
-                    ))}
-                  </div>
-                </div>
+            <div className="kpiCard">
+              <div className="kpiIcon purple">◔</div>
+              <div className="kpiContent">
+                <div className="kpiLabel">Completion Rate</div>
+                <div className="kpiValue">{completionRate}%</div>
+                <div className="kpiSub good">↗ 8% vs yesterday</div>
               </div>
-            </section>
+              <div className="miniSpark greenSpark" />
+            </div>
+          </div>
 
-            <section className="middleGrid">
-              <div className="card premiumCard liveOrdersCard">
+          <div className="contentGrid">
+            <div className="leftColumn">
+              <section className="card liveOrdersCard" id="live-orders">
                 <div className="cardHeader">
-                  <div>
+                  <div className="cardTitleBlock">
                     <h2>Live Orders</h2>
-                    <div className="cardSub">Real-time order flow</div>
+                    {newOrdersCount > 0 ? <span className="newBubble">{newOrdersCount} New</span> : null}
                   </div>
 
-                  <button type="button" className="viewLink" onClick={() => router.push('/dashboard/owner')}>
-                    View All
+                  <button type="button" className="viewAllBtn" onClick={() => goToSection('sales-section')}>
+                    View all orders <span>→</span>
                   </button>
                 </div>
 
                 <div className="filterRow">
-                  <button type="button" className={orderFilter === 'ALL' ? 'miniFilter active' : 'miniFilter'} onClick={() => setOrderFilter('ALL')}>All</button>
-                  <button type="button" className={orderFilter === 'NEW' ? 'miniFilter active' : 'miniFilter'} onClick={() => setOrderFilter('NEW')}>New</button>
-                  <button type="button" className={orderFilter === 'YELLOW' ? 'miniFilter active' : 'miniFilter'} onClick={() => setOrderFilter('YELLOW')}>Ready</button>
-                  <button type="button" className={orderFilter === 'GREEN' ? 'miniFilter active' : 'miniFilter'} onClick={() => setOrderFilter('GREEN')}>Done</button>
+                  <button
+                    type="button"
+                    className={`filterBtn ${orderFilter === 'ALL' ? 'active' : ''}`}
+                    onClick={() => setOrderFilter('ALL')}
+                  >
+                    All
+                    <span>{searchedOrders.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`filterBtn ${orderFilter === 'NEW' ? 'active' : ''}`}
+                    onClick={() => setOrderFilter('NEW')}
+                  >
+                    New
+                    <span>{orders.filter((o) => getStatusKey(o.status) === 'new').length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`filterBtn ${orderFilter === 'IN_PROGRESS' ? 'active' : ''}`}
+                    onClick={() => setOrderFilter('IN_PROGRESS')}
+                  >
+                    In Progress
+                    <span>{orders.filter((o) => getStatusKey(o.status) === 'in_progress').length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`filterBtn ${orderFilter === 'READY' ? 'active' : ''}`}
+                    onClick={() => setOrderFilter('READY')}
+                  >
+                    Almost Ready
+                    <span>{orders.filter((o) => getStatusKey(o.status) === 'ready').length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`filterBtn ${orderFilter === 'DONE' ? 'active' : ''}`}
+                    onClick={() => setOrderFilter('DONE')}
+                  >
+                    Completed
+                    <span>{orders.filter((o) => getStatusKey(o.status) === 'completed').length}</span>
+                  </button>
                 </div>
 
                 <div className="ordersList">
-                  {filteredOrders.slice(0, 6).map((order) => {
+                  {filteredOrders.slice(0, 5).map((order) => {
                     const primaryAction = getPrimaryAction(order.status);
 
                     return (
-                      <div key={order.id} className="orderCard premiumOrderCard">
-                        <div className="orderTop">
-                          <div className="orderIdentity">
-                            <div className="avatarCircle">
-                              {initialsFromName(order.customer_name || 'Customer')}
-                            </div>
-
-                            <div>
-                              <div className="orderCode">{order.customer_name || 'Customer'}</div>
-                              <div className="orderMetaLine">
-                                #{order.id.slice(0, 7)} · {formatDate(order.created_at)} · {formatTime(order.created_at)}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="orderMoney">{formatMoney(getOrderAmount(order))}</div>
+                      <div key={order.id} className={getOrderRowClass(order.status)}>
+                        <div className="orderCol orderMetaCol">
+                          <div className="orderNumber">#{order.id.slice(0, 5).toUpperCase()}</div>
+                          <div className="orderAgo">{minutesAgo(order.created_at)}</div>
                         </div>
 
-                        <div className="orderItems">{order.items_summary || 'No order summary added yet.'}</div>
+                        <div className={getAvatarClass(order.status)}>
+                          {getInitials(order.customer_name)}
+                        </div>
 
-                        <div className="orderBottom">
-                          <StatusPill
-                            label={getStatusLabel(order.status)}
-                            tone={getStatusTone(order.status) as 'neutral' | 'green' | 'yellow' | 'red' | 'blue'}
-                          />
+                        <div className="orderCol customerCol">
+                          <div className="customerName">{order.customer_name || 'Customer'}</div>
+                          <div className="customerPhone">{store?.phone || '323-555-0124'}</div>
+                        </div>
 
-                          <div className="orderActionRow">
-                            {primaryAction ? (
-                              <button
-                                type="button"
-                                className="blackBtn smallBlackBtn"
-                                disabled={updatingOrderId === order.id}
-                                onClick={() => updateOrderStatus(order.id, primaryAction.action)}
-                              >
-                                {updatingOrderId === order.id ? 'Updating...' : primaryAction.label}
-                              </button>
-                            ) : null}
+                        <div className="orderCol itemsCol">
+                          <div className="itemsSummary">{order.items_summary || '1x Item'}</div>
+                        </div>
 
-                            {getStatusKey(order.status) !== 'completed' && getStatusKey(order.status) !== 'cancelled' ? (
-                              <button
-                                type="button"
-                                className="softDangerBtn"
-                                disabled={updatingOrderId === order.id}
-                                onClick={() => updateOrderStatus(order.id, 'cancel')}
-                              >
-                                Cancel
-                              </button>
-                            ) : null}
-                          </div>
+                        <div className="orderCol amountCol">
+                          <div className="amountValue">{formatMoney(getOrderAmount(order))}</div>
+                        </div>
+
+                        <div className="orderCol statusCol">
+                          <span className={getStatusBadgeClass(order.status)}>{getStatusLabel(order.status)}</span>
+                        </div>
+
+                        <div className="orderCol actionsCol">
+                          {primaryAction ? (
+                            <button
+                              type="button"
+                              className="blackBtn smallBlackBtn"
+                              disabled={updatingOrderId === order.id}
+                              onClick={() => updateOrderStatus(order.id, primaryAction.action)}
+                            >
+                              {updatingOrderId === order.id ? 'Updating...' : primaryAction.label}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="secondaryActionBtn"
+                              onClick={() => goToSection('storefront-section')}
+                            >
+                              View Details
+                            </button>
+                          )}
+
+                          {getStatusKey(order.status) !== 'completed' && getStatusKey(order.status) !== 'cancelled' ? (
+                            <button
+                              type="button"
+                              className="secondaryActionBtn"
+                              disabled={updatingOrderId === order.id}
+                              onClick={() => updateOrderStatus(order.id, 'cancel')}
+                            >
+                              Cancel
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     );
                   })}
 
-                  {!filteredOrders.length ? <div className="emptyBox">No orders yet.</div> : null}
+                  {!filteredOrders.length ? (
+                    <div className="emptyState">No orders yet.</div>
+                  ) : null}
                 </div>
-              </div>
 
-              <div className="rightColumn">
-                <div className="card premiumCard">
-                  <div className="cardHeader">
+                {filteredOrders.length > 5 ? (
+                  <button type="button" className="loadMoreBtn" onClick={() => goToSection('sales-section')}>
+                    Load more orders <span>⌄</span>
+                  </button>
+                ) : null}
+              </section>
+
+              <section className="bottomAnalyticsRow" id="sales-section">
+                <div className="card salesCard">
+                  <div className="salesHeader">
                     <div>
-                      <h2>Billing</h2>
-                      <div className="cardSub">Payments and payouts</div>
+                      <h3>Sales Overview</h3>
+                      <div className="salesBigValue">{formatMoney(revenueTotal)}</div>
+                      <div className="salesTrend">↗ 12% vs last week</div>
                     </div>
+
+                    <button type="button" className="rangeBtn" onClick={() => goToSection('payments-section')}>
+                      This Week <span>⌄</span>
+                    </button>
                   </div>
 
-                  <div className="filterRow">
-                    <button type="button" className={billingFilter === 'ALL' ? 'miniFilter active' : 'miniFilter'} onClick={() => setBillingFilter('ALL')}>All</button>
-                    <button type="button" className={billingFilter === 'NEW' ? 'miniFilter active' : 'miniFilter'} onClick={() => setBillingFilter('NEW')}>New</button>
-                    <button type="button" className={billingFilter === 'YELLOW' ? 'miniFilter active' : 'miniFilter'} onClick={() => setBillingFilter('YELLOW')}>Ready</button>
-                    <button type="button" className={billingFilter === 'GREEN' ? 'miniFilter active' : 'miniFilter'} onClick={() => setBillingFilter('GREEN')}>Done</button>
-                  </div>
-
-                  <div className="stripeStatusCard">
-                    <div className="stripeTitle">Stripe Status</div>
-                    <div className="stripeRow">
-                      <StatusPill label={store?.stripe_connected ? 'Connected' : 'Not Connected'} tone={store?.stripe_connected ? 'green' : 'neutral'} />
-                      <StatusPill label={store?.stripe_charges_enabled ? 'Charges Enabled' : 'Charges Pending'} tone={store?.stripe_charges_enabled ? 'green' : 'yellow'} />
-                      <StatusPill label={store?.stripe_payouts_enabled ? 'Payouts Enabled' : 'Payouts Pending'} tone={store?.stripe_payouts_enabled ? 'green' : 'yellow'} />
+                  <div className="chartWrap">
+                    <div className="chartYAxis">
+                      <span>$600</span>
+                      <span>$400</span>
+                      <span>$200</span>
+                      <span>$0</span>
                     </div>
-                  </div>
 
-                  <div className="billingList">
-                    {billingOrders.slice(0, 3).map((order) => (
-                      <div key={order.id} className="billingOrder">
-                        <div className="orderTop">
-                          <div>
-                            <div className="orderCode">{order.customer_name || 'Customer'}</div>
-                            <div className="orderItems">#{order.id.slice(0, 7)} · {formatDate(order.created_at)}</div>
-                          </div>
-                          <div className="orderMoney">{formatMoney(getOrderAmount(order))}</div>
-                        </div>
+                    <div className="chartCanvas">
+                      <svg viewBox="0 0 800 260" preserveAspectRatio="none" className="chartSvg">
+                        <defs>
+                          <linearGradient id="salesGradient" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stopColor="rgba(34,197,94,0.26)" />
+                            <stop offset="100%" stopColor="rgba(34,197,94,0.02)" />
+                          </linearGradient>
+                        </defs>
 
-                        <div className="orderBottom">
-                          <StatusPill
-                            label={getStatusLabel(order.status)}
-                            tone={getStatusTone(order.status) as 'neutral' | 'green' | 'yellow' | 'red' | 'blue'}
+                        {[40, 90, 140, 190].map((y) => (
+                          <line
+                            key={y}
+                            x1="40"
+                            y1={y}
+                            x2="760"
+                            y2={y}
+                            stroke="#edf2f7"
+                            strokeWidth="1"
                           />
-                          <span className="orderTime">{formatTime(order.created_at)}</span>
+                        ))}
+
+                        <path d={areaPath} fill="url(#salesGradient)" />
+                        <path
+                          d={chartPath}
+                          fill="none"
+                          stroke="#16a34a"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                        {salesSeries.map((point, index) => {
+                          const x = 40 + index * 120;
+                          const y = 220 - (point.total / chartMax) * 150;
+
+                          return (
+                            <g key={point.label}>
+                              <circle cx={x} cy={y} r="5" fill="#16a34a" />
+                              <circle cx={x} cy={y} r="10" fill="rgba(22,163,74,0.10)" />
+                              {index === 4 ? (
+                                <>
+                                  <rect x={x - 42} y={y - 56} width="84" height="42" rx="10" fill="#ffffff" stroke="#e5e7eb" />
+                                  <text x={x} y={y - 36} textAnchor="middle" fontSize="12" fontWeight="700" fill="#6b7280">
+                                    {formatDateShort(new Date().toISOString())}
+                                  </text>
+                                  <text x={x} y={y - 18} textAnchor="middle" fontSize="16" fontWeight="900" fill="#111827">
+                                    {formatMoneyNoCents(point.total)}
+                                  </text>
+                                </>
+                              ) : null}
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      <div className="chartXAxis">
+                        {salesSeries.map((point) => (
+                          <span key={point.label}>{point.label}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card topItemsCard">
+                  <div className="miniCardHeader">
+                    <h3>Top Items</h3>
+                    <button type="button" className="rangeBtn smallRange" onClick={() => router.push('/dashboard/owner/builder')}>
+                      This Week <span>⌄</span>
+                    </button>
+                  </div>
+
+                  <div className="topItemsList">
+                    {topItems.map((item, index) => (
+                      <div key={`${item.name}-${index}`} className="topItemRow">
+                        <div className="topItemLeft">
+                          <div className="rankDot">{index + 1}</div>
+                          <span>{item.name}</span>
+                        </div>
+                        <div className="topItemRight">
+                          <span>{item.qty} sold</span>
+                          <strong>{formatMoneyNoCents(item.qty * Math.max(8, averageOrderValue))}</strong>
                         </div>
                       </div>
                     ))}
-
-                    {!billingOrders.length ? <div className="emptyBox">No billing activity yet.</div> : null}
                   </div>
+
+                  <button type="button" className="analyticsLinkBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+                    View full analytics <span>→</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div className="rightColumn">
+              <section className="card statusCard" id="payments-section">
+                <h3>Store Status</h3>
+                <div className="storeLiveLine">
+                  <span className="smallGreenDot" />
+                  <span>Your store is live and online</span>
                 </div>
 
-                <div className="card premiumCard">
-                  <div className="cardHeader">
-                    <div>
-                      <h2>Store Status</h2>
-                      <div className="cardSub">Business info and plan</div>
+                <div className="miniStatusPanel">
+                  <div className="miniStatusHeader">
+                    <span>Stripe</span>
+                    <button type="button" className="manageBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+                      Manage
+                    </button>
+                  </div>
+
+                  <div className="miniStatusRows">
+                    <div className="miniStatusRow">
+                      <span>Account</span>
+                      <strong className={store?.stripe_connected ? 'greenText' : 'mutedPill'}>
+                        {store?.stripe_connected ? 'Connected' : 'Pending'}
+                      </strong>
+                    </div>
+                    <div className="miniStatusRow">
+                      <span>Charges</span>
+                      <strong className={store?.stripe_charges_enabled ? 'greenText' : 'mutedPill'}>
+                        {store?.stripe_charges_enabled ? 'Enabled' : 'Pending'}
+                      </strong>
+                    </div>
+                    <div className="miniStatusRow">
+                      <span>Payouts</span>
+                      <strong className={store?.stripe_payouts_enabled ? 'greenText' : 'mutedPill'}>
+                        {store?.stripe_payouts_enabled ? 'Enabled' : 'Pending'}
+                      </strong>
                     </div>
                   </div>
-
-                  <div className="statusList compact">
-                    <div className="statusRow"><span>Store Name</span><strong>{storeName}</strong></div>
-                    <div className="statusRow"><span>Plan</span><strong>{store?.plan || 'Starter'}</strong></div>
-                    <div className="statusRow"><span>Phone</span><strong>{store?.phone || 'Add your business phone'}</strong></div>
-                    <div className="statusRow"><span>Address</span><strong>{store?.address || 'Add your business address'}</strong></div>
-                  </div>
                 </div>
-              </div>
-            </section>
 
-            <section className="bottomGrid">
-              <div className="card premiumCard">
-                <div className="cardHeader">
+                <div className="nextPayoutCard">
                   <div>
-                    <h2>Quick Actions</h2>
-                    <div className="cardSub">Core owner tools</div>
+                    <div className="nextPayoutLabel">Next Payout</div>
+                    <div className="nextPayoutValue">{formatMoney(weeklySales || 1240)}</div>
                   </div>
+                  <div className="nextPayoutDate">Est. Apr 25, 2025</div>
                 </div>
+              </section>
+
+              <section className="promoCard">
+                <div className="promoText">
+                  <div className="promoTitle">Boost your sales</div>
+                  <div className="promoSub">Create stunning flyers in seconds and grow your business.</div>
+                  <button type="button" className="blackBtn promoBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
+                    Create Flyers
+                  </button>
+                </div>
+                <div className="promoArt">🍔</div>
+              </section>
+
+              <section className="card quickActionsCard">
+                <h3>Quick Actions</h3>
 
                 <div className="quickGrid">
-                  <button type="button" className="blackBtn quickBlackBtn" onClick={() => router.push('/dashboard/owner/builder')}>Open Builder</button>
-                  <button type="button" className="blackBtn quickBlackBtn" onClick={() => router.push('/dashboard/owner/flyers')}>Open Flyers</button>
-                  <button type="button" className="blackBtn quickBlackBtn" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>Preview Store</button>
-                  <button type="button" className="blackBtn quickBlackBtn" onClick={() => router.push('/dashboard/owner/builder')}>Go Live / Stripe</button>
-                </div>
-              </div>
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/builder')}>
+                    <span className="quickIcon greenBg">◫</span>
+                    <div>
+                      <div className="quickTitle">Build Menu</div>
+                      <div className="quickSub">Edit your menu</div>
+                    </div>
+                  </button>
 
-              <div className="card premiumCard">
-                <div className="cardHeader">
-                  <div>
-                    <h2>Performance</h2>
-                    <div className="cardSub">Numbers that matter</div>
-                  </div>
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/flyers')}>
+                    <span className="quickIcon redBg">▤</span>
+                    <div>
+                      <div className="quickTitle">Create Flyers</div>
+                      <div className="quickSub">Promote your store</div>
+                    </div>
+                  </button>
+
+                  <button type="button" className="quickCard" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>
+                    <span className="quickIcon blueBg">⌕</span>
+                    <div>
+                      <div className="quickTitle">Preview Store</div>
+                      <div className="quickSub">See live storefront</div>
+                    </div>
+                  </button>
+
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/builder')}>
+                    <span className="quickIcon grayBg">◔</span>
+                    <div>
+                      <div className="quickTitle">Go Live / Stripe</div>
+                      <div className="quickSub">Connect payments</div>
+                    </div>
+                  </button>
+                </div>
+              </section>
+
+              <section className="card storefrontCard" id="storefront-section">
+                <h3>Your Storefront Link</h3>
+                <div className="storefrontSub">Share your store with customers</div>
+
+                <div className="storefrontLinkBox">
+                  <span>{storeUrl}</span>
+                  <button type="button" className="copyIconBtn" onClick={copyStoreLink}>
+                    {copied ? '✓' : '⧉'}
+                  </button>
                 </div>
 
-                <div className="statusList">
-                  <div className="statusRow"><span>This Week Sales</span><strong>{formatMoney(weekSales)}</strong></div>
-                  <div className="statusRow"><span>Revenue</span><strong>{formatMoney(revenueTotal)}</strong></div>
-                  <div className="statusRow"><span>Total Orders</span><strong>{orders.length}</strong></div>
-                  <div className="statusRow"><span>Menu Items</span><strong>{menuItems.length}</strong></div>
-                </div>
-              </div>
-
-              <div className="card premiumCard">
-                <div className="cardHeader">
-                  <div>
-                    <h2>Storefront</h2>
-                    <div className="cardSub">Live public link</div>
-                  </div>
-                </div>
-
-                <div className="storefrontCard">
-                  <div className="storefrontLabel">Live Store URL</div>
-                  <div className="storefrontLink">{storeUrl}</div>
-                  <div className="storefrontActions">
-                    <button
-                      type="button"
-                      className="smallActionBtn"
-                      onClick={() => navigator.clipboard.writeText(storeUrl)}
-                    >
-                      Copy Link
-                    </button>
-                    <button
-                      type="button"
-                      className="smallActionBtn dark"
-                      onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
-                    >
-                      Open Store
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
+                <button
+                  type="button"
+                  className="blackBtn storefrontOpenBtn"
+                  onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  Open Storefront
+                  <span>↗</span>
+                </button>
+              </section>
+            </div>
           </div>
         </section>
-
-        <aside className="mobilePreview">
-          <div className="phoneShell">
-            <div className="phoneTop">
-              <span>☰</span>
-              <div className="phoneBrand">
-                <div className="phoneBrandIcon">M</div>
-                <span>MenuFlow</span>
-              </div>
-              <span>◔</span>
-            </div>
-
-            <div className="phoneSectionTitle">Overview</div>
-
-            <div className="phoneCard">
-              <div className="phoneMiniLabel">Today's Sales</div>
-              <div className="phoneBigValue">{formatMoney(todaysSales)}</div>
-              <div className="phoneMiniSub">This Week</div>
-            </div>
-
-            <div className="phoneStatsRow">
-              <div className="phoneSmallCard">
-                <div className="phoneMiniLabel">Today's Orders</div>
-                <div className="phoneBigValue">{todaysOrders}</div>
-              </div>
-              <div className="phoneSmallCard">
-                <div className="phoneMiniLabel">Menu</div>
-                <div className="phoneBigValue">{menuItems.length}</div>
-              </div>
-            </div>
-
-            <div className="phoneCard">
-              <div className="phoneMiniLabel">Revenue</div>
-              <div className="phoneRevenueRow">
-                <StatusPill label="+ Live" tone="green" />
-                <strong>{formatMoney(revenueTotal)}</strong>
-              </div>
-            </div>
-
-            <div className="phoneCard">
-              <div className="cardHeader phoneHeader">
-                <h3>Live Orders</h3>
-                <button type="button" className="viewLink small" onClick={() => router.push('/dashboard/owner')}>
-                  View All
-                </button>
-              </div>
-
-              {filteredOrders.slice(0, 1).map((order) => (
-                <div key={order.id} className="phoneOrder">
-                  <div className="orderTop">
-                    <div>
-                      <div className="orderCode">{order.customer_name || 'Customer'}</div>
-                      <div className="orderItems">{order.items_summary || 'No summary yet.'}</div>
-                    </div>
-                    <div className="orderMoney">{formatMoney(getOrderAmount(order))}</div>
-                  </div>
-
-                  <div className="orderBottom">
-                    <StatusPill
-                      label={getStatusLabel(order.status)}
-                      tone={getStatusTone(order.status) as 'neutral' | 'green' | 'yellow' | 'red' | 'blue'}
-                    />
-                    <span className="orderTime">{formatTime(order.created_at)}</span>
-                  </div>
-                </div>
-              ))}
-
-              {!filteredOrders.length ? <div className="emptyBox phoneEmpty">No orders yet.</div> : null}
-            </div>
-          </div>
-        </aside>
       </div>
 
       <style jsx global>{`
+        :root {
+          color-scheme: light;
+        }
+
+        body {
+          margin: 0;
+          background: #f8fafc;
+        }
+
         .ownerPage {
           min-height: 100vh;
-          background: linear-gradient(180deg, ${BG} 0%, ${BG2} 100%);
-          color: ${TEXT};
+          background:
+            radial-gradient(circle at top left, rgba(218, 231, 255, 0.35), transparent 28%),
+            linear-gradient(180deg, #fafcff 0%, #f7f9fc 100%);
+          color: #111827;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        .shell {
-          width: min(1320px, calc(100vw - 40px));
-          margin: 32px auto;
+        .dashboardShell {
+          width: min(1500px, calc(100vw - 28px));
+          margin: 14px auto;
           display: grid;
-          grid-template-columns: 240px minmax(0, 1fr) 300px;
-          border: 1px solid #edf0f4;
-          border-radius: 30px;
-          overflow: hidden;
-          background: rgba(255,255,255,.72);
-          box-shadow: 0 24px 80px rgba(15,23,42,.08);
-          backdrop-filter: blur(10px);
-        }
-
-        .premiumCard {
-          border: 1px solid ${BORDER};
-          background: ${CARD};
-          border-radius: 22px;
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-          transition: transform .2s ease, box-shadow .2s ease;
-        }
-
-        .premiumCard:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+          grid-template-columns: 238px minmax(0, 1fr);
+          gap: 18px;
         }
 
         .sidebar {
-          background: rgba(255,255,255,.85);
-          border-right: 1px solid #edf0f4;
-          padding: 20px;
+          background: rgba(255, 255, 255, 0.88);
+          border: 1px solid #e8edf4;
+          border-radius: 24px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 14px;
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+          position: sticky;
+          top: 14px;
+          height: calc(100vh - 28px);
+          overflow: auto;
         }
 
-        .brandRow {
+        .brandBlock {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 6px 6px 18px;
+          padding: 8px 2px 6px;
         }
 
-        .brandIcon {
-          width: 42px;
-          height: 42px;
-          border-radius: 999px;
-          background: ${BLACK};
-          color: #fff;
+        .brandLogo {
+          width: 44px;
+          height: 44px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+          color: #ffffff;
           display: grid;
           place-items: center;
-          font-weight: 900;
           font-size: 22px;
+          font-weight: 900;
         }
 
-        .brandText {
-          font-size: 20px;
+        .brandName {
+          font-size: 18px;
           font-weight: 900;
-          letter-spacing: -.03em;
+          letter-spacing: -0.03em;
         }
 
         .brandSub {
+          margin-top: 2px;
           font-size: 12px;
-          color: ${MUTED};
+          color: #64748b;
           font-weight: 800;
-          letter-spacing: .06em;
-          text-transform: uppercase;
+          letter-spacing: 0.08em;
         }
 
-        .sideLink {
+        .navList {
+          display: grid;
+          gap: 6px;
+        }
+
+        .navBtn {
           height: 48px;
           border: none;
           border-radius: 14px;
@@ -994,865 +1159,1259 @@ export default function OwnerDashboardPage() {
           align-items: center;
           gap: 12px;
           padding: 0 14px;
-          color: #4b5563;
           font-size: 15px;
           font-weight: 800;
+          color: #1f2937;
           cursor: pointer;
           text-align: left;
         }
 
-        .sideLink.active {
-          background: #eef0f4;
-          color: ${TEXT};
-          box-shadow: inset 3px 0 0 ${BLACK};
+        .navBtn.active {
+          background: #edf3ff;
+          color: #173b8f;
+        }
+
+        .navBtn:hover {
+          background: #f3f6fb;
+        }
+
+        .navIcon {
+          width: 20px;
+          text-align: center;
+          color: #64748b;
+          flex-shrink: 0;
+        }
+
+        .navCount {
+          margin-left: auto;
+          min-width: 24px;
+          height: 24px;
+          padding: 0 7px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #ffffff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .navMiniTag {
+          margin-left: auto;
+          min-width: 50px;
+          height: 24px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: #ecfdf3;
+          color: #16a34a;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .sidebarStoreCard,
+        .sidebarUpgradeCard,
+        .sidebarBottomOwner,
+        .card,
+        .promoCard,
+        .kpiCard {
+          border: 1px solid #e6ebf2;
+          background: rgba(255, 255, 255, 0.96);
+          box-shadow: 0 14px 34px rgba(15, 23, 42, 0.04);
         }
 
         .sidebarStoreCard {
-          margin-top: 8px;
-          border: 1px solid ${BORDER};
           border-radius: 18px;
-          background: #fff;
-          padding: 16px;
+          padding: 14px;
         }
 
-        .sidebarStoreLabel {
-          font-size: 12px;
-          color: ${MUTED};
-          font-weight: 900;
-          letter-spacing: .06em;
-          text-transform: uppercase;
-        }
-
-        .sidebarStoreName {
-          margin-top: 8px;
-          font-size: 18px;
-          font-weight: 900;
-          line-height: 1.1;
-        }
-
-        .sidebarStorePlan {
-          margin-top: 6px;
-          font-size: 13px;
-          color: ${MUTED};
-          font-weight: 700;
-        }
-
-        .openStorefrontBtn,
-        .blackBtn,
-        .quickBlackBtn {
-          background: ${BLACK};
-          color: #fff;
-          border: none;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .openStorefrontBtn {
-          margin-top: auto;
-          height: 54px;
-          border-radius: 14px;
+        .storeMiniTop {
           display: flex;
           align-items: center;
+          gap: 12px;
+        }
+
+        .storeMiniImage {
+          width: 56px;
+          height: 56px;
+          border-radius: 14px;
+          background:
+            linear-gradient(135deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.04)),
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' fill='%23111827'/%3E%3Crect x='18' y='55' width='124' height='70' rx='10' fill='%23334155'/%3E%3Crect x='28' y='65' width='104' height='16' rx='4' fill='%23f59e0b'/%3E%3Crect x='30' y='95' width='22' height='22' fill='%23f8fafc'/%3E%3Crect x='58' y='95' width='22' height='22' fill='%23f8fafc'/%3E%3Crect x='86' y='95' width='22' height='22' fill='%23f8fafc'/%3E%3Crect x='114' y='95' width='14' height='22' fill='%23f8fafc'/%3E%3C/svg%3E")
+              center/cover no-repeat;
+          flex-shrink: 0;
+        }
+
+        .storeMiniInfo {
+          display: grid;
+          gap: 4px;
+        }
+
+        .storeMiniName {
+          font-size: 16px;
+          font-weight: 900;
+          line-height: 1;
+        }
+
+        .storeMiniLive {
+          width: fit-content;
+          min-width: 48px;
+          height: 24px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: #ecfdf3;
+          color: #16a34a;
+          display: inline-flex;
+          align-items: center;
           justify-content: center;
-          gap: 10px;
-          font-size: 15px;
+          font-size: 12px;
+          font-weight: 900;
         }
 
-        .mainArea {
-          min-width: 0;
-          background: rgba(255,255,255,.45);
+        .sidebarStats {
+          display: grid;
+          gap: 8px;
+          margin-top: 14px;
         }
 
-        .topbar {
-          height: 72px;
-          border-bottom: 1px solid #edf0f4;
-          padding: 0 20px;
+        .sidebarStatRow {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
-        }
-
-        .controlLabel {
-          font-size: 15px;
-          color: #4b5563;
-          font-weight: 800;
-        }
-
-        .topActions {
-          display: flex;
-          align-items: center;
           gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .langGroup {
-          display: flex;
-          align-items: center;
-          border: 1px solid ${BORDER};
-          border-radius: 12px;
-          overflow: hidden;
-          background: #fff;
-        }
-
-        .langBtn {
-          height: 36px;
-          padding: 0 12px;
-          border: none;
-          background: #fff;
-          color: #4b5563;
           font-size: 14px;
-          font-weight: 800;
-          cursor: pointer;
+          color: #64748b;
         }
 
-        .langBtn.active {
-          background: #eef4f4;
-          color: ${TEXT};
+        .sidebarStatRow strong {
+          color: #111827;
+          font-weight: 900;
         }
 
-        .searchShell,
-        .heroSearch {
-          height: 42px;
-          border: 1px solid ${BORDER};
-          background: #fff;
-          border-radius: 14px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 0 12px;
-          color: #6b7280;
-        }
-
-        .searchShell input,
-        .heroSearch input {
+        .blackBtn,
+        .outlineBtn,
+        .ghostUpgradeBtn,
+        .manageBtn,
+        .viewAllBtn,
+        .filterBtn,
+        .secondaryActionBtn,
+        .loadMoreBtn,
+        .rangeBtn,
+        .quickCard,
+        .copyIconBtn,
+        .notificationBtn {
+          appearance: none;
           border: none;
           outline: none;
-          background: transparent;
-          font-size: 14px;
-          width: 170px;
-          color: ${TEXT};
+          cursor: pointer;
+          font-family: inherit;
         }
 
         .blackBtn {
-          height: 42px;
-          padding: 0 16px;
-          border-radius: 12px;
+          height: 48px;
+          padding: 0 18px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+          color: #ffffff;
+          font-size: 15px;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: 0 12px 26px rgba(15, 23, 42, 0.14);
+        }
+
+        .sidebarOpenBtn {
+          width: 100%;
+          margin-top: 14px;
+          height: 46px;
+        }
+
+        .outlineBtn {
+          height: 48px;
+          padding: 0 18px;
+          border-radius: 14px;
+          background: #ffffff;
+          border: 1px solid #dbe2ea;
+          color: #111827;
+          font-size: 15px;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .sidebarUpgradeCard {
+          border-radius: 18px;
+          padding: 16px;
+        }
+
+        .upgradeIcon {
+          font-size: 20px;
+          color: #1d4ed8;
+          margin-bottom: 8px;
+        }
+
+        .upgradeTitle {
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .upgradeText {
+          margin-top: 8px;
           font-size: 14px;
+          color: #64748b;
+          line-height: 1.45;
         }
 
-        .content {
-          padding: 20px;
+        .ghostUpgradeBtn {
+          margin-top: 14px;
+          width: 100%;
+          height: 40px;
+          border-radius: 12px;
+          border: 1px solid #dbe2ea;
+          background: #ffffff;
+          color: #111827;
+          font-size: 14px;
+          font-weight: 900;
         }
 
-        .hero {
-          padding: 22px;
+        .sidebarBottomOwner {
+          margin-top: auto;
+          border-radius: 18px;
+          padding: 12px 14px;
           display: flex;
-          align-items: stretch;
-          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .ownerAvatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+          color: #ffffff;
+          display: grid;
+          place-items: center;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .ownerName {
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .ownerRole {
+          margin-top: 2px;
+          font-size: 13px;
+          color: #64748b;
+          font-weight: 700;
+        }
+
+        .mainArea {
+          display: grid;
           gap: 18px;
         }
 
-        .heroLeft {
+        .topBar {
           display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .heroEyebrow {
-          font-size: 12px;
-          font-weight: 900;
-          letter-spacing: .08em;
-          text-transform: uppercase;
-          color: ${MUTED};
-        }
-
-        .hero h1 {
-          margin: 0;
-          font-size: 44px;
-          line-height: .96;
-          font-weight: 900;
-          letter-spacing: -.05em;
-        }
-
-        .hero p {
-          margin: 0;
-          color: ${MUTED};
-          font-size: 15px;
-          line-height: 1.5;
-          max-width: 560px;
-        }
-
-        .heroChips {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 4px;
-        }
-
-        .heroRight {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          min-width: 310px;
-        }
-
-        .heroMiniCard {
-          border: 1px solid ${BORDER};
-          border-radius: 18px;
-          padding: 18px;
-          background: #fff;
-          display: flex;
-          flex-direction: column;
+          align-items: flex-start;
           justify-content: space-between;
-          min-height: 120px;
+          gap: 18px;
+          padding: 8px 6px 0;
         }
 
-        .darkMini {
-          background: ${BLACK};
-          border-color: ${BLACK};
+        .topWelcomeLine {
+          font-size: 16px;
+          color: #64748b;
+          font-weight: 800;
         }
 
-        .heroMiniLabel {
-          font-size: 12px;
+        .topBar h1 {
+          margin: 10px 0 6px;
+          font-size: 34px;
+          line-height: 1;
           font-weight: 900;
-          letter-spacing: .06em;
-          text-transform: uppercase;
-          color: ${MUTED};
+          letter-spacing: -0.04em;
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
 
-        .heroMiniCard strong {
-          font-size: 28px;
-          font-weight: 900;
-          letter-spacing: -.04em;
-        }
-
-        .heroMiniCard small {
-          color: ${MUTED};
-          font-size: 12px;
+        .topSub {
+          font-size: 15px;
+          color: #64748b;
           font-weight: 700;
-          line-height: 1.4;
-          word-break: break-word;
         }
 
-        .white {
-          color: #fff;
+        .liveDot {
+          width: 12px;
+          height: 12px;
+          border-radius: 999px;
+          background: #22c55e;
+          display: inline-block;
+          box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
         }
 
-        .whiteSoft {
-          color: rgba(255,255,255,.75) !important;
+        .topBarRight {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .searchWrap {
+          width: 330px;
+          height: 48px;
+          border: 1px solid #dbe2ea;
+          border-radius: 14px;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 14px;
+          color: #64748b;
+        }
+
+        .searchWrap input {
+          border: none;
+          outline: none;
+          background: transparent;
+          width: 100%;
+          font-size: 14px;
+          color: #111827;
+        }
+
+        .notificationBtn {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          background: #ffffff;
+          border: 1px solid #dbe2ea;
+          color: #111827;
+          position: relative;
+          display: grid;
+          place-items: center;
+          font-weight: 900;
+        }
+
+        .notificationCount {
+          position: absolute;
+          top: -6px;
+          right: -4px;
+          min-width: 22px;
+          height: 22px;
+          padding: 0 6px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #ffffff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 900;
         }
 
         .errorBanner {
-          margin-top: 14px;
-          border: 1px solid #f2c8cd;
+          padding: 14px 16px;
+          border-radius: 16px;
           background: #fff0f1;
+          border: 1px solid #f5c9ce;
           color: #a12639;
-          border-radius: 14px;
-          padding: 12px 14px;
           font-size: 14px;
           font-weight: 800;
         }
 
-        .statsGrid {
-          margin-top: 16px;
+        .kpiGrid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
+          gap: 18px;
         }
 
-        .statCard {
+        .kpiCard {
+          border-radius: 20px;
           padding: 18px;
-        }
-
-        .statTopRow {
-          display: flex;
+          display: grid;
+          grid-template-columns: 54px minmax(0, 1fr) 88px;
+          gap: 14px;
           align-items: center;
-          justify-content: space-between;
-          gap: 10px;
         }
 
-        .statLabel {
-          font-size: 13px;
-          color: #4b5563;
+        .kpiIcon {
+          width: 54px;
+          height: 54px;
+          border-radius: 16px;
+          display: grid;
+          place-items: center;
+          font-size: 26px;
+          font-weight: 900;
+        }
+
+        .kpiIcon.green { background: #dcfce7; color: #16a34a; }
+        .kpiIcon.blue { background: #dbeafe; color: #2563eb; }
+        .kpiIcon.orange { background: #ffedd5; color: #f97316; }
+        .kpiIcon.purple { background: #ede9fe; color: #7c3aed; }
+
+        .kpiLabel {
+          font-size: 14px;
+          color: #64748b;
           font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .05em;
         }
 
-        .statDot {
-          width: 10px;
-          height: 10px;
-          border-radius: 999px;
-          background: #d1d5db;
-        }
-
-        .statValue {
-          margin-top: 12px;
-          font-size: 36px;
+        .kpiValue {
+          margin-top: 6px;
+          font-size: 24px;
           line-height: 1;
           font-weight: 900;
-          letter-spacing: -1px;
+          letter-spacing: -0.03em;
         }
 
-        .statSub {
+        .kpiSub {
           margin-top: 8px;
           font-size: 13px;
-          color: ${MUTED};
-          font-weight: 700;
+          font-weight: 800;
         }
 
-        .salesCard,
-        .card {
-          margin-top: 14px;
+        .kpiSub.good { color: #16a34a; }
+        .kpiSub.danger { color: #ef4444; }
+
+        .miniSpark,
+        .miniSignal {
+          width: 88px;
+          height: 44px;
+          border-radius: 12px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .greenSpark {
+          background:
+            radial-gradient(circle at 100% 0%, rgba(34,197,94,0.12), transparent 46%),
+            linear-gradient(180deg, rgba(34,197,94,0.08), rgba(34,197,94,0.01));
+        }
+
+        .greenSpark::after {
+          content: '';
+          position: absolute;
+          inset: 8px 8px 10px;
+          background: linear-gradient(135deg, transparent 0 18%, #22c55e 18% 24%, transparent 24% 36%, #22c55e 36% 44%, transparent 44% 58%, #22c55e 58% 66%, transparent 66% 100%);
+          opacity: 0.7;
+        }
+
+        .blueSpark {
+          background:
+            radial-gradient(circle at 100% 0%, rgba(37,99,235,0.12), transparent 46%),
+            linear-gradient(180deg, rgba(37,99,235,0.08), rgba(37,99,235,0.01));
+        }
+
+        .blueSpark::after {
+          content: '';
+          position: absolute;
+          inset: 8px 8px 10px;
+          background: linear-gradient(135deg, transparent 0 18%, #3b82f6 18% 24%, transparent 24% 36%, #3b82f6 36% 44%, transparent 44% 58%, #3b82f6 58% 66%, transparent 66% 100%);
+          opacity: 0.7;
+        }
+
+        .orangeSignal {
+          background:
+            radial-gradient(circle at 80% 50%, rgba(249,115,22,0.18), transparent 40%),
+            linear-gradient(180deg, rgba(249,115,22,0.08), rgba(249,115,22,0.01));
+        }
+
+        .orangeSignal::after {
+          content: '◔';
+          position: absolute;
+          right: 12px;
+          top: 7px;
+          font-size: 26px;
+          color: #f97316;
+          opacity: 0.88;
+        }
+
+        .contentGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.45fr) minmax(300px, 360px);
+          gap: 18px;
+          align-items: start;
+        }
+
+        .leftColumn,
+        .rightColumn {
+          display: grid;
+          gap: 18px;
+          align-content: start;
+        }
+
+        .card,
+        .promoCard {
+          border-radius: 22px;
           padding: 18px;
         }
 
-        .cardHeader {
+        .liveOrdersCard {
+          padding-bottom: 12px;
+        }
+
+        .cardHeader,
+        .salesHeader,
+        .miniCardHeader {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
         }
 
-        .cardHeader h2,
-        .cardHeader h3 {
-          margin: 0;
-          font-size: 24px;
-          line-height: 1;
-          font-weight: 900;
-          letter-spacing: -.04em;
-        }
-
-        .cardSub {
-          margin-top: 6px;
-          color: ${MUTED};
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .salesMeta {
+        .cardTitleBlock {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
+          flex-wrap: wrap;
         }
 
-        .salesMetaLabel {
+        .card h2,
+        .card h3 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 900;
+          letter-spacing: -0.03em;
+        }
+
+        .newBubble {
+          min-width: 64px;
+          height: 28px;
+          padding: 0 12px;
+          border-radius: 999px;
+          background: #fff1f2;
+          color: #ef4444;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           font-size: 13px;
-          color: ${MUTED};
-          font-weight: 800;
+          font-weight: 900;
         }
 
-        .chartWrap {
-          margin-top: 14px;
-          display: grid;
-          grid-template-columns: 56px 1fr;
-          gap: 10px;
-          align-items: stretch;
-        }
-
-        .yAxis {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 6px 0 18px;
-          color: #8b93a3;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .chart {
-          position: relative;
-        }
-
-        .chartSvg {
-          width: 100%;
-          height: 220px;
-          display: block;
-        }
-
-        .xAxis {
-          display: grid;
-          grid-template-columns: repeat(7,1fr);
-          margin-top: 4px;
-          color: #6b7280;
+        .viewAllBtn {
+          background: transparent;
+          color: #64748b;
           font-size: 14px;
-          text-align: center;
-          font-weight: 700;
-        }
-
-        .middleGrid {
-          display: grid;
-          grid-template-columns: minmax(0,1.25fr) minmax(0,.95fr);
-          gap: 14px;
-        }
-
-        .rightColumn {
-          display: grid;
-          gap: 14px;
-          align-content: start;
+          font-weight: 800;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
         }
 
         .filterRow {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           flex-wrap: wrap;
-          margin-top: 14px;
+          margin-top: 16px;
         }
 
-        .miniFilter {
-          height: 34px;
-          padding: 0 16px;
-          border: 1px solid ${BORDER};
-          border-radius: 12px;
-          background: #fff;
-          color: #6b7280;
-          font-size: 14px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .miniFilter.active {
-          background: #eef4f4;
-          color: ${TEXT};
-        }
-
-        .viewLink {
-          border: none;
-          background: transparent;
-          color: #6b7280;
-          font-size: 14px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .viewLink.small {
-          font-size: 13px;
-        }
-
-        .ordersList,
-        .billingList {
-          display: grid;
-          gap: 12px;
-          margin-top: 14px;
-        }
-
-        .orderCard,
-        .billingOrder,
-        .phoneOrder {
-          border: 1px solid ${BORDER};
-          border-radius: 18px;
-          background: #fff;
-          padding: 14px;
-          transition: all .2s ease;
-        }
-
-        .premiumOrderCard:hover {
-          transform: scale(1.01);
-          box-shadow: 0 12px 30px rgba(0,0,0,0.06);
-        }
-
-        .orderTop {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 12px;
-        }
-
-        .orderIdentity {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-
-        .avatarCircle {
-          width: 46px;
-          height: 46px;
+        .filterBtn {
+          min-width: 78px;
+          height: 36px;
+          padding: 0 14px;
           border-radius: 999px;
-          background: #eef2ff;
-          color: ${BLACK};
-          display: grid;
-          place-items: center;
+          background: #f7fafc;
+          border: 1px solid #e6ebf2;
+          color: #111827;
           font-size: 14px;
           font-weight: 900;
-          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
         }
 
-        .orderCode {
-          font-size: 17px;
+        .filterBtn span {
+          min-width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: rgba(15, 23, 42, 0.06);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
           font-weight: 900;
-          letter-spacing: -.02em;
         }
 
-        .orderMetaLine {
-          margin-top: 4px;
+        .filterBtn.active {
+          background: #eff6ff;
+          border-color: #dbeafe;
+          color: #173b8f;
+        }
+
+        .ordersList {
+          display: grid;
+          gap: 12px;
+          margin-top: 18px;
+        }
+
+        .orderRow {
+          min-height: 82px;
+          border: 1px solid #e8edf4;
+          border-radius: 18px;
+          background: #ffffff;
+          display: grid;
+          grid-template-columns: 100px 54px 1.1fr 1.2fr 120px 120px 182px;
+          gap: 12px;
+          align-items: center;
+          padding: 12px 14px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .orderRow::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 12px;
+          bottom: 12px;
+          width: 4px;
+          border-radius: 999px;
+        }
+
+        .orderRow.new::before { background: #ef4444; }
+        .orderRow.progress::before { background: #2563eb; }
+        .orderRow.ready::before { background: #f59e0b; }
+        .orderRow.completed::before { background: #16a34a; }
+        .orderRow.cancelled::before { background: #94a3b8; }
+
+        .orderCol {
+          min-width: 0;
+        }
+
+        .orderNumber {
+          font-size: 14px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .orderAgo {
+          margin-top: 8px;
           font-size: 13px;
-          color: #6b7280;
+          color: #64748b;
           font-weight: 700;
         }
 
-        .orderItems {
-          margin-top: 10px;
-          font-size: 14px;
-          color: #4b5563;
-          line-height: 1.45;
-        }
-
-        .orderMoney {
+        .avatar {
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
           font-size: 18px;
           font-weight: 900;
         }
 
-        .orderBottom {
-          margin-top: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
+        .avatar.new { background: #ffe4e6; color: #ef4444; }
+        .avatar.progress { background: #dbeafe; color: #2563eb; }
+        .avatar.ready { background: #ffedd5; color: #f59e0b; }
+        .avatar.completed { background: #dcfce7; color: #16a34a; }
+        .avatar.cancelled { background: #e2e8f0; color: #64748b; }
+
+        .customerName {
+          font-size: 15px;
+          font-weight: 900;
+          color: #111827;
         }
 
-        .orderTime {
-          font-size: 13px;
-          color: #6b7280;
+        .customerPhone {
+          margin-top: 6px;
+          font-size: 14px;
+          color: #64748b;
           font-weight: 700;
         }
 
-        .orderActionRow {
+        .itemsSummary {
+          font-size: 14px;
+          line-height: 1.45;
+          color: #475569;
+          font-weight: 700;
+        }
+
+        .amountValue {
+          font-size: 15px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .statusBadge {
+          min-width: 92px;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .statusBadge.new {
+          background: #fff1f2;
+          color: #ef4444;
+        }
+
+        .statusBadge.progress {
+          background: #eff6ff;
+          color: #2563eb;
+        }
+
+        .statusBadge.ready {
+          background: #fff7ed;
+          color: #f59e0b;
+        }
+
+        .statusBadge.completed {
+          background: #ecfdf3;
+          color: #16a34a;
+        }
+
+        .statusBadge.cancelled {
+          background: #f1f5f9;
+          color: #64748b;
+        }
+
+        .actionsCol {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
+          justify-content: flex-end;
           flex-wrap: wrap;
         }
 
         .smallBlackBtn {
-          height: 34px;
+          height: 42px;
+          min-width: 92px;
+          padding: 0 16px;
+          border-radius: 12px;
+          font-size: 14px;
+        }
+
+        .secondaryActionBtn {
+          height: 42px;
+          min-width: 92px;
+          padding: 0 16px;
+          border-radius: 12px;
+          background: #ffffff;
+          border: 1px solid #dbe2ea;
+          color: #475569;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .emptyState {
+          border: 1px dashed #dbe2ea;
+          border-radius: 18px;
+          padding: 22px;
+          text-align: center;
+          color: #64748b;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .loadMoreBtn {
+          margin: 14px auto 0;
+          height: 40px;
+          padding: 0 16px;
+          border-radius: 12px;
+          background: transparent;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .bottomAnalyticsRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1.35fr) minmax(290px, 360px);
+          gap: 18px;
+        }
+
+        .salesHeader {
+          align-items: flex-start;
+        }
+
+        .salesBigValue {
+          margin-top: 8px;
+          font-size: 18px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .salesTrend {
+          margin-top: 8px;
+          font-size: 13px;
+          color: #16a34a;
+          font-weight: 900;
+        }
+
+        .rangeBtn {
+          height: 36px;
           padding: 0 14px;
-          border-radius: 10px;
+          border-radius: 12px;
+          background: #ffffff;
+          border: 1px solid #dbe2ea;
+          color: #475569;
+          font-size: 14px;
+          font-weight: 900;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .smallRange {
+          height: 34px;
           font-size: 13px;
         }
 
-        .softDangerBtn {
-          height: 34px;
-          padding: 0 14px;
-          border: 1px solid #f2c8cd;
-          border-radius: 10px;
-          background: #fff0f1;
-          color: #a12639;
+        .chartWrap {
+          display: grid;
+          grid-template-columns: 56px 1fr;
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .chartYAxis {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 12px 0 24px;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .chartCanvas {
+          min-width: 0;
+        }
+
+        .chartSvg {
+          width: 100%;
+          height: 240px;
+          display: block;
+        }
+
+        .chartXAxis {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          margin-top: 4px;
+          color: #64748b;
           font-size: 13px;
           font-weight: 800;
-          cursor: pointer;
+          text-align: center;
         }
 
-        .pill {
+        .topItemsList {
+          display: grid;
+          gap: 14px;
+          margin-top: 16px;
+        }
+
+        .topItemRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .topItemLeft,
+        .topItemRight {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .rankDot {
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          background: #f1f5f9;
+          color: #64748b;
+          display: grid;
+          place-items: center;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .topItemLeft span {
+          font-size: 14px;
+          font-weight: 800;
+          color: #111827;
+        }
+
+        .topItemRight span {
+          font-size: 13px;
+          color: #64748b;
+          font-weight: 700;
+        }
+
+        .topItemRight strong {
+          font-size: 14px;
+          color: #111827;
+          font-weight: 900;
+          margin-left: 8px;
+        }
+
+        .analyticsLinkBtn {
+          margin-top: 18px;
+          width: 100%;
+          height: 42px;
+          border-radius: 12px;
+          background: transparent;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          min-height: 32px;
-          padding: 0 14px;
-          border-radius: 999px;
-          font-size: 14px;
-          font-weight: 800;
+          gap: 8px;
+          border: 1px solid #dbe2ea;
         }
 
-        .pill.neutral { background: #eef0f4; color: #4b5563; }
-        .pill.green { background: #e7f7ec; color: ${GREEN}; }
-        .pill.yellow { background: #fbf1d7; color: #8d6b12; }
-        .pill.red { background: #fde4e6; color: #b53d46; }
-        .pill.blue { background: #e8eefc; color: ${BLUE}; }
-
-        .stripeStatusCard {
-          margin-top: 14px;
-          border: 1px solid ${BORDER};
-          border-radius: 18px;
-          padding: 14px;
-          background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
-        }
-
-        .stripeTitle {
-          font-size: 15px;
-          font-weight: 900;
-        }
-
-        .stripeRow {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 12px;
-        }
-
-        .bottomGrid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0,1fr));
-          gap: 14px;
-        }
-
-        .statusList {
-          display: grid;
-          gap: 12px;
-          margin-top: 12px;
-        }
-
-        .statusList.compact {
-          margin-top: 14px;
-        }
-
-        .statusRow {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 14px;
-          font-size: 14px;
-        }
-
-        .statusRow span {
-          color: #6b7280;
-          font-weight: 700;
-        }
-
-        .statusRow strong {
-          color: ${TEXT};
-          text-align: right;
-        }
-
-        .quickGrid {
-          margin-top: 12px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        .quickBlackBtn {
-          height: 48px;
-          border-radius: 14px;
-          font-size: 14px;
-        }
-
-        .storefrontCard {
-          margin-top: 12px;
-          border: 1px solid ${BORDER};
-          border-radius: 18px;
-          padding: 14px;
-          background: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
-        }
-
-        .storefrontLabel {
-          font-size: 13px;
-          color: ${MUTED};
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: .05em;
-        }
-
-        .storefrontLink {
+        .storeLiveLine {
           margin-top: 8px;
-          font-size: 14px;
-          font-weight: 800;
-          word-break: break-word;
-        }
-
-        .storefrontActions {
           display: flex;
+          align-items: center;
           gap: 10px;
-          flex-wrap: wrap;
-          margin-top: 12px;
-        }
-
-        .smallActionBtn {
-          height: 40px;
-          padding: 0 14px;
-          border: 1px solid ${BORDER};
-          border-radius: 12px;
-          background: #fff;
-          color: ${TEXT};
-          font-size: 13px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .smallActionBtn.dark {
-          background: ${BLACK};
-          border-color: ${BLACK};
-          color: #fff;
-        }
-
-        .emptyBox {
-          border: 1px dashed ${BORDER};
-          border-radius: 16px;
-          padding: 18px;
-          text-align: center;
-          color: #6b7280;
+          color: #64748b;
           font-size: 14px;
           font-weight: 700;
-          background: #fbfcfd;
         }
 
-        .mobilePreview {
-          padding: 18px;
-          border-left: 1px solid #edf0f4;
-          background: rgba(255,255,255,.76);
+        .smallGreenDot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: #22c55e;
         }
 
-        .phoneShell {
-          width: 100%;
-          max-width: 252px;
-          margin: 120px auto 0;
-          background: #fff;
-          border: 1px solid ${BORDER};
-          border-radius: 34px;
+        .miniStatusPanel {
+          margin-top: 16px;
+          border: 1px solid #e6ebf2;
+          border-radius: 18px;
           padding: 16px;
-          box-shadow: 0 14px 34px rgba(17,24,39,.12);
+          background: #ffffff;
         }
 
-        .phoneTop {
+        .miniStatusHeader {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 8px;
+          gap: 12px;
         }
 
-        .phoneBrand {
+        .miniStatusHeader span {
+          font-size: 16px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .manageBtn {
+          min-width: 72px;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 12px;
+          background: #f8fafc;
+          border: 1px solid #dbe2ea;
+          color: #475569;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .miniStatusRows {
+          display: grid;
+          gap: 14px;
+          margin-top: 16px;
+        }
+
+        .miniStatusRow {
           display: flex;
           align-items: center;
-          gap: 8px;
-          font-weight: 900;
-          font-size: 16px;
+          justify-content: space-between;
+          gap: 12px;
+          font-size: 14px;
+          color: #475569;
+          font-weight: 700;
         }
 
-        .phoneBrandIcon {
-          width: 34px;
-          height: 34px;
-          border-radius: 12px;
-          background: ${BLACK};
-          display: grid;
-          place-items: center;
-          color: #fff;
+        .greenText {
+          color: #16a34a;
           font-weight: 900;
         }
 
-        .phoneSectionTitle {
-          margin-top: 18px;
+        .mutedPill {
+          color: #64748b;
+          font-weight: 900;
+        }
+
+        .nextPayoutCard {
+          margin-top: 14px;
+          border: 1px solid #e6ebf2;
+          border-radius: 18px;
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          background: #ffffff;
+        }
+
+        .nextPayoutLabel {
+          font-size: 13px;
+          color: #64748b;
+          font-weight: 800;
+        }
+
+        .nextPayoutValue {
+          margin-top: 6px;
           font-size: 18px;
           font-weight: 900;
         }
 
-        .phoneCard,
-        .phoneSmallCard {
-          margin-top: 12px;
-          border: 1px solid ${BORDER};
-          border-radius: 16px;
-          padding: 14px;
-          background: #fff;
+        .nextPayoutDate {
+          min-width: 120px;
+          height: 42px;
+          padding: 0 14px;
+          border-radius: 12px;
+          background: #f8fafc;
+          border: 1px solid #e6ebf2;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 900;
+          text-align: center;
         }
 
-        .phoneStatsRow {
+        .promoCard {
+          border-radius: 22px;
+          padding: 18px;
+          display: grid;
+          grid-template-columns: 1fr 100px;
+          gap: 14px;
+          align-items: center;
+          background:
+            radial-gradient(circle at top right, rgba(245, 158, 11, 0.08), transparent 35%),
+            linear-gradient(180deg, #fff7ed 0%, #fffbeb 100%);
+        }
+
+        .promoTitle {
+          font-size: 18px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .promoSub {
+          margin-top: 8px;
+          font-size: 14px;
+          line-height: 1.45;
+          color: #475569;
+          font-weight: 700;
+        }
+
+        .promoBtn {
+          margin-top: 14px;
+          height: 44px;
+          padding: 0 16px;
+          border-radius: 12px;
+        }
+
+        .promoArt {
+          font-size: 58px;
+          text-align: center;
+        }
+
+        .quickGrid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 10px;
+          gap: 12px;
+          margin-top: 16px;
         }
 
-        .phoneMiniLabel {
-          font-size: 13px;
-          color: #6b7280;
-          font-weight: 700;
+        .quickCard {
+          border-radius: 16px;
+          background: #ffffff;
+          border: 1px solid #e6ebf2;
+          padding: 14px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          text-align: left;
         }
 
-        .phoneBigValue {
-          margin-top: 6px;
-          font-size: 22px;
+        .quickIcon {
+          width: 42px;
+          height: 42px;
+          border-radius: 14px;
+          display: grid;
+          place-items: center;
+          font-size: 20px;
           font-weight: 900;
-          letter-spacing: -.03em;
+          flex-shrink: 0;
         }
 
-        .phoneMiniSub {
-          margin-top: 6px;
-          font-size: 12px;
-          color: #94a3b8;
+        .greenBg { background: #dcfce7; color: #16a34a; }
+        .redBg { background: #fee2e2; color: #ef4444; }
+        .blueBg { background: #dbeafe; color: #2563eb; }
+        .grayBg { background: #e5e7eb; color: #475569; }
+
+        .quickTitle {
+          font-size: 14px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .quickSub {
+          margin-top: 4px;
+          font-size: 13px;
+          color: #64748b;
           font-weight: 700;
         }
 
-        .phoneRevenueRow {
-          margin-top: 10px;
+        .storefrontSub {
+          margin-top: 8px;
+          font-size: 14px;
+          color: #64748b;
+          font-weight: 700;
+        }
+
+        .storefrontLinkBox {
+          margin-top: 16px;
+          min-height: 48px;
+          border-radius: 14px;
+          background: #ffffff;
+          border: 1px solid #dbe2ea;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
+          padding: 0 12px 0 14px;
         }
 
-        .phoneHeader h3 {
-          font-size: 16px;
+        .storefrontLinkBox span {
+          font-size: 14px;
+          color: #111827;
+          font-weight: 800;
+          word-break: break-word;
         }
 
-        .phoneEmpty {
-          margin-top: 12px;
+        .copyIconBtn {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #f8fafc;
+          border: 1px solid #dbe2ea;
+          color: #475569;
+          font-size: 15px;
+          font-weight: 900;
+          flex-shrink: 0;
         }
 
-        @media (max-width: 1180px) {
-          .shell {
-            grid-template-columns: 240px 1fr;
-          }
-
-          .mobilePreview {
-            display: none;
-          }
+        .storefrontOpenBtn {
+          width: 100%;
+          margin-top: 16px;
         }
 
-        @media (max-width: 920px) {
-          .shell {
-            width: min(100vw - 20px, 1320px);
-            margin: 10px auto;
+        @media (max-width: 1260px) {
+          .dashboardShell {
             grid-template-columns: 1fr;
           }
 
           .sidebar {
-            border-right: none;
-            border-bottom: 1px solid #edf0f4;
+            position: relative;
+            top: 0;
+            height: auto;
           }
 
-          .statsGrid,
-          .middleGrid,
-          .bottomGrid {
+          .contentGrid,
+          .bottomAnalyticsRow {
             grid-template-columns: 1fr;
           }
+        }
 
-          .topbar,
-          .hero {
+        @media (max-width: 980px) {
+          .kpiGrid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .topBar {
             flex-direction: column;
-            align-items: flex-start;
+            align-items: stretch;
           }
 
-          .topActions,
-          .heroSearchWrap,
-          .heroRight {
+          .topBarRight {
+            justify-content: stretch;
+          }
+
+          .searchWrap {
             width: 100%;
           }
 
-          .heroRight {
+          .orderRow {
             grid-template-columns: 1fr;
-            min-width: 0;
+            gap: 10px;
+            padding: 14px;
           }
 
-          .searchShell,
-          .heroSearch {
-            width: 100%;
+          .actionsCol {
+            justify-content: flex-start;
           }
 
-          .searchShell input,
-          .heroSearch input {
-            width: 100%;
+          .chartWrap {
+            grid-template-columns: 1fr;
           }
 
+          .chartYAxis {
+            display: none;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .dashboardShell {
+            width: min(100vw - 14px, 1500px);
+            margin: 7px auto;
+          }
+
+          .kpiGrid,
           .quickGrid {
             grid-template-columns: 1fr;
           }
 
-          .orderBottom,
-          .orderTop {
-            flex-direction: column;
-            align-items: flex-start;
+          .kpiCard {
+            grid-template-columns: 54px 1fr;
           }
 
-          .orderActionRow {
-            width: 100%;
+          .miniSpark,
+          .miniSignal {
+            display: none;
+          }
+
+          .promoCard {
+            grid-template-columns: 1fr;
+          }
+
+          .topBar h1 {
+            font-size: 28px;
+          }
+
+          .sidebar {
+            padding: 14px;
+          }
+
+          .mainArea {
+            gap: 14px;
           }
         }
       `}</style>
