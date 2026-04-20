@@ -53,6 +53,8 @@ type FlyerOrderPayload = {
 /* =========================
    CONSTANTS
 ========================= */
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
+
 const FALLBACK_STORE: StoreRecord = {
   name: 'MenuFlow Kitchen',
   slug: 'menuflow-kitchen',
@@ -132,7 +134,7 @@ function buildQrImageUrl(value: string) {
 }
 
 /* =========================
-   QR OVERLAY
+   QR ON IMAGE
 ========================= */
 function FlyerQrOverlay({
   qrSrc,
@@ -143,23 +145,20 @@ function FlyerQrOverlay({
 }) {
   return (
     <button type="button" className="qrOverlay" onClick={onOpenStore} aria-label="Open store">
-      <div className="qrOverlayInner">
-        <img src={qrSrc} alt="Store QR code" className="qrImage" />
-        <div className="qrOverlayText">
-          <div className="qrTitle">SCAN TO ORDER</div>
-        </div>
-      </div>
+      <img src={qrSrc} alt="Store QR code" className="qrImage" />
+      <span className="qrText">SCAN TO ORDER</span>
     </button>
   );
 }
 
 /* =========================
-   IMAGE CARD
+   FLYER CARD
 ========================= */
 function FlyerCard({
   src,
   title,
   selected,
+  onPreview,
   onSelect,
   broken,
   onError,
@@ -169,6 +168,7 @@ function FlyerCard({
   src: string;
   title: string;
   selected: boolean;
+  onPreview: () => void;
   onSelect: () => void;
   broken: boolean;
   onError: () => void;
@@ -176,39 +176,39 @@ function FlyerCard({
   onOpenStore: () => void;
 }) {
   return (
-    <button
-      type="button"
-      className={`flyerCard ${selected ? 'selected' : ''}`}
-      onClick={onSelect}
-      aria-label={title}
-    >
-      <div className="styleBadge">{title.toUpperCase()}</div>
+    <div className={`flyerCard ${selected ? 'selected' : ''}`}>
+      <button type="button" className="flyerPreviewBtn" onClick={onPreview} aria-label={title}>
+        <div className="styleBadge">{title.toUpperCase()}</div>
 
-      {!broken ? (
-        <div className="flyerCardInner">
+        {!broken ? (
           <div className="flyerImageWrap">
-            <img
-              src={src}
-              alt={title}
-              className="flyerImage"
-              onError={onError}
-            />
+            <img src={src} alt={title} className="flyerImage" onError={onError} />
+            <div className="imageShade" />
+            <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
           </div>
+        ) : (
+          <div className="flyerMissing">
+            <div className="missingTitle">Missing flyer image</div>
+            <div className="missingPath">{src}</div>
+          </div>
+        )}
+      </button>
 
-          <div className="flyerQrSection">
-            <img src={qrSrc} alt="Store QR code" className="flyerQrImage" />
-            <div className="flyerQrText">SCAN TO ORDER</div>
-          </div>
-        </div>
-      ) : (
-        <div className="flyerMissing">
-          <div className="missingTitle">Missing flyer image</div>
-          <div className="missingPath">{src}</div>
-        </div>
-      )}
-    </button>
+      <div className="flyerActionBar">
+        <div className="flyerState">{selected ? 'Locked In' : 'Not Selected'}</div>
+
+        <button
+          type="button"
+          className={`selectFlyerBtn ${selected ? 'selected' : ''}`}
+          onClick={onSelect}
+        >
+          {selected ? 'Selected Flyer' : 'Select This Flyer'}
+        </button>
+      </div>
+    </div>
   );
 }
+
 /* =========================
    PREVIEW MODAL
 ========================= */
@@ -241,6 +241,7 @@ function PreviewModal({
 
         <div className="modalImageWrap">
           <img src={imageSrc} alt={title} className="modalImage" />
+          <div className="imageShade modalShade" />
           <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
         </div>
       </div>
@@ -300,21 +301,19 @@ export default function Page() {
   const selectedFlyer = flyerOptions[selectedFlyerIndex] || flyerOptions[0];
 
   const slug = getSlug(store);
-  const storeUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/store/${slug}`
-      : `https://menuflow.app/store/${slug}`;
-
+  const storeUrl = `${BASE_URL}/store/${slug}`;
   const qrImageUrl = useMemo(() => buildQrImageUrl(storeUrl), [storeUrl]);
 
   async function saveFlyerOrder() {
     if (tab === 'free') {
-     window.location.href = storeUrl;
+      window.location.href = storeUrl;
       return;
     }
 
+    const checkoutUrl = PACKS[pack].url;
+
     if (!store?.id) {
-      window.location.href = PACKS[pack].url;
+      window.location.href = checkoutUrl;
       return;
     }
 
@@ -332,16 +331,16 @@ export default function Page() {
       store_phone: getPhone(store),
       store_address: getAddress(store),
       qr_url: storeUrl,
-      checkout_url: PACKS[pack].url,
+      checkout_url: checkoutUrl,
     };
 
     try {
       await supabase.from('flyer_orders').insert(payload);
     } catch {
-      // keep checkout moving even if logging fails
+      // keep checkout moving even if insert fails
     }
 
-    window.open(PACKS[pack].url, '_blank', 'noopener,noreferrer');
+    window.location.href = checkoutUrl;
   }
 
   function copyLink() {
@@ -356,7 +355,7 @@ export default function Page() {
   }
 
   function openStore() {
-    window.open(storeUrl, '_blank', 'noopener,noreferrer');
+    window.location.href = storeUrl;
   }
 
   if (loading) {
@@ -374,7 +373,7 @@ export default function Page() {
         <div className="heroIcon">📣</div>
         <div>
           <h1>Custom QR Flyers</h1>
-          <p>Choose a category, preview real flyer images, and overlay the live QR linked to the current store slug.</p>
+          <p>Pick a category, lock in one flyer, then upgrade and unlock your print package.</p>
         </div>
       </div>
 
@@ -436,7 +435,14 @@ export default function Page() {
         <>
           <div className="sectionTitle split">
             <span>2. CHOOSE YOUR FLYER STYLE</span>
-            <span className="helperText">Tap any design to preview</span>
+            <span className="helperText">Preview it or lock it in below</span>
+          </div>
+
+          <div className="selectedSummary">
+            <span className="selectedSummaryLabel">Selected Flyer</span>
+            <strong>
+              {getCategoryMeta(category).label} — {selectedFlyer.title}
+            </strong>
           </div>
 
           <div className="flyerGrid">
@@ -446,10 +452,11 @@ export default function Page() {
                 src={flyer.src}
                 title={flyer.title}
                 selected={selectedFlyerIndex === index}
-                onSelect={() => {
+                onPreview={() => {
                   setSelectedFlyerIndex(index);
                   setPreviewOpen(true);
                 }}
+                onSelect={() => setSelectedFlyerIndex(index)}
                 broken={!!brokenImages[flyer.src]}
                 onError={() => markImageBroken(flyer.src)}
                 qrSrc={qrImageUrl}
@@ -635,7 +642,8 @@ const styles = `
   .packCard,
   .checkoutBtn,
   .modalClose,
-  .flyerCard,
+  .flyerPreviewBtn,
+  .selectFlyerBtn,
   .qrOverlay {
     appearance: none;
     border: none;
@@ -708,6 +716,24 @@ const styles = `
     color: #64748b;
   }
 
+  .selectedSummary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #e6e8ef;
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+
+  .selectedSummaryLabel {
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    color: #64748b;
+  }
+
   .categoryRow {
     display: flex;
     gap: 12px;
@@ -748,52 +774,13 @@ const styles = `
     gap: 16px;
   }
 
-  .flyerCardInner {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.flyerImageWrap {
-  width: 100%;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.flyerImage {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: contain;
-  background: #ffffff;
-}
-
-.flyerQrSection {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 12px 16px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-}
-
-.flyerQrImage {
-  width: 74px;
-  height: 74px;
-  display: block;
-  background: #ffffff;
-}
-
-.flyerQrText {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #0f172a;
-}
+  .flyerCard {
+    background: #ffffff;
+    border: 2px solid #e2e8f0;
+    border-radius: 22px;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
 
   .flyerCard:hover {
     transform: translateY(-2px);
@@ -805,12 +792,19 @@ const styles = `
     box-shadow: 0 0 0 4px rgba(8, 27, 82, 0.08);
   }
 
+  .flyerPreviewBtn {
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    text-align: left;
+  }
+
   .styleBadge {
     position: absolute;
     top: 12px;
     left: 12px;
-    z-index: 5;
-    background: rgba(8, 27, 82, 0.95);
+    z-index: 6;
+    background: rgba(8, 27, 82, 0.96);
     color: #ffffff;
     border-radius: 10px;
     padding: 7px 10px;
@@ -819,24 +813,93 @@ const styles = `
     letter-spacing: 0.03em;
   }
 
-  
+  .flyerImageWrap {
     position: relative;
     width: 100%;
     aspect-ratio: 9 / 16;
-    background: #f8fafc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: #111827;
     overflow: hidden;
   }
 
   .flyerImage {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     object-position: center center;
     display: block;
+  }
+
+  .imageShade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 140px;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .qrOverlay {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    z-index: 7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    padding: 0;
+  }
+
+  .qrImage {
+    width: 72px;
+    height: 72px;
     background: #ffffff;
+    padding: 6px;
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .qrText {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    color: #ffffff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85);
+  }
+
+  .flyerActionBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .flyerState {
+    font-size: 13px;
+    font-weight: 800;
+    color: #64748b;
+  }
+
+  .selectFlyerBtn {
+    min-width: 148px;
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 12px;
+    background: #081b52;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 900;
+  }
+
+  .selectFlyerBtn.selected {
+    background: #16a34a;
   }
 
   .flyerMissing {
@@ -864,53 +927,6 @@ const styles = `
     color: #475569;
     word-break: break-word;
   }
-
-  .flyerCardInner {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.flyerImageWrap {
-  width: 100%;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.flyerImage {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: contain;
-  background: #ffffff;
-}
-
-.flyerQrSection {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 12px 16px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-}
-
-.flyerQrImage {
-  width: 74px;
-  height: 74px;
-  display: block;
-  background: #ffffff;
-}
-
-.flyerQrText {
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  color: #0f172a;
-}
 
   .packList {
     display: grid;
@@ -1091,20 +1107,20 @@ const styles = `
     position: relative;
     width: 100%;
     aspect-ratio: 9 / 16;
-    background: #f8fafc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: #111827;
     overflow: hidden;
   }
 
   .modalImage {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     object-position: center center;
-    background: #ffffff;
     display: block;
+  }
+
+  .modalShade {
+    height: 160px;
   }
 
   @media (max-width: 980px) {
@@ -1136,23 +1152,21 @@ const styles = `
       font-size: 20px;
     }
 
-    .qrOverlay {
-      right: 10px;
-      bottom: 10px;
+    .flyerActionBar {
+      flex-direction: column;
+      align-items: stretch;
     }
 
-    .qrOverlayInner {
-      padding: 6px 8px;
-      gap: 8px;
-      border-radius: 14px;
+    .selectFlyerBtn {
+      width: 100%;
     }
 
     .qrImage {
-      width: 50px;
-      height: 50px;
+      width: 64px;
+      height: 64px;
     }
 
-    .qrTitle {
+    .qrText {
       font-size: 10px;
     }
   }
