@@ -3,9 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-/* =========================
-   TYPES
-========================= */
 type FlyerCategoryKey =
   | 'seafood'
   | 'soul_food'
@@ -56,9 +53,6 @@ type FlyerOption = {
   src: string;
 };
 
-/* =========================
-   CONSTANTS
-========================= */
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
 
 const FALLBACK_STORE: StoreRecord = {
@@ -89,9 +83,6 @@ const CATEGORIES: { key: FlyerCategoryKey; label: string; emoji: string; folder:
   { key: 'desserts', label: 'Desserts', emoji: '🍰', folder: 'desserts' },
 ];
 
-/* =========================
-   HELPERS
-========================= */
 function getName(store: StoreRecord | null) {
   return store?.name?.trim() || 'MenuFlow Kitchen';
 }
@@ -127,9 +118,6 @@ function buildQrImageUrl(value: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&data=${encodeURIComponent(value)}`;
 }
 
-/* =========================
-   UI
-========================= */
 function FlyerQrOverlay({
   qrSrc,
   onOpenStore,
@@ -176,7 +164,6 @@ function FlyerCard({
         {!broken ? (
           <div className="flyerImageWrap">
             <img src={src} alt={title} className="flyerImage" onError={onError} />
-            <div className="imageGlow" />
             <div className="imageShade" />
             <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
           </div>
@@ -230,7 +217,6 @@ function PreviewModal({
             <strong>{title}</strong>
             <span>Preview</span>
           </div>
-
           <button type="button" className="modalClose" onClick={onClose}>
             ✕
           </button>
@@ -238,7 +224,6 @@ function PreviewModal({
 
         <div className="modalImageWrap">
           <img src={imageSrc} alt={title} className="modalImage" />
-          <div className="imageGlow modalGlow" />
           <div className="imageShade modalShade" />
           <FlyerQrOverlay qrSrc={qrSrc} onOpenStore={onOpenStore} />
         </div>
@@ -247,9 +232,6 @@ function PreviewModal({
   );
 }
 
-/* =========================
-   PAGE
-========================= */
 export default function Page() {
   const [store, setStore] = useState<StoreRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -336,7 +318,7 @@ export default function Page() {
     try {
       await supabase.from('flyer_orders').insert(payload);
     } catch {
-      // continue checkout even if insert fails
+      // keep checkout moving
     }
 
     window.location.href = checkoutUrl;
@@ -346,7 +328,7 @@ export default function Page() {
     try {
       await navigator.clipboard.writeText(storeUrl);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      window.setTimeout(() => setCopied(false), 1500);
     } catch {
       setCopied(false);
     }
@@ -383,8 +365,8 @@ export default function Page() {
 
       <div className="pageShell">
         <section className="heroCard">
+          <div className="heroBadge">Style {selectedFlyerIndex + 1}</div>
           <div className="heroIcon">📣</div>
-
           <div className="heroText">
             <h1>Custom QR Flyers</h1>
             <p>Pick a category, lock in one flyer, then upgrade and unlock your print package.</p>
@@ -393,11 +375,10 @@ export default function Page() {
 
         <section className="storeCard">
           <div className="storeTop">
-            <div>
+            <div className="storeText">
               <div className="storeLabel">Your Store Link</div>
               <div className="storeUrl">{storeUrl}</div>
             </div>
-
             <span className="statusPill">Active</span>
           </div>
 
@@ -435,7 +416,7 @@ export default function Page() {
         </div>
 
         <section className="categorySection">
-          <div className="categoryRow">
+          <div className="categoryRow" role="tablist" aria-label="Flyer categories">
             {CATEGORIES.map((item) => (
               <button
                 key={item.key}
@@ -495,7 +476,6 @@ export default function Page() {
             <section className="packList">
               {(Object.keys(PACKS) as FlyerPackKey[]).map((key) => {
                 const item = PACKS[key];
-
                 return (
                   <button
                     key={key}
@@ -507,7 +487,6 @@ export default function Page() {
                       <div className={`radioDot ${pack === key ? 'active' : ''}`}>
                         {pack === key ? '✓' : ''}
                       </div>
-
                       <div>
                         <div className="packQty">{item.qty} Flyers</div>
                         <div className="packType">One Time</div>
@@ -567,48 +546,48 @@ const styles = `
     padding: 20px 16px 120px;
     overflow: hidden;
     background:
-      radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 24%),
-      radial-gradient(circle at top right, rgba(56, 189, 248, 0.10), transparent 22%),
-      linear-gradient(180deg, #06090f 0%, #090d16 42%, #06090f 100%);
+      radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 24%),
+      radial-gradient(circle at top right, rgba(56,189,248,0.10), transparent 24%),
+      linear-gradient(180deg, #05080e 0%, #07111f 42%, #05080e 100%);
   }
 
   .backgroundGlow {
     position: absolute;
     border-radius: 999px;
     filter: blur(90px);
-    pointer-events: none;
     opacity: 0.22;
+    pointer-events: none;
   }
 
   .glow1 {
     width: 280px;
     height: 280px;
-    background: #2563eb;
+    background: #1d4ed8;
     top: -90px;
-    left: -100px;
+    left: -110px;
   }
 
   .glow2 {
-    width: 240px;
-    height: 240px;
+    width: 220px;
+    height: 220px;
     background: #0ea5e9;
-    top: 180px;
-    right: -90px;
+    top: 170px;
+    right: -80px;
   }
 
   .glow3 {
     width: 180px;
     height: 180px;
-    background: #1d4ed8;
-    bottom: 120px;
-    left: 4%;
+    background: #1e40af;
+    bottom: 140px;
+    left: 8%;
   }
 
   .pageShell {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 1320px;
+    max-width: 1380px;
     margin: 0 auto;
     display: grid;
     gap: 18px;
@@ -617,12 +596,13 @@ const styles = `
   .loadingCard,
   .heroCard,
   .storeCard,
+  .tabsWrap,
   .categorySection,
   .selectedSummary,
   .freeFlyerCard,
   .modalCard {
-    background: linear-gradient(180deg, rgba(15, 23, 34, 0.94) 0%, rgba(10, 15, 23, 0.98) 100%);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
+    border: 1px solid rgba(96,165,250,0.12);
     box-shadow:
       0 24px 80px rgba(0,0,0,0.34),
       inset 0 1px 0 rgba(255,255,255,0.04);
@@ -632,108 +612,144 @@ const styles = `
   .loadingCard {
     position: relative;
     z-index: 1;
-    border-radius: 22px;
+    max-width: 1380px;
+    margin: 0 auto;
+    border-radius: 24px;
     padding: 34px;
     font-size: 18px;
     font-weight: 800;
     color: #ffffff;
-    max-width: 1320px;
-    margin: 0 auto;
   }
 
   .heroCard {
-    display: flex;
-    align-items: center;
+    position: relative;
+    display: grid;
+    grid-template-columns: 112px 1fr;
     gap: 18px;
-    border-radius: 26px;
-    padding: 22px;
+    align-items: center;
+    border-radius: 30px;
+    padding: 24px;
+    overflow: hidden;
+  }
+
+  .heroCard::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(37,99,235,0.14), transparent 34%);
+    pointer-events: none;
+  }
+
+  .heroBadge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 33, 75, 0.95);
+    border: 1px solid rgba(96,165,250,0.30);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    z-index: 2;
   }
 
   .heroIcon {
-    width: 82px;
-    height: 82px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, rgba(37,99,235,0.28) 0%, rgba(14,165,233,0.14) 100%);
-    border: 1px solid rgba(96, 165, 250, 0.26);
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(37,99,235,0.24) 0%, rgba(8,47,117,0.12) 100%);
+    border: 1px solid rgba(96,165,250,0.22);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 38px;
-    flex-shrink: 0;
-    box-shadow: 0 0 30px rgba(37,99,235,0.18);
+    font-size: 44px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 0 36px rgba(37,99,235,0.16);
   }
 
   .heroText {
     display: grid;
-    gap: 6px;
+    gap: 8px;
   }
 
   h1 {
     margin: 0;
-    font-size: 42px;
-    line-height: 0.96;
-    font-weight: 950;
-    letter-spacing: -0.05em;
     color: #ffffff;
+    font-size: 56px;
+    line-height: 0.94;
+    font-weight: 950;
+    letter-spacing: -0.06em;
   }
 
   p {
     margin: 0;
-    color: rgba(255,255,255,0.66);
-    font-size: 16px;
-    line-height: 1.5;
-    font-weight: 700;
+    color: rgba(255,255,255,0.72);
+    font-size: 20px;
+    line-height: 1.45;
+    font-weight: 800;
   }
 
   .storeCard {
-    border-radius: 24px;
-    padding: 20px;
+    border-radius: 26px;
+    padding: 22px;
   }
 
   .storeTop {
     display: flex;
-    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+  }
+
+  .storeText {
+    min-width: 0;
   }
 
   .storeLabel {
+    margin-bottom: 10px;
+    color: rgba(255,255,255,0.56);
     font-size: 12px;
     font-weight: 950;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: rgba(255,255,255,0.5);
-    margin-bottom: 8px;
   }
 
   .storeUrl {
-    font-size: 18px;
-    font-weight: 850;
     color: #ffffff;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   .statusPill {
-    min-height: 34px;
-    padding: 0 12px;
+    min-height: 40px;
+    padding: 0 16px;
     border-radius: 999px;
-    background: rgba(34,197,94,0.18);
-    border: 1px solid rgba(74, 222, 128, 0.22);
+    background: rgba(34,197,94,0.16);
+    border: 1px solid rgba(74,222,128,0.20);
     color: #bbf7d0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    font-weight: 900;
-    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 950;
     box-shadow: 0 0 24px rgba(34,197,94,0.10);
+    white-space: nowrap;
   }
 
   .storeButtons {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 14px;
   }
 
   .primaryBtn,
@@ -747,101 +763,148 @@ const styles = `
   .selectFlyerBtn,
   .qrOverlay {
     appearance: none;
+    font-family: inherit;
     outline: none;
     cursor: pointer;
-    font-family: inherit;
+  }
+
+  .secondaryBtn,
+  .primaryBtn,
+  .tabBtn {
+    min-height: 58px;
+    border-radius: 18px;
+    font-size: 16px;
+    font-weight: 950;
   }
 
   .secondaryBtn {
-    min-height: 54px;
-    border-radius: 16px;
+    border: 1px solid rgba(96,165,250,0.16);
     background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(96,165,250,0.18);
     color: #ffffff;
-    font-size: 16px;
-    font-weight: 900;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
   }
 
   .primaryBtn {
-    min-height: 54px;
-    border-radius: 16px;
     border: 1px solid rgba(96,165,250,0.28);
-    background: linear-gradient(180deg, rgba(14,34,76,0.84) 0%, rgba(8,18,46,0.94) 100%);
+    background: linear-gradient(180deg, rgba(18,55,131,0.96) 0%, rgba(10,28,70,1) 100%);
     color: #ffffff;
-    font-size: 16px;
-    font-weight: 900;
     box-shadow: 0 0 26px rgba(37,99,235,0.16);
   }
 
   .tabsWrap {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 14px;
+    border-radius: 24px;
+    padding: 8px;
   }
 
   .tabBtn {
-    min-height: 54px;
-    border-radius: 18px;
     border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.03);
     color: rgba(255,255,255,0.70);
-    font-size: 16px;
-    font-weight: 900;
   }
 
   .tabBtn.active {
     color: #ffffff;
-    border-color: rgba(96,165,250,0.28);
-    background: linear-gradient(180deg, rgba(12,31,67,0.90) 0%, rgba(10,20,42,0.98) 100%);
-    box-shadow: 0 0 24px rgba(37,99,235,0.14);
+    border-color: rgba(96,165,250,0.30);
+    background: linear-gradient(180deg, rgba(24,65,152,0.94) 0%, rgba(10,27,69,1) 100%);
+    box-shadow: 0 0 26px rgba(37,99,235,0.16);
   }
 
   .sectionTitle {
     display: flex;
-    align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin: 4px 0 -4px;
-    font-size: 15px;
+    align-items: center;
+    margin: 2px 0 -4px;
+    color: #ffffff;
+    font-size: 18px;
     font-weight: 950;
-    color: #e2e8f0;
-    letter-spacing: 0.04em;
-  }
-
-  .sectionTitle.split {
-    margin-top: 4px;
+    letter-spacing: 0.02em;
   }
 
   .helperText {
-    font-size: 13px;
+    color: rgba(255,255,255,0.54);
+    font-size: 14px;
     font-weight: 800;
-    color: rgba(255,255,255,0.52);
   }
 
   .categorySection {
-    border-radius: 24px;
+    border-radius: 26px;
     padding: 14px;
   }
 
-  .selectedSummary {
-    border-radius: 22px;
-    padding: 16px 18px;
+  .categoryRow {
     display: grid;
-    gap: 8px;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .categoryRow::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .categoryRow::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.03);
+    border-radius: 999px;
+  }
+
+  .categoryRow::-webkit-scrollbar-thumb {
+    background: rgba(96,165,250,0.30);
+    border-radius: 999px;
+  }
+
+  .categoryBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 58px;
+    padding: 0 20px;
+    border-radius: 18px;
+    white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 900;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+
+  .categoryBtn.active {
+    background: linear-gradient(180deg, rgba(18,55,131,0.96) 0%, rgba(10,28,70,1) 100%);
+    border-color: rgba(96,165,250,0.32);
+    box-shadow: 0 0 22px rgba(37,99,235,0.18);
+  }
+
+  .emoji {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .selectedSummary {
+    border-radius: 24px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
   }
 
   .selectedSummaryTop {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     flex-wrap: wrap;
   }
 
   .selectedStepPill,
   .selectedLockedPill {
-    min-height: 28px;
-    padding: 0 10px;
+    min-height: 30px;
+    padding: 0 12px;
     border-radius: 999px;
     display: inline-flex;
     align-items: center;
@@ -859,67 +922,17 @@ const styles = `
   }
 
   .selectedLockedPill {
-    background: rgba(34,197,94,0.18);
-    border: 1px solid rgba(74,222,128,0.20);
+    background: rgba(34,197,94,0.16);
+    border: 1px solid rgba(74,222,128,0.18);
     color: #bbf7d0;
   }
 
   .selectedSummary strong {
     color: #ffffff;
-    font-size: 24px;
-    line-height: 1.1;
+    font-size: 28px;
+    line-height: 1.05;
     font-weight: 950;
-    letter-spacing: -0.03em;
-  }
-
-  .categoryRow {
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: thin;
-  }
-
-  .categoryRow::-webkit-scrollbar {
-    height: 8px;
-  }
-
-  .categoryRow::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.04);
-    border-radius: 999px;
-  }
-
-  .categoryRow::-webkit-scrollbar-thumb {
-    background: rgba(96,165,250,0.30);
-    border-radius: 999px;
-  }
-
-  .categoryBtn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-width: max-content;
-    min-height: 52px;
-    padding: 0 16px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #ffffff;
-    font-size: 15px;
-    font-weight: 850;
-    white-space: nowrap;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
-  }
-
-  .categoryBtn.active {
-    background: linear-gradient(180deg, rgba(18,54,123,0.86) 0%, rgba(8,25,59,0.98) 100%);
-    border-color: rgba(96,165,250,0.38);
-    box-shadow: 0 0 20px rgba(37,99,235,0.22);
-  }
-
-  .emoji {
-    font-size: 22px;
-    line-height: 1;
+    letter-spacing: -0.04em;
   }
 
   .flyerGrid {
@@ -929,24 +942,24 @@ const styles = `
   }
 
   .flyerCard {
-    border-radius: 24px;
     overflow: hidden;
+    border-radius: 26px;
     border: 1px solid rgba(255,255,255,0.08);
-    background: linear-gradient(180deg, rgba(15,23,34,0.94) 0%, rgba(10,15,23,0.98) 100%);
-    box-shadow: 0 24px 80px rgba(0,0,0,0.28);
+    background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
+    box-shadow: 0 26px 80px rgba(0,0,0,0.28);
     transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   }
 
   .flyerCard:hover {
     transform: translateY(-4px);
     border-color: rgba(96,165,250,0.24);
-    box-shadow: 0 28px 80px rgba(0,0,0,0.34), 0 0 24px rgba(37,99,235,0.10);
+    box-shadow: 0 30px 84px rgba(0,0,0,0.34), 0 0 24px rgba(37,99,235,0.10);
   }
 
   .flyerCard.selected {
-    border-color: rgba(96,165,250,0.40);
+    border-color: rgba(96,165,250,0.36);
     box-shadow:
-      0 28px 90px rgba(0,0,0,0.36),
+      0 30px 90px rgba(0,0,0,0.36),
       0 0 0 1px rgba(96,165,250,0.20),
       0 0 28px rgba(37,99,235,0.18);
   }
@@ -964,11 +977,11 @@ const styles = `
     top: 14px;
     left: 14px;
     z-index: 6;
-    background: rgba(8, 25, 59, 0.96);
+    background: rgba(8,25,59,0.96);
     color: #ffffff;
-    border: 1px solid rgba(96,165,250,0.22);
+    border: 1px solid rgba(96,165,250,0.24);
     border-radius: 999px;
-    padding: 7px 12px;
+    padding: 8px 12px;
     font-size: 12px;
     font-weight: 950;
     letter-spacing: 0.06em;
@@ -977,7 +990,7 @@ const styles = `
   .flyerImageWrap {
     position: relative;
     width: 100%;
-    background: #111827;
+    background: #0b1220;
     overflow: hidden;
   }
 
@@ -985,16 +998,7 @@ const styles = `
     width: 100%;
     height: auto;
     display: block;
-    object-fit: contain;
-  }
-
-  .imageGlow {
-    position: absolute;
-    inset: auto 10% -40px 10%;
-    height: 100px;
-    background: radial-gradient(circle, rgba(37,99,235,0.28) 0%, rgba(37,99,235,0) 72%);
-    pointer-events: none;
-    z-index: 1;
+    object-fit: cover;
   }
 
   .imageShade {
@@ -1002,8 +1006,8 @@ const styles = `
     left: 0;
     right: 0;
     bottom: 0;
-    height: 160px;
-    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(3,7,18,0.82) 100%);
+    height: 170px;
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(3,7,18,0.84) 100%);
     pointer-events: none;
     z-index: 2;
   }
@@ -1024,8 +1028,8 @@ const styles = `
   }
 
   .qrShell {
-    width: 84px;
-    height: 84px;
+    width: 82px;
+    height: 82px;
     padding: 6px;
     border-radius: 16px;
     background: rgba(255,255,255,0.96);
@@ -1040,17 +1044,17 @@ const styles = `
   }
 
   .qrText {
+    color: #ffffff;
     font-size: 11px;
     font-weight: 950;
     letter-spacing: 0.08em;
-    color: #ffffff;
     text-shadow: 0 2px 12px rgba(0,0,0,0.92);
   }
 
   .flyerActionBar {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     padding: 14px;
     background: linear-gradient(180deg, rgba(17,24,39,0.96) 0%, rgba(10,15,23,0.98) 100%);
@@ -1072,8 +1076,8 @@ const styles = `
   }
 
   .flyerStatePill.locked {
-    background: rgba(34,197,94,0.18);
-    border: 1px solid rgba(74,222,128,0.20);
+    background: rgba(34,197,94,0.16);
+    border: 1px solid rgba(74,222,128,0.18);
     color: #bbf7d0;
   }
 
@@ -1084,22 +1088,20 @@ const styles = `
   }
 
   .selectFlyerBtn {
-    min-width: 152px;
+    min-width: 160px;
     min-height: 42px;
     padding: 0 16px;
     border-radius: 14px;
     border: 1px solid rgba(96,165,250,0.18);
-    background: linear-gradient(180deg, rgba(12,31,67,0.86) 0%, rgba(8,18,46,0.96) 100%);
+    background: linear-gradient(180deg, rgba(18,55,131,0.94) 0%, rgba(10,28,70,1) 100%);
     color: #ffffff;
     font-size: 14px;
     font-weight: 950;
-    box-shadow: 0 0 16px rgba(37,99,235,0.10);
   }
 
   .selectFlyerBtn.selected {
     border-color: rgba(74,222,128,0.18);
     background: linear-gradient(180deg, rgba(20,83,45,0.94) 0%, rgba(18,60,34,0.98) 100%);
-    box-shadow: 0 0 18px rgba(34,197,94,0.12);
   }
 
   .flyerMissing {
@@ -1135,24 +1137,21 @@ const styles = `
 
   .packCard {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     gap: 14px;
     width: 100%;
-    min-height: 78px;
-    background: linear-gradient(180deg, rgba(15,23,34,0.94) 0%, rgba(10,15,23,0.98) 100%);
-    border: 1px solid rgba(255,255,255,0.08);
+    min-height: 80px;
     border-radius: 22px;
     padding: 16px 18px;
+    background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
     color: #ffffff;
-    box-shadow: 0 20px 44px rgba(0,0,0,0.20);
   }
 
   .packCard.active {
-    border-color: rgba(96,165,250,0.36);
-    box-shadow:
-      0 22px 50px rgba(0,0,0,0.28),
-      0 0 24px rgba(37,99,235,0.16);
+    border-color: rgba(96,165,250,0.30);
+    box-shadow: 0 0 24px rgba(37,99,235,0.16);
   }
 
   .packLeft {
@@ -1172,7 +1171,6 @@ const styles = `
     justify-content: center;
     font-size: 14px;
     font-weight: 950;
-    flex-shrink: 0;
     background: rgba(255,255,255,0.04);
   }
 
@@ -1180,7 +1178,6 @@ const styles = `
     color: #ffffff;
     border-color: rgba(96,165,250,0.34);
     background: linear-gradient(180deg, rgba(37,99,235,0.90) 0%, rgba(29,78,216,1) 100%);
-    box-shadow: 0 0 18px rgba(37,99,235,0.18);
   }
 
   .packQty {
@@ -1210,7 +1207,7 @@ const styles = `
     display: block;
     border-radius: 18px;
     border: 1px solid rgba(96,165,250,0.22);
-    background: linear-gradient(180deg, rgba(10,20,42,0.98) 0%, rgba(6,12,28,1) 100%);
+    background: linear-gradient(180deg, rgba(18,55,131,0.96) 0%, rgba(10,28,70,1) 100%);
     color: #ffffff;
     font-size: 20px;
     font-weight: 950;
@@ -1250,7 +1247,6 @@ const styles = `
     font-weight: 950;
     color: #ffffff;
     margin-bottom: 10px;
-    letter-spacing: -0.03em;
   }
 
   .freeStoreUrl {
@@ -1281,14 +1277,13 @@ const styles = `
     font-size: 34px;
     font-weight: 950;
     color: #ffffff;
-    letter-spacing: -0.03em;
   }
 
   .modalWrap {
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: rgba(3, 7, 18, 0.86);
+    background: rgba(3,7,18,0.88);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
@@ -1304,8 +1299,8 @@ const styles = `
 
   .modalTop {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: center;
     gap: 12px;
     padding: 16px 18px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -1345,7 +1340,7 @@ const styles = `
     position: relative;
     width: 100%;
     aspect-ratio: 9 / 16;
-    background: #111827;
+    background: #0b1220;
     overflow: hidden;
   }
 
@@ -1357,41 +1352,43 @@ const styles = `
     display: block;
   }
 
-  .modalGlow {
-    inset: auto 12% -50px 12%;
-  }
-
   .modalShade {
-    height: 180px;
+    height: 190px;
   }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1180px) {
+    h1 {
+      font-size: 48px;
+    }
+
     .flyerGrid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (max-width: 820px) {
+  @media (max-width: 860px) {
     .heroCard {
-      align-items: flex-start;
+      grid-template-columns: 88px 1fr;
+      align-items: start;
+      padding-top: 56px;
     }
 
     h1 {
-      font-size: 34px;
+      font-size: 36px;
+    }
+
+    p {
+      font-size: 16px;
+    }
+
+    .storeTop {
+      flex-direction: column;
     }
 
     .storeButtons,
     .tabsWrap,
     .flyerGrid {
       grid-template-columns: 1fr;
-    }
-
-    .packPrice {
-      font-size: 24px;
-    }
-
-    .storeTop {
-      flex-direction: column;
     }
   }
 
@@ -1402,6 +1399,7 @@ const styles = `
 
     .heroCard,
     .storeCard,
+    .tabsWrap,
     .categorySection,
     .selectedSummary,
     .freeFlyerCard {
@@ -1409,20 +1407,42 @@ const styles = `
       border-radius: 22px;
     }
 
+    .heroCard {
+      gap: 14px;
+    }
+
+    .heroBadge {
+      top: 10px;
+      left: 10px;
+    }
+
     .heroIcon {
-      width: 72px;
-      height: 72px;
-      border-radius: 18px;
-      font-size: 32px;
+      width: 76px;
+      height: 76px;
+      border-radius: 20px;
+      font-size: 34px;
     }
 
     h1 {
-      font-size: 30px;
+      font-size: 28px;
+    }
+
+    p {
+      font-size: 14px;
+    }
+
+    .storeUrl {
+      font-size: 16px;
     }
 
     .sectionTitle {
       flex-direction: column;
       align-items: flex-start;
+      font-size: 16px;
+    }
+
+    .selectedSummary strong {
+      font-size: 22px;
     }
 
     .flyerActionBar {
