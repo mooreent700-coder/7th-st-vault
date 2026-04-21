@@ -991,21 +991,20 @@ const styles = `
     letter-spacing: 0.06em;
   }
 
-  .flyerImageWrap {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 9 / 16;
-    background: #0b1220;
-    overflow: hidden;
-  }
+ .flyerImageWrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #0b1220;
+  border-radius: 18px;
+}
 
-  .flyerImage {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: contain;
-    object-position: center center;
-  }
+.flyerImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
 
   .imageShade {
     position: absolute;
@@ -1110,24 +1109,20 @@ const styles = `
     background: linear-gradient(180deg, rgba(20,83,45,0.94) 0%, rgba(18,60,34,0.98) 100%);
   }
 
-  .flyerMissing {
-    width: 100%;
-    aspect-ratio: 9 / 16;
-    background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.98) 100%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 22px;
-    text-align: center;
-  }
+  .flyerImageWrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #0b1220;
+  border-radius: 18px;
+}
 
-  .missingTitle {
-    font-size: 18px;
-    font-weight: 950;
-    color: #ffffff;
-    margin-bottom: 8px;
-  }
+.flyerImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
 
   .missingPath {
     font-size: 13px;

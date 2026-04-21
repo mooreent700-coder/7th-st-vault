@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -254,8 +254,9 @@ export default function StorefrontPage() {
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-
+  const trackedViewRef = useRef(false);
   const copy = COPY[language];
+  
   const theme = parseTheme(restaurant?.storefront_theme);
 
   useEffect(() => {
@@ -390,16 +391,27 @@ export default function StorefrontPage() {
   }, [slug]);
 
   useEffect(() => {
-    if (!categories.length) return;
+  if (!slug || !restaurant?.id || trackedViewRef.current) return;
 
-    const firstCategoryId = categories[0]?.id ?? '';
+  trackedViewRef.current = true;
 
-    setActiveCategory((current) => {
-      if (!current) return firstCategoryId;
-      const stillExists = categories.some((category) => category.id === current);
-      return stillExists ? current : firstCategoryId;
-    });
-  }, [categories]);
+  const run = async () => {
+    const { error: insertError } = await supabase
+      .from('storefront_views')
+      .insert({
+        restaurant_id: restaurant.id,
+        store_slug: slug,
+        slug,
+        created_at: new Date().toISOString(),
+      });
+
+    if (insertError) {
+      console.error('storefront_views insert failed:', insertError.message);
+    }
+  };
+
+  void run();
+}, [slug, restaurant?.id]);
 
   useEffect(() => {
     if (!selectedItem) return;
