@@ -217,6 +217,7 @@ function PreviewModal({
             <strong>{title}</strong>
             <span>Preview</span>
           </div>
+
           <button type="button" className="modalClose" onClick={onClose}>
             ✕
           </button>
@@ -367,6 +368,7 @@ export default function Page() {
         <section className="heroCard">
           <div className="heroBadge">Style {selectedFlyerIndex + 1}</div>
           <div className="heroIcon">📣</div>
+
           <div className="heroText">
             <h1>Custom QR Flyers</h1>
             <p>Pick a category, lock in one flyer, then upgrade and unlock your print package.</p>
@@ -379,6 +381,7 @@ export default function Page() {
               <div className="storeLabel">Your Store Link</div>
               <div className="storeUrl">{storeUrl}</div>
             </div>
+
             <span className="statusPill">Active</span>
           </div>
 
@@ -543,7 +546,7 @@ const styles = `
     position: relative;
     width: 100%;
     min-height: 100vh;
-    padding: 20px 16px 120px;
+    padding: 18px 14px 120px;
     overflow: hidden;
     background:
       radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 24%),
@@ -587,10 +590,10 @@ const styles = `
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 1380px;
+    max-width: 1440px;
     margin: 0 auto;
     display: grid;
-    gap: 18px;
+    gap: 16px;
   }
 
   .loadingCard,
@@ -603,16 +606,14 @@ const styles = `
   .modalCard {
     background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
     border: 1px solid rgba(96,165,250,0.12);
-    box-shadow:
-      0 24px 80px rgba(0,0,0,0.34),
-      inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.04);
     backdrop-filter: blur(18px);
   }
 
   .loadingCard {
     position: relative;
     z-index: 1;
-    max-width: 1380px;
+    max-width: 1440px;
     margin: 0 auto;
     border-radius: 24px;
     padding: 34px;
@@ -624,11 +625,11 @@ const styles = `
   .heroCard {
     position: relative;
     display: grid;
-    grid-template-columns: 112px 1fr;
-    gap: 18px;
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
     align-items: center;
-    border-radius: 30px;
-    padding: 24px;
+    border-radius: 28px;
+    padding: 22px;
     overflow: hidden;
   }
 
@@ -642,15 +643,15 @@ const styles = `
 
   .heroBadge {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    min-height: 34px;
-    padding: 0 14px;
+    top: 10px;
+    left: 10px;
+    min-height: 32px;
+    padding: 0 12px;
     border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: rgba(14, 33, 75, 0.95);
+    background: rgba(14,33,75,0.95);
     border: 1px solid rgba(96,165,250,0.30);
     color: #ffffff;
     font-size: 12px;
@@ -661,43 +662,44 @@ const styles = `
   }
 
   .heroIcon {
-    width: 96px;
-    height: 96px;
-    border-radius: 24px;
+    width: 86px;
+    height: 86px;
+    border-radius: 22px;
     background: linear-gradient(180deg, rgba(37,99,235,0.24) 0%, rgba(8,47,117,0.12) 100%);
     border: 1px solid rgba(96,165,250,0.22);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 44px;
+    font-size: 40px;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03), 0 0 36px rgba(37,99,235,0.16);
   }
 
   .heroText {
     display: grid;
-    gap: 8px;
+    gap: 6px;
+    min-width: 0;
   }
 
   h1 {
     margin: 0;
     color: #ffffff;
-    font-size: 56px;
-    line-height: 0.94;
+    font-size: 46px;
+    line-height: 0.95;
     font-weight: 950;
-    letter-spacing: -0.06em;
+    letter-spacing: -0.05em;
   }
 
   p {
     margin: 0;
     color: rgba(255,255,255,0.72);
-    font-size: 20px;
-    line-height: 1.45;
+    font-size: 18px;
+    line-height: 1.4;
     font-weight: 800;
   }
 
   .storeCard {
-    border-radius: 26px;
-    padding: 22px;
+    border-radius: 24px;
+    padding: 18px;
   }
 
   .storeTop {
@@ -705,15 +707,16 @@ const styles = `
     justify-content: space-between;
     gap: 14px;
     align-items: flex-start;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
   }
 
   .storeText {
     min-width: 0;
+    max-width: 100%;
   }
 
   .storeLabel {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: rgba(255,255,255,0.56);
     font-size: 12px;
     font-weight: 950;
@@ -723,7 +726,7 @@ const styles = `
 
   .storeUrl {
     color: #ffffff;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 900;
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -731,8 +734,8 @@ const styles = `
   }
 
   .statusPill {
-    min-height: 40px;
-    padding: 0 16px;
+    min-height: 38px;
+    padding: 0 14px;
     border-radius: 999px;
     background: rgba(34,197,94,0.16);
     border: 1px solid rgba(74,222,128,0.20);
@@ -749,7 +752,7 @@ const styles = `
   .storeButtons {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 12px;
   }
 
   .primaryBtn,
@@ -771,8 +774,8 @@ const styles = `
   .secondaryBtn,
   .primaryBtn,
   .tabBtn {
-    min-height: 58px;
-    border-radius: 18px;
+    min-height: 54px;
+    border-radius: 16px;
     font-size: 16px;
     font-weight: 950;
   }
@@ -793,8 +796,8 @@ const styles = `
   .tabsWrap {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    border-radius: 24px;
+    gap: 12px;
+    border-radius: 22px;
     padding: 8px;
   }
 
@@ -816,7 +819,7 @@ const styles = `
     justify-content: space-between;
     gap: 12px;
     align-items: center;
-    margin: 2px 0 -4px;
+    margin: 0;
     color: #ffffff;
     font-size: 18px;
     font-weight: 950;
@@ -830,20 +833,22 @@ const styles = `
   }
 
   .categorySection {
-    border-radius: 26px;
-    padding: 14px;
+    border-radius: 24px;
+    padding: 12px;
+    overflow: hidden;
   }
 
   .categoryRow {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    gap: 14px;
+    display: flex;
+    gap: 12px;
     overflow-x: auto;
     overflow-y: hidden;
+    width: 100%;
+    max-width: 100%;
     padding-bottom: 6px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
+    white-space: nowrap;
   }
 
   .categoryRow::-webkit-scrollbar {
@@ -861,17 +866,18 @@ const styles = `
   }
 
   .categoryBtn {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    min-height: 58px;
-    padding: 0 20px;
-    border-radius: 18px;
+    min-height: 54px;
+    padding: 0 18px;
+    border-radius: 16px;
     white-space: nowrap;
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.04);
     color: #ffffff;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 900;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
   }
@@ -888,10 +894,10 @@ const styles = `
   }
 
   .selectedSummary {
-    border-radius: 24px;
-    padding: 18px 20px;
+    border-radius: 22px;
+    padding: 16px 18px;
     display: grid;
-    gap: 10px;
+    gap: 8px;
   }
 
   .selectedSummaryTop {
@@ -929,7 +935,7 @@ const styles = `
 
   .selectedSummary strong {
     color: #ffffff;
-    font-size: 28px;
+    font-size: 24px;
     line-height: 1.05;
     font-weight: 950;
     letter-spacing: -0.04em;
@@ -938,12 +944,13 @@ const styles = `
   .flyerGrid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 18px;
+    gap: 16px;
+    align-items: start;
   }
 
   .flyerCard {
     overflow: hidden;
-    border-radius: 26px;
+    border-radius: 24px;
     border: 1px solid rgba(255,255,255,0.08);
     background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
     box-shadow: 0 26px 80px rgba(0,0,0,0.28);
@@ -958,10 +965,7 @@ const styles = `
 
   .flyerCard.selected {
     border-color: rgba(96,165,250,0.36);
-    box-shadow:
-      0 30px 90px rgba(0,0,0,0.36),
-      0 0 0 1px rgba(96,165,250,0.20),
-      0 0 28px rgba(37,99,235,0.18);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.36), 0 0 0 1px rgba(96,165,250,0.20), 0 0 28px rgba(37,99,235,0.18);
   }
 
   .flyerPreviewBtn {
@@ -990,15 +994,17 @@ const styles = `
   .flyerImageWrap {
     position: relative;
     width: 100%;
+    aspect-ratio: 9 / 16;
     background: #0b1220;
     overflow: hidden;
   }
 
   .flyerImage {
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
-    object-fit: cover;
+    object-fit: contain;
+    object-position: center center;
   }
 
   .imageShade {
@@ -1006,7 +1012,7 @@ const styles = `
     left: 0;
     right: 0;
     bottom: 0;
-    height: 170px;
+    height: 150px;
     background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(3,7,18,0.84) 100%);
     pointer-events: none;
     z-index: 2;
@@ -1028,10 +1034,10 @@ const styles = `
   }
 
   .qrShell {
-    width: 82px;
-    height: 82px;
+    width: 74px;
+    height: 74px;
     padding: 6px;
-    border-radius: 16px;
+    border-radius: 14px;
     background: rgba(255,255,255,0.96);
     box-shadow: 0 14px 30px rgba(0,0,0,0.28);
   }
@@ -1039,13 +1045,13 @@ const styles = `
   .qrImage {
     width: 100%;
     height: 100%;
-    border-radius: 10px;
+    border-radius: 8px;
     display: block;
   }
 
   .qrText {
     color: #ffffff;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 950;
     letter-spacing: 0.08em;
     text-shadow: 0 2px 12px rgba(0,0,0,0.92);
@@ -1088,7 +1094,7 @@ const styles = `
   }
 
   .selectFlyerBtn {
-    min-width: 160px;
+    min-width: 156px;
     min-height: 42px;
     padding: 0 16px;
     border-radius: 14px;
@@ -1141,8 +1147,8 @@ const styles = `
     align-items: center;
     gap: 14px;
     width: 100%;
-    min-height: 80px;
-    border-radius: 22px;
+    min-height: 76px;
+    border-radius: 20px;
     padding: 16px 18px;
     background: linear-gradient(180deg, rgba(10,19,35,0.96) 0%, rgba(7,13,24,0.98) 100%);
     border: 1px solid rgba(255,255,255,0.08);
@@ -1194,7 +1200,7 @@ const styles = `
   }
 
   .packPrice {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 950;
     color: #ffffff;
     letter-spacing: -0.03em;
@@ -1202,14 +1208,14 @@ const styles = `
 
   .checkoutBtn {
     width: min(100%, 520px);
-    min-height: 58px;
+    min-height: 56px;
     margin: 4px auto 0;
     display: block;
     border-radius: 18px;
     border: 1px solid rgba(96,165,250,0.22);
     background: linear-gradient(180deg, rgba(18,55,131,0.96) 0%, rgba(10,28,70,1) 100%);
     color: #ffffff;
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 950;
     letter-spacing: 0.03em;
     box-shadow: 0 0 28px rgba(37,99,235,0.14);
@@ -1357,8 +1363,18 @@ const styles = `
   }
 
   @media (max-width: 1180px) {
+    .flyerGrid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 980px) {
     h1 {
-      font-size: 48px;
+      font-size: 40px;
+    }
+
+    p {
+      font-size: 16px;
     }
 
     .flyerGrid {
@@ -1366,19 +1382,18 @@ const styles = `
     }
   }
 
-  @media (max-width: 860px) {
+  @media (max-width: 820px) {
     .heroCard {
-      grid-template-columns: 88px 1fr;
+      grid-template-columns: 78px 1fr;
       align-items: start;
-      padding-top: 56px;
+      padding-top: 54px;
     }
 
-    h1 {
-      font-size: 36px;
-    }
-
-    p {
-      font-size: 16px;
+    .heroIcon {
+      width: 72px;
+      height: 72px;
+      font-size: 34px;
+      border-radius: 18px;
     }
 
     .storeTop {
@@ -1386,15 +1401,18 @@ const styles = `
     }
 
     .storeButtons,
-    .tabsWrap,
-    .flyerGrid {
+    .tabsWrap {
       grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 640px) {
     .page {
-      padding: 14px 12px 110px;
+      padding: 14px 12px 100px;
+    }
+
+    .pageShell {
+      gap: 14px;
     }
 
     .heroCard,
@@ -1403,24 +1421,8 @@ const styles = `
     .categorySection,
     .selectedSummary,
     .freeFlyerCard {
-      padding: 16px;
-      border-radius: 22px;
-    }
-
-    .heroCard {
-      gap: 14px;
-    }
-
-    .heroBadge {
-      top: 10px;
-      left: 10px;
-    }
-
-    .heroIcon {
-      width: 76px;
-      height: 76px;
+      padding: 14px;
       border-radius: 20px;
-      font-size: 34px;
     }
 
     h1 {
@@ -1445,6 +1447,10 @@ const styles = `
       font-size: 22px;
     }
 
+    .flyerGrid {
+      grid-template-columns: 1fr;
+    }
+
     .flyerActionBar {
       flex-direction: column;
       align-items: stretch;
@@ -1464,8 +1470,8 @@ const styles = `
     }
 
     .qrShell {
-      width: 72px;
-      height: 72px;
+      width: 70px;
+      height: 70px;
       border-radius: 14px;
     }
 
