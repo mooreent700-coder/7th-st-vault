@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
+/* =========================
+   TYPES
+========================= */
 type FlyerCategoryKey =
   | 'seafood'
   | 'soul_food'
@@ -53,6 +56,9 @@ type FlyerOption = {
   src: string;
 };
 
+/* =========================
+   CONSTANTS
+========================= */
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
 
 const FALLBACK_STORE: StoreRecord = {
@@ -83,6 +89,9 @@ const CATEGORIES: { key: FlyerCategoryKey; label: string; emoji: string; folder:
   { key: 'desserts', label: 'Desserts', emoji: '🍰', folder: 'desserts' },
 ];
 
+/* =========================
+   HELPERS
+========================= */
 function getName(store: StoreRecord | null) {
   return store?.name?.trim() || 'MenuFlow Kitchen';
 }
@@ -118,6 +127,9 @@ function buildQrImageUrl(value: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=0&data=${encodeURIComponent(value)}`;
 }
 
+/* =========================
+   UI
+========================= */
 function FlyerQrOverlay({
   qrSrc,
   onOpenStore,
@@ -235,6 +247,9 @@ function PreviewModal({
   );
 }
 
+/* =========================
+   PAGE
+========================= */
 export default function Page() {
   const [store, setStore] = useState<StoreRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -862,11 +877,21 @@ const styles = `
     gap: 12px;
     overflow-x: auto;
     padding-bottom: 4px;
-    scrollbar-width: none;
+    scrollbar-width: thin;
   }
 
   .categoryRow::-webkit-scrollbar {
-    display: none;
+    height: 8px;
+  }
+
+  .categoryRow::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.04);
+    border-radius: 999px;
+  }
+
+  .categoryRow::-webkit-scrollbar-thumb {
+    background: rgba(96,165,250,0.30);
+    border-radius: 999px;
   }
 
   .categoryBtn {
