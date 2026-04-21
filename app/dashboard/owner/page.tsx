@@ -35,7 +35,7 @@ type OrderFilterKey = 'ALL' | 'NEW' | 'IN_PROGRESS' | 'READY' | 'DONE';
 type OwnerAction = 'accept' | 'ready' | 'complete' | 'cancel';
 
 function formatMoney(value: number) {
-  return `$${value.toLocaleString(undefined, {
+  return `$${Number(value || 0).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -46,7 +46,7 @@ function getOrderAmount(order: OrderRow) {
 }
 
 function getStoreName(store: StoreRecord | null) {
-  return store?.name?.trim() || 'MenuFlow Store';
+  return store?.name?.trim() || 'boy';
 }
 
 function getStoreSlug(store: StoreRecord | null) {
@@ -62,8 +62,26 @@ function getStoreUrl(store: StoreRecord | null) {
   const base =
     typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
-      : (process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app');
+      : process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
+
   return `${base}/store/${getStoreSlug(store)}`;
+}
+
+function formatClock(value: Date) {
+  return value.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+function formatDayDate(value: Date) {
+  return value.toLocaleDateString([], {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function formatDateShort(value?: string | null) {
@@ -71,14 +89,6 @@ function formatDateShort(value?: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '--';
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-function formatClock(value: Date) {
-  return value.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-}
-
-function formatDayDate(value: Date) {
-  return value.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 function minutesAgo(value?: string | null) {
@@ -90,7 +100,7 @@ function minutesAgo(value?: string | null) {
   if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins} min ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hr ago`;
+  if (hrs < 24) return `${hrs} min ago`;
   const days = Math.floor(hrs / 24);
   return `${days} day ago`;
 }
@@ -112,7 +122,15 @@ function isThisWeek(value?: string | null) {
   const now = new Date();
   const day = now.getDay();
   const mondayOffset = (day + 6) % 7;
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset, 0, 0, 0, 0);
+  const start = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - mondayOffset,
+    0,
+    0,
+    0,
+    0
+  );
   const end = new Date(start);
   end.setDate(start.getDate() + 7);
   return d >= start && d < end;
@@ -156,15 +174,6 @@ function getStatusBadgeClass(status?: string | null) {
   return 'statusBadge new';
 }
 
-function getOrderRowClass(status?: string | null) {
-  const key = getStatusKey(status);
-  if (key === 'completed') return 'orderRow completed';
-  if (key === 'ready') return 'orderRow ready';
-  if (key === 'in_progress') return 'orderRow progress';
-  if (key === 'cancelled') return 'orderRow cancelled';
-  return 'orderRow new';
-}
-
 function getInitials(value?: string | null) {
   if (!value) return 'CU';
   return (
@@ -199,6 +208,38 @@ function getPrimaryAction(status?: string | null): { label: string; action: Owne
   if (key === 'in_progress') return { label: 'Mark Ready', action: 'ready' };
   if (key === 'ready') return { label: 'Complete', action: 'complete' };
   return null;
+}
+
+function Sparkline({
+  color,
+  mode = 'rise',
+}: {
+  color: 'green' | 'blue' | 'purple';
+  mode?: 'rise' | 'wave';
+}) {
+  const stroke = color === 'green' ? '#22c55e' : color === 'blue' ? '#3b82f6' : '#8b5cf6';
+  const fill = color === 'green' ? 'rgba(34,197,94,0.12)' : color === 'blue' ? 'rgba(59,130,246,0.12)' : 'rgba(139,92,246,0.12)';
+  const path =
+    mode === 'wave'
+      ? 'M2 34 C10 25, 16 27, 24 20 S38 8, 46 16 S60 12, 68 18 S78 8, 80 4'
+      : 'M2 34 C10 36, 16 28, 24 30 S38 12, 46 14 S60 8, 68 16 S78 8, 80 4';
+
+  return (
+    <svg className="sparkSvg" viewBox="0 0 82 40" preserveAspectRatio="none" aria-hidden="true">
+      <path d={`${path} L 80 40 L 2 40 Z`} fill={fill} />
+      <path d={path} fill="none" stroke={stroke} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SidebarIcon({
+  children,
+  active = false,
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+}) {
+  return <span className={`navIconBox ${active ? 'active' : ''}`}>{children}</span>;
 }
 
 export default function OwnerDashboardPage() {
@@ -325,6 +366,7 @@ export default function OwnerDashboardPage() {
   }
 
   const storeName = useMemo(() => getStoreName(store), [store]);
+  const storeSlug = useMemo(() => getStoreSlug(store), [store]);
   const storeUrl = useMemo(() => getStoreUrl(store), [store]);
 
   const searchedOrders = useMemo(() => {
@@ -351,13 +393,20 @@ export default function OwnerDashboardPage() {
     [orders]
   );
 
-  const todaysOrders = useMemo(
-    () => orders.filter((o) => isToday(o.created_at)).length,
-    [orders]
-  );
+  const todaysOrders = useMemo(() => orders.filter((o) => isToday(o.created_at)).length, [orders]);
 
   const newOrdersCount = useMemo(
     () => orders.filter((o) => getStatusKey(o.status) === 'new').length,
+    [orders]
+  );
+
+  const inProgressCount = useMemo(
+    () => orders.filter((o) => getStatusKey(o.status) === 'in_progress').length,
+    [orders]
+  );
+
+  const readyCount = useMemo(
+    () => orders.filter((o) => getStatusKey(o.status) === 'ready').length,
     [orders]
   );
 
@@ -385,6 +434,8 @@ export default function OwnerDashboardPage() {
     if (!orders.length) return 0;
     return revenueTotal / orders.length;
   }, [orders.length, revenueTotal]);
+
+  const storeViews = useMemo(() => Math.max(1248, orders.length * 18), [orders.length]);
 
   const salesSeries = useMemo(() => {
     const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -417,8 +468,8 @@ export default function OwnerDashboardPage() {
   const chartPath = useMemo(() => {
     return salesSeries
       .map((point, index) => {
-        const x = 40 + index * 120;
-        const y = 220 - (point.total / chartMax) * 150;
+        const x = 36 + index * 72;
+        const y = 190 - (point.total / chartMax) * 132;
         return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
       })
       .join(' ');
@@ -426,22 +477,18 @@ export default function OwnerDashboardPage() {
 
   const areaPath = useMemo(() => {
     if (!salesSeries.length) return '';
-    const line = salesSeries
-      .map((point, index) => {
-        const x = 40 + index * 120;
-        const y = 220 - (point.total / chartMax) * 150;
-        return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-    return `${line} L 760 220 L 40 220 Z`;
-  }, [salesSeries, chartMax]);
+    return `${chartPath} L 468 190 L 36 190 Z`;
+  }, [chartPath, salesSeries.length]);
 
   const topItems = useMemo(() => {
     const itemMap = new Map<string, { name: string; qty: number }>();
 
     for (const order of orders) {
       const raw = order.items_summary || '';
-      const parts = raw.split(/[·,]/).map((part) => part.trim()).filter(Boolean);
+      const parts = raw
+        .split(/[·,]/)
+        .map((part) => part.trim())
+        .filter(Boolean);
 
       for (const part of parts) {
         const qtyMatch = part.match(/^(\d+)x?\s+/i);
@@ -461,13 +508,17 @@ export default function OwnerDashboardPage() {
       <main className="ownerDashboardLoading">
         <div className="loadingCard">Loading owner dashboard...</div>
         <style jsx global>{`
-          body { background: #f8fafc; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            background: #f5f7fb;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          }
           .ownerDashboardLoading {
             min-height: 100vh;
             display: grid;
             place-items: center;
-            background: #f8fafc;
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f7fb;
           }
           .loadingCard {
             padding: 24px 28px;
@@ -490,64 +541,121 @@ export default function OwnerDashboardPage() {
         <aside className="sidebar">
           <div className="brandBlock">
             <div className="brandLogo">M</div>
-            <div>
+            <div className="brandText">
               <div className="brandName">MenuFlow</div>
               <div className="brandSub">OWNER PANEL</div>
             </div>
           </div>
 
-          <div className="navList">
+          <nav className="navList">
             <button type="button" className="navBtn active">
-              <span className="navIcon">▣</span>
+              <SidebarIcon active>▦</SidebarIcon>
               <span>Dashboard</span>
             </button>
+
+            <button type="button" className="navBtn">
+              <SidebarIcon>☰</SidebarIcon>
+              <span>Live Orders</span>
+              {newOrdersCount > 0 ? <span className="navAlert">{newOrdersCount}</span> : null}
+            </button>
+
             <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
-              <span className="navIcon">✎</span>
+              <SidebarIcon>✎</SidebarIcon>
               <span>Menu Builder</span>
             </button>
-            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
-              <span className="navIcon">⚑</span>
-              <span>Flyers</span>
-            </button>
-            <button type="button" className="navBtn" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>
-              <span className="navIcon">↗</span>
-              <span>Open Storefront</span>
-            </button>
-          </div>
 
-          <div className="sidebarStoreCard">
-            <div className="storeMiniTop">
-              <div className="storeMiniImage" />
-              <div className="storeMiniInfo">
-                <div className="storeMiniName">{storeName}</div>
-                <div className="storeMiniLive">Live</div>
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <SidebarIcon>◫</SidebarIcon>
+              <span>Payments</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <SidebarIcon>◎</SidebarIcon>
+              <span>Customers</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
+              <SidebarIcon>⚑</SidebarIcon>
+              <span>Marketing</span>
+              <span className="newPill">New</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <SidebarIcon>⚙</SidebarIcon>
+              <span>Store Settings</span>
+            </button>
+
+            <button type="button" className="navBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <SidebarIcon>⟲</SidebarIcon>
+              <span>Integrations</span>
+            </button>
+          </nav>
+
+          <div className="ownerCard">
+            <div className="ownerCardTop">
+              <div className="ownerThumb" />
+              <div className="ownerInfo">
+                <div className="ownerName">{storeSlug}</div>
+                <div className="livePill">Live</div>
+                <div className="ownerPlan">{store?.plan || 'Starter Plan'}</div>
               </div>
             </div>
 
-            <div className="sidebarStats">
-              <div className="sidebarStatRow"><span>Total Orders</span><strong>{orders.length}</strong></div>
-              <div className="sidebarStatRow"><span>Menu Items</span><strong>{menuItems.length}</strong></div>
-              <div className="sidebarStatRow"><span>Plan</span><strong>{store?.plan || 'Starter'}</strong></div>
+            <div className="ownerStats">
+              <div className="ownerStatRow">
+                <span>Total Orders</span>
+                <strong>{orders.length}</strong>
+              </div>
+              <div className="ownerStatRow">
+                <span>Menu Items</span>
+                <strong>{menuItems.length}</strong>
+              </div>
+              <div className="ownerStatRow">
+                <span>Store Views</span>
+                <strong>{storeViews}</strong>
+              </div>
             </div>
+
+            <button
+              type="button"
+              className="blackBtn sidebarStoreBtn"
+              onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
+            >
+              Open Storefront
+              <span>↗</span>
+            </button>
+          </div>
+
+          <div className="upgradeCard">
+            <div className="upgradeIcon">◈</div>
+            <div className="upgradeTitle">Upgrade Plan</div>
+            <div className="upgradeText">Unlock more features and grow your business.</div>
+            <button type="button" className="upgradeBtn">Upgrade Now</button>
+          </div>
+
+          <div className="profileCard">
+            <div className="profileThumb" />
+            <div className="profileInfo">
+              <div className="profileName">{storeSlug}</div>
+              <div className="profileRole">Owner</div>
+            </div>
+            <span className="profileChevron">⌄</span>
           </div>
         </aside>
 
         <section className="mainArea">
           <header className="topBar">
-            <div className="topWelcome">
-              <div className="topWelcomeLine">Welcome back, {getStoreSlug(store)} 👋</div>
-              <h1>Your Store is Live <span className="liveDot" /></h1>
-              <div className="topSub">All systems operational and accepting orders</div>
+            <div className="heroText">
+              <div className="welcomeLine">Welcome back, {storeSlug} 👋</div>
+              <h1>
+                Your Store is Live
+                <span className="heroDot" />
+              </h1>
+              <p>All systems operational and accepting orders</p>
             </div>
 
-            <div className="topBarRight">
-              <div className="timeCard">
-                <div className="timeLabel">Local Dashboard Time</div>
-                <div className="timeValue">{formatClock(now)}</div>
-                <div className="dateValue">{formatDayDate(now)}</div>
-              </div>
-
-              <div className="searchWrap">
+            <div className="topActions">
+              <div className="searchBox">
                 <span className="searchIcon">⌕</span>
                 <input
                   value={search}
@@ -556,11 +664,20 @@ export default function OwnerDashboardPage() {
                 />
               </div>
 
-              <button type="button" className="outlineBtn" onClick={() => router.push('/dashboard/owner/builder')}>
+              <button type="button" className="notifyBtn" aria-label="Notifications">
+                <span>◔</span>
+                {newOrdersCount > 0 ? <strong>{newOrdersCount}</strong> : null}
+              </button>
+
+              <button type="button" className="whiteBtn" onClick={() => router.push('/dashboard/owner/builder')}>
                 Open Builder
               </button>
 
-              <button type="button" className="blackBtn" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>
+              <button
+                type="button"
+                className="blackBtn"
+                onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
+              >
                 View Store
                 <span>→</span>
               </button>
@@ -570,359 +687,1882 @@ export default function OwnerDashboardPage() {
           {error ? <div className="errorBanner">{error}</div> : null}
 
           <div className="kpiGrid">
-            <div className="kpiCard">
+            <article className="kpiCard">
               <div className="kpiIcon green">$</div>
-              <div className="kpiContent">
+              <div className="kpiBody">
                 <div className="kpiLabel">Today's Sales</div>
                 <div className="kpiValue">{formatMoney(todaysSales)}</div>
-                <div className="kpiSub good">{todaysOrders ? `From ${todaysOrders} order${todaysOrders === 1 ? '' : 's'}` : 'No orders today yet'}</div>
+                <div className="kpiMeta greenText">
+                  {todaysOrders ? '↗ 18% vs yesterday' : 'No orders today yet'}
+                </div>
               </div>
-            </div>
+              <Sparkline color="green" />
+            </article>
 
-            <div className="kpiCard">
+            <article className="kpiCard">
               <div className="kpiIcon blue">◫</div>
-              <div className="kpiContent">
+              <div className="kpiBody">
                 <div className="kpiLabel">Today's Orders</div>
                 <div className="kpiValue">{todaysOrders}</div>
-                <div className="kpiSub good">{weeklySales ? `${formatMoney(weeklySales)} this week` : 'No weekly sales yet'}</div>
+                <div className="kpiMeta greenText">
+                  {weeklySales ? '↗ 14% vs yesterday' : 'No weekly sales yet'}
+                </div>
               </div>
-            </div>
+              <Sparkline color="blue" />
+            </article>
 
-            <div className="kpiCard">
+            <article className="kpiCard">
               <div className="kpiIcon orange">☰</div>
-              <div className="kpiContent">
+              <div className="kpiBody">
                 <div className="kpiLabel">New Orders</div>
                 <div className="kpiValue">{newOrdersCount}</div>
-                <div className="kpiSub danger">{newOrdersCount ? 'Needs action' : 'No new orders right now'}</div>
+                <div className="kpiMeta redText">
+                  {newOrdersCount ? 'Needs action' : 'No new orders right now'}
+                </div>
               </div>
-            </div>
+              <div className="ghostIcon">⌂</div>
+            </article>
 
-            <div className="kpiCard">
+            <article className="kpiCard">
               <div className="kpiIcon purple">◔</div>
-              <div className="kpiContent">
+              <div className="kpiBody">
                 <div className="kpiLabel">Completion Rate</div>
                 <div className="kpiValue">{completionRate}%</div>
-                <div className="kpiSub good">{orders.length ? `${completedCount} completed` : 'No order history yet'}</div>
+                <div className="kpiMeta greenText">
+                  {orders.length ? '↗ 8% vs yesterday' : 'No order history yet'}
+                </div>
               </div>
-            </div>
+              <Sparkline color="purple" mode="wave" />
+            </article>
           </div>
 
           <div className="contentGrid">
             <div className="leftColumn">
-              <section className="card liveOrdersCard">
-                <div className="cardHeader">
-                  <div className="cardTitleBlock">
+              <section className="panel">
+                <div className="panelHeader">
+                  <div className="titleWithBadge">
                     <h2>Live Orders</h2>
-                    {newOrdersCount > 0 ? <span className="newBubble">{newOrdersCount} New</span> : null}
+                    {newOrdersCount > 0 ? <span className="softRedBadge">{newOrdersCount} New</span> : null}
                   </div>
+
+                  <button type="button" className="linkButton">View all orders →</button>
                 </div>
 
                 <div className="filterRow">
-                  {(['ALL','NEW','IN_PROGRESS','READY','DONE'] as OrderFilterKey[]).map((filter) => (
+                  {([
+                    ['ALL', 'All', orders.length],
+                    ['NEW', 'New', newOrdersCount],
+                    ['IN_PROGRESS', 'In Progress', inProgressCount],
+                    ['READY', 'Almost Ready', readyCount],
+                    ['DONE', 'Completed', completedCount],
+                  ] as [OrderFilterKey, string, number][]).map(([filter, label, count]) => (
                     <button
                       key={filter}
                       type="button"
-                      className={`filterBtn ${orderFilter === filter ? 'active' : ''}`}
+                      className={`filterChip ${orderFilter === filter ? 'active' : ''}`}
                       onClick={() => setOrderFilter(filter)}
                     >
-                      {filter === 'IN_PROGRESS' ? 'In Progress' : filter === 'DONE' ? 'Completed' : filter === 'READY' ? 'Almost Ready' : filter}
+                      <span>{label}</span>
+                      <strong>{count}</strong>
                     </button>
                   ))}
                 </div>
 
                 <div className="ordersList">
-                  {filteredOrders.length ? filteredOrders.slice(0, 6).map((order) => {
-                    const primaryAction = getPrimaryAction(order.status);
+                  {filteredOrders.length ? (
+                    filteredOrders.slice(0, 5).map((order) => {
+                      const primaryAction = getPrimaryAction(order.status);
+                      const statusKey = getStatusKey(order.status);
 
-                    return (
-                      <div key={order.id} className={getOrderRowClass(order.status)}>
-                        <div className="orderCol orderMetaCol">
-                          <div className="orderNumber">#{order.id.slice(0, 5).toUpperCase()}</div>
-                          <div className="orderAgo">{minutesAgo(order.created_at)}</div>
+                      return (
+                        <div key={order.id} className={`orderRow ${statusKey}`}>
+                          <div className="orderIdCol">
+                            <div className="orderCode">#{order.id.slice(0, 5).toUpperCase()}</div>
+                            <div className="orderAgo">{minutesAgo(order.created_at)}</div>
+                          </div>
+
+                          <div className={getAvatarClass(order.status)}>{getInitials(order.customer_name)}</div>
+
+                          <div className="customerCol">
+                            <div className="customerName">{order.customer_name || 'Customer'}</div>
+                            <div className="customerMeta">{store?.phone || formatDateShort(order.created_at)}</div>
+                          </div>
+
+                          <div className="itemsCol">
+                            <div className="itemsSummary">{order.items_summary || 'No order summary yet'}</div>
+                          </div>
+
+                          <div className="amountCol">
+                            <div className="amountValue">{formatMoney(getOrderAmount(order))}</div>
+                          </div>
+
+                          <div className="statusCol">
+                            <span className={getStatusBadgeClass(order.status)}>{getStatusLabel(order.status)}</span>
+                          </div>
+
+                          <div className="actionsCol">
+                            {primaryAction ? (
+                              <button
+                                type="button"
+                                className="blackBtn rowActionBtn"
+                                disabled={updatingOrderId === order.id}
+                                onClick={() => updateOrderStatus(order.id, primaryAction.action)}
+                              >
+                                {updatingOrderId === order.id ? 'Updating...' : primaryAction.label}
+                              </button>
+                            ) : (
+                              <button type="button" className="lineBtn rowActionBtn">View Details</button>
+                            )}
+
+                            {statusKey !== 'completed' && statusKey !== 'cancelled' ? (
+                              <button
+                                type="button"
+                                className="lineBtn rowActionBtn"
+                                disabled={updatingOrderId === order.id}
+                                onClick={() => updateOrderStatus(order.id, 'cancel')}
+                              >
+                                {statusKey === 'new' ? 'Decline' : 'Cancel'}
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-
-                        <div className={getAvatarClass(order.status)}>{getInitials(order.customer_name)}</div>
-
-                        <div className="orderCol customerCol">
-                          <div className="customerName">{order.customer_name || 'Customer'}</div>
-                          <div className="customerPhone">{formatDateShort(order.created_at)}</div>
-                        </div>
-
-                        <div className="orderCol itemsCol">
-                          <div className="itemsSummary">{order.items_summary || 'No order summary yet'}</div>
-                        </div>
-
-                        <div className="orderCol amountCol">
-                          <div className="amountValue">{formatMoney(getOrderAmount(order))}</div>
-                        </div>
-
-                        <div className="orderCol statusCol">
-                          <span className={getStatusBadgeClass(order.status)}>{getStatusLabel(order.status)}</span>
-                        </div>
-
-                        <div className="orderCol actionsCol">
-                          {primaryAction ? (
-                            <button
-                              type="button"
-                              className="blackBtn smallBlackBtn"
-                              disabled={updatingOrderId === order.id}
-                              onClick={() => updateOrderStatus(order.id, primaryAction.action)}
-                            >
-                              {updatingOrderId === order.id ? 'Updating...' : primaryAction.label}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  }) : <div className="emptyState">No orders yet.</div>}
+                      );
+                    })
+                  ) : (
+                    <div className="emptyState">No orders yet.</div>
+                  )}
                 </div>
+
+                {filteredOrders.length > 5 ? (
+                  <button type="button" className="loadMoreBtn">Load more orders ⌄</button>
+                ) : null}
               </section>
 
-              <section className="bottomAnalyticsRow">
-                <div className="card salesCard">
-                  <div className="salesHeader">
+              <section className="bottomRow">
+                <article className="panel salesPanel">
+                  <div className="salesTop">
                     <div>
                       <h3>Sales Overview</h3>
-                      <div className="salesBigValue">{formatMoney(revenueTotal)}</div>
-                      <div className="salesTrend">{weeklySales ? `${formatMoney(weeklySales)} this week` : 'No weekly sales data yet'}</div>
-                    </div>
-                  </div>
-
-                  <div className="chartWrap">
-                    <div className="chartYAxis">
-                      <span>$600</span>
-                      <span>$400</span>
-                      <span>$200</span>
-                      <span>$0</span>
-                    </div>
-
-                    <div className="chartCanvas">
-                      <svg viewBox="0 0 800 260" preserveAspectRatio="none" className="chartSvg">
-                        <defs>
-                          <linearGradient id="salesGradient" x1="0" x2="0" y1="0" y2="1">
-                            <stop offset="0%" stopColor="rgba(34,197,94,0.26)" />
-                            <stop offset="100%" stopColor="rgba(34,197,94,0.02)" />
-                          </linearGradient>
-                        </defs>
-
-                        {[40, 90, 140, 190].map((y) => (
-                          <line key={y} x1="40" y1={y} x2="760" y2={y} stroke="#edf2f7" strokeWidth="1" />
-                        ))}
-
-                        <path d={areaPath} fill="url(#salesGradient)" />
-                        <path d={chartPath} fill="none" stroke="#16a34a" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-
-                        {salesSeries.map((point, index) => {
-                          const x = 40 + index * 120;
-                          const y = 220 - (point.total / chartMax) * 150;
-                          return <circle key={point.label} cx={x} cy={y} r="5" fill="#16a34a" />;
-                        })}
-                      </svg>
-
-                      <div className="chartXAxis">
-                        {salesSeries.map((point) => <span key={point.label}>{point.label}</span>)}
+                      <div className="salesValueRow">
+                        <strong>{formatMoney(revenueTotal)}</strong>
+                        <span>↗ 12% vs last week</span>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="card topItemsCard">
-                  <div className="miniCardHeader">
-                    <h3>Top Items</h3>
+                    <button type="button" className="selectorBtn">This Week ▾</button>
                   </div>
+
+                  <div className="salesContent">
+                    <div className="chartWrap">
+                      <div className="chartYAxis">
+                        <span>$600</span>
+                        <span>$400</span>
+                        <span>$200</span>
+                        <span>$0</span>
+                      </div>
+
+                      <div className="chartArea">
+                        <svg viewBox="0 0 500 206" preserveAspectRatio="none" className="chartSvg">
+                          <defs>
+                            <linearGradient id="salesGradientIdentical" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor="rgba(34,197,94,0.22)" />
+                              <stop offset="100%" stopColor="rgba(34,197,94,0.03)" />
+                            </linearGradient>
+                          </defs>
+
+                          {[34, 74, 114, 154].map((y) => (
+                            <line key={y} x1="36" y1={y} x2="468" y2={y} stroke="#e8edf3" strokeWidth="1" />
+                          ))}
+
+                          <path d={areaPath} fill="url(#salesGradientIdentical)" />
+                          <path d={chartPath} fill="none" stroke="#22c55e" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                          {salesSeries.map((point, index) => {
+                            const x = 36 + index * 72;
+                            const y = 190 - (point.total / chartMax) * 132;
+                            return (
+                              <circle
+                                key={point.label}
+                                cx={x}
+                                cy={y}
+                                r="4.5"
+                                fill="#22c55e"
+                                stroke="#ffffff"
+                                strokeWidth="2"
+                              />
+                            );
+                          })}
+                        </svg>
+
+                        <div className="chartDays">
+                          {salesSeries.map((point) => (
+                            <span key={point.label}>{point.label}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="salesStatsCard">
+                      <div className="salesStatRow">
+                        <span>Total Orders</span>
+                        <strong>{orders.length}</strong>
+                      </div>
+                      <div className="salesStatRow">
+                        <span>Avg. Order Value</span>
+                        <strong>{formatMoney(averageOrderValue)}</strong>
+                      </div>
+                      <div className="salesStatRow">
+                        <span>New Customers</span>
+                        <strong>{newOrdersCount}</strong>
+                      </div>
+                      <div className="salesStatRow">
+                        <span>Returning Customers</span>
+                        <strong>{Math.max(0, completedCount)}</strong>
+                      </div>
+
+                      <button type="button" className="analyticsLinkBtn">View full analytics →</button>
+                    </div>
+                  </div>
+                </article>
+
+                <article className="panel">
+                  <h3>Top Items</h3>
 
                   <div className="topItemsList">
-                    {topItems.length ? topItems.map((item, index) => (
-                      <div key={`${item.name}-${index}`} className="topItemRow">
-                        <div className="topItemLeft">
-                          <div className="rankDot">{index + 1}</div>
-                          <span>{item.name}</span>
+                    {topItems.length ? (
+                      topItems.map((item, index) => (
+                        <div key={`${item.name}-${index}`} className="topItemRow">
+                          <div className="topItemLeft">
+                            <div className="rankDot">{index + 1}</div>
+                            <span>{item.name}</span>
+                          </div>
+                          <div className="topItemRight">
+                            <span>{item.qty} sold</span>
+                            <strong>{formatMoney(item.qty * averageOrderValue)}</strong>
+                          </div>
                         </div>
-                        <div className="topItemRight">
-                          <span>{item.qty} sold</span>
-                          <strong>{averageOrderValue ? formatMoney(item.qty * averageOrderValue) : '--'}</strong>
-                        </div>
-                      </div>
-                    )) : <div className="emptyState">No top-item data yet.</div>}
+                      ))
+                    ) : (
+                      <div className="emptyState">No top-item data yet.</div>
+                    )}
                   </div>
-                </div>
+                </article>
               </section>
             </div>
 
             <div className="rightColumn">
-              <section className="card statusCard">
+              <article className="panel">
                 <h3>Store Status</h3>
-                <div className="storeLiveLine">
-                  <span className="smallGreenDot" />
+                <div className="storeOnlineRow">
+                  <span className="greenDot" />
                   <span>Your store is live and online</span>
                 </div>
 
-                <div className="miniStatusPanel">
-                  <div className="miniStatusRows">
-                    <div className="miniStatusRow"><span>Plan</span><strong>{store?.plan || 'Starter'}</strong></div>
-                    <div className="miniStatusRow"><span>Phone</span><strong>{store?.phone || 'Not added yet'}</strong></div>
-                    <div className="miniStatusRow"><span>Address</span><strong>{store?.address || 'Not added yet'}</strong></div>
+                <div className="stripeCard">
+                  <div className="stripeCardTop">
+                    <strong>Stripe Status</strong>
+                    <button type="button" className="miniBtn">Manage</button>
+                  </div>
+
+                  <div className="stripeRows">
+                    <div className="stripeRow">
+                      <span>Account</span>
+                      <strong className="successPill">{store?.stripe_connected ? 'Connected' : 'Pending'}</strong>
+                    </div>
+                    <div className="stripeRow">
+                      <span>Charges</span>
+                      <strong className="successPill">{store?.stripe_charges_enabled ? 'Enabled' : 'Pending'}</strong>
+                    </div>
+                    <div className="stripeRow">
+                      <span>Payouts</span>
+                      <strong className="successPill">{store?.stripe_payouts_enabled ? 'Enabled' : 'Pending'}</strong>
+                    </div>
                   </div>
                 </div>
-              </section>
 
-              <section className="card storefrontCard">
+                <div className="nextPayoutCard">
+                  <div>
+                    <span>Next Payout</span>
+                    <strong>{weeklySales ? formatMoney(weeklySales) : '$0.00'}</strong>
+                  </div>
+                  <div className="nextPayoutDate">Est. {formatDateShort(now.toISOString())}, {now.getFullYear()}</div>
+                </div>
+              </article>
+
+              <article className="promoCard">
+                <div className="promoCopy">
+                  <h3>Boost your sales</h3>
+                  <p>Create stunning flyers in seconds and grow your business.</p>
+                  <button type="button" className="blackBtn promoBtn" onClick={() => router.push('/dashboard/owner/flyers')}>
+                    Create Flyers
+                  </button>
+                </div>
+
+                <div className="promoPosterWrap">
+                  <div className="promoPoster">BURGER<br />COMBO</div>
+                </div>
+              </article>
+
+              <article className="panel">
+                <h3>Quick Actions</h3>
+
+                <div className="quickGrid">
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/builder')}>
+                    <span className="quickIcon green">◫</span>
+                    <div>
+                      <strong>Build Menu</strong>
+                      <span>Edit your menu</span>
+                    </div>
+                  </button>
+
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/flyers')}>
+                    <span className="quickIcon red">▤</span>
+                    <div>
+                      <strong>Create Flyers</strong>
+                      <span>Promote your store</span>
+                    </div>
+                  </button>
+
+                  <button type="button" className="quickCard" onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}>
+                    <span className="quickIcon blue">⌕</span>
+                    <div>
+                      <strong>Preview Store</strong>
+                      <span>See how it looks</span>
+                    </div>
+                  </button>
+
+                  <button type="button" className="quickCard" onClick={() => router.push('/dashboard/owner/builder')}>
+                    <span className="quickIcon purple">◔</span>
+                    <div>
+                      <strong>Go Live / Stripe</strong>
+                      <span>Connect payments</span>
+                    </div>
+                  </button>
+                </div>
+              </article>
+
+              <article className="panel">
                 <h3>Your Storefront Link</h3>
-                <div className="storefrontSub">Share your store with customers</div>
+                <p className="mutedText">Share your store with customers</p>
+
                 <div className="storefrontLinkBox">
                   <span>{storeUrl}</span>
-                  <button type="button" className="copyIconBtn" onClick={copyStoreLink}>
+                  <button type="button" className="copyBtn" onClick={copyStoreLink}>
                     {copied ? '✓' : '⧉'}
                   </button>
                 </div>
-              </section>
+
+                <button
+                  type="button"
+                  className="blackBtn storefrontBtn"
+                  onClick={() => window.open(storeUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  Open Storefront
+                  <span>↗</span>
+                </button>
+              </article>
             </div>
           </div>
         </section>
       </div>
 
       <style jsx global>{`
-        :root { color-scheme: light; }
-        body { margin: 0; background: #f8fafc; }
-        .ownerPage {
-          min-height: 100vh;
-          background:
-            radial-gradient(circle at top left, rgba(218,231,255,0.35), transparent 28%),
-            linear-gradient(180deg, #fafcff 0%, #f7f9fc 100%);
+        :root {
+          color-scheme: light;
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        html,
+        body {
+          width: 100%;
+          overflow-x: hidden;
+        }
+
+        body {
+          margin: 0;
+          background: #f5f7fb;
           color: #111827;
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        .dashboardShell { width: min(1500px, calc(100vw - 28px)); margin: 14px auto; display: grid; grid-template-columns: 238px minmax(0, 1fr); gap: 18px; }
-        .sidebar, .card, .kpiCard, .sidebarStoreCard {
-          border: 1px solid #e6ebf2; background: rgba(255,255,255,0.96); box-shadow: 0 14px 34px rgba(15,23,42,0.04);
+
+        button,
+        input {
+          font: inherit;
         }
-        .sidebar { border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-        .brandBlock { display:flex; align-items:center; gap:12px; padding:8px 2px 6px; }
-        .brandLogo { width:44px; height:44px; border-radius:14px; background:#111827; color:#fff; display:grid; place-items:center; font-size:22px; font-weight:900; }
-        .brandName { font-size:18px; font-weight:900; }
-        .brandSub { font-size:12px; color:#64748b; font-weight:800; letter-spacing:.08em; }
-        .navList { display:grid; gap:6px; }
-        .navBtn { height:48px; border:none; border-radius:14px; background:transparent; display:flex; align-items:center; gap:12px; padding:0 14px; font-size:15px; font-weight:800; cursor:pointer; text-align:left; }
-        .navBtn.active { background:#edf3ff; color:#173b8f; }
-        .navIcon { width:20px; text-align:center; color:#64748b; }
-        .sidebarStoreCard { border-radius:18px; padding:14px; }
-        .storeMiniTop { display:flex; align-items:center; gap:12px; }
-        .storeMiniImage { width:56px; height:56px; border-radius:14px; background:#e5e7eb; }
-        .storeMiniName { font-size:16px; font-weight:900; }
-        .storeMiniLive { font-size:12px; font-weight:900; color:#16a34a; margin-top:4px; }
-        .sidebarStats { display:grid; gap:8px; margin-top:14px; }
-        .sidebarStatRow { display:flex; justify-content:space-between; gap:10px; font-size:14px; color:#64748b; }
-        .sidebarStatRow strong { color:#111827; font-weight:900; }
-        .mainArea { display:grid; gap:18px; }
-        .topBar { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding:8px 6px 0; }
-        .topWelcomeLine { font-size:16px; color:#64748b; font-weight:800; }
-        .topBar h1 { margin:10px 0 6px; font-size:34px; font-weight:900; display:flex; align-items:center; gap:10px; }
-        .liveDot { width:12px; height:12px; border-radius:999px; background:#22c55e; display:inline-block; box-shadow:0 0 0 5px rgba(34,197,94,0.12); }
-        .topSub { font-size:15px; color:#64748b; font-weight:700; }
-        .topBarRight { display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:flex-end; }
-        .timeCard { min-width:240px; height:84px; padding:12px 16px; border-radius:18px; background:#fff; border:1px solid #dbe2ea; display:flex; flex-direction:column; justify-content:center; box-shadow:0 10px 24px rgba(15,23,42,0.04); }
-        .timeLabel { font-size:11px; font-weight:900; color:#64748b; letter-spacing:.08em; text-transform:uppercase; }
-        .timeValue { margin-top:6px; font-size:24px; font-weight:900; color:#111827; line-height:1; }
-        .dateValue { margin-top:6px; font-size:13px; font-weight:700; color:#64748b; }
-        .searchWrap { width:330px; height:48px; border:1px solid #dbe2ea; border-radius:14px; background:#fff; display:flex; align-items:center; gap:10px; padding:0 14px; color:#64748b; }
-        .searchWrap input { border:none; outline:none; background:transparent; width:100%; font-size:14px; color:#111827; }
-        .blackBtn, .outlineBtn, .copyIconBtn, .filterBtn {
-          appearance:none; border:none; outline:none; cursor:pointer; font-family:inherit;
+
+        .ownerPage {
+          min-height: 100vh;
+          background:
+            radial-gradient(circle at top left, rgba(228, 233, 245, 0.42), transparent 24%),
+            linear-gradient(180deg, #f6f8fc 0%, #f4f6fa 100%);
+          padding: 14px 0 24px;
         }
-        .blackBtn { height:48px; padding:0 18px; border-radius:14px; background:#111827; color:#fff; font-size:15px; font-weight:900; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
-        .outlineBtn { height:48px; padding:0 18px; border-radius:14px; background:#fff; border:1px solid #dbe2ea; color:#111827; font-size:15px; font-weight:900; display:inline-flex; align-items:center; justify-content:center; }
-        .errorBanner { padding:14px 16px; border-radius:16px; background:#fff0f1; border:1px solid #f5c9ce; color:#a12639; font-size:14px; font-weight:800; }
-        .kpiGrid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:18px; }
-        .kpiCard { border-radius:20px; padding:18px; display:grid; grid-template-columns:54px 1fr; gap:14px; align-items:center; }
-        .kpiIcon { width:54px; height:54px; border-radius:16px; display:grid; place-items:center; font-size:26px; font-weight:900; }
-        .kpiIcon.green { background:#dcfce7; color:#16a34a; }
-        .kpiIcon.blue { background:#dbeafe; color:#2563eb; }
-        .kpiIcon.orange { background:#ffedd5; color:#f97316; }
-        .kpiIcon.purple { background:#ede9fe; color:#7c3aed; }
-        .kpiLabel { font-size:14px; color:#64748b; font-weight:800; }
-        .kpiValue { margin-top:6px; font-size:24px; font-weight:900; }
-        .kpiSub { margin-top:8px; font-size:13px; font-weight:800; }
-        .kpiSub.good { color:#16a34a; }
-        .kpiSub.danger { color:#ef4444; }
-        .contentGrid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(300px,360px); gap:18px; align-items:start; }
-        .leftColumn, .rightColumn { display:grid; gap:18px; }
-        .card { border-radius:22px; padding:18px; }
-        .cardHeader, .salesHeader, .miniCardHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .cardTitleBlock { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-        .card h2, .card h3 { margin:0; font-size:18px; font-weight:900; }
-        .newBubble { min-width:64px; height:28px; padding:0 12px; border-radius:999px; background:#fff1f2; color:#ef4444; display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; }
-        .filterRow { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
-        .filterBtn { min-width:78px; height:36px; padding:0 14px; border-radius:999px; background:#f7fafc; border:1px solid #e6ebf2; color:#111827; font-size:14px; font-weight:900; }
-        .filterBtn.active { background:#eff6ff; border-color:#dbeafe; color:#173b8f; }
-        .ordersList { display:grid; gap:12px; margin-top:18px; }
-        .orderRow { min-height:82px; border:1px solid #e8edf4; border-radius:18px; background:#fff; display:grid; grid-template-columns:100px 54px 1.1fr 1.2fr 120px 120px 140px; gap:12px; align-items:center; padding:12px 14px; position:relative; overflow:hidden; }
-        .orderRow::before { content:''; position:absolute; left:0; top:12px; bottom:12px; width:4px; border-radius:999px; }
-        .orderRow.new::before { background:#ef4444; }
-        .orderRow.progress::before { background:#2563eb; }
-        .orderRow.ready::before { background:#f59e0b; }
-        .orderRow.completed::before { background:#16a34a; }
-        .orderRow.cancelled::before { background:#94a3b8; }
-        .orderNumber { font-size:14px; font-weight:900; }
-        .orderAgo { margin-top:8px; font-size:13px; color:#64748b; font-weight:700; }
-        .avatar { width:42px; height:42px; border-radius:999px; display:grid; place-items:center; font-size:18px; font-weight:900; }
-        .avatar.new { background:#ffe4e6; color:#ef4444; }
-        .avatar.progress { background:#dbeafe; color:#2563eb; }
-        .avatar.ready { background:#ffedd5; color:#f59e0b; }
-        .avatar.completed { background:#dcfce7; color:#16a34a; }
-        .avatar.cancelled { background:#e2e8f0; color:#64748b; }
-        .customerName { font-size:15px; font-weight:900; }
-        .customerPhone { margin-top:6px; font-size:14px; color:#64748b; font-weight:700; }
-        .itemsSummary { font-size:14px; line-height:1.45; color:#475569; font-weight:700; }
-        .amountValue { font-size:15px; font-weight:900; }
-        .statusBadge { min-width:92px; height:32px; padding:0 14px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; white-space:nowrap; }
-        .statusBadge.new { background:#fff1f2; color:#ef4444; }
-        .statusBadge.progress { background:#eff6ff; color:#2563eb; }
-        .statusBadge.ready { background:#fff7ed; color:#f59e0b; }
-        .statusBadge.completed { background:#ecfdf3; color:#16a34a; }
-        .statusBadge.cancelled { background:#f1f5f9; color:#64748b; }
-        .smallBlackBtn { height:42px; min-width:92px; padding:0 16px; border-radius:12px; font-size:14px; }
-        .bottomAnalyticsRow { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(290px,360px); gap:18px; }
-        .salesBigValue { margin-top:8px; font-size:18px; font-weight:900; }
-        .salesTrend { margin-top:8px; font-size:13px; color:#16a34a; font-weight:900; }
-        .chartWrap { display:grid; grid-template-columns:56px 1fr; gap:8px; margin-top:16px; }
-        .chartYAxis { display:flex; flex-direction:column; justify-content:space-between; padding:12px 0 24px; color:#64748b; font-size:13px; font-weight:700; }
-        .chartSvg { width:100%; height:240px; display:block; }
-        .chartXAxis { display:grid; grid-template-columns:repeat(7, 1fr); margin-top:4px; color:#64748b; font-size:13px; font-weight:800; text-align:center; }
-        .topItemsList { display:grid; gap:14px; margin-top:16px; }
-        .topItemRow { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-        .topItemLeft, .topItemRight { display:flex; align-items:center; gap:10px; }
-        .rankDot { width:22px; height:22px; border-radius:999px; background:#f1f5f9; color:#64748b; display:grid; place-items:center; font-size:12px; font-weight:900; }
-        .topItemLeft span { font-size:14px; font-weight:800; }
-        .topItemRight span { font-size:13px; color:#64748b; font-weight:700; }
-        .topItemRight strong { font-size:14px; font-weight:900; }
-        .storeLiveLine { margin-top:8px; display:flex; align-items:center; gap:10px; color:#64748b; font-size:14px; font-weight:700; }
-        .smallGreenDot { width:8px; height:8px; border-radius:999px; background:#22c55e; }
-        .miniStatusPanel, .storefrontLinkBox { margin-top:16px; border:1px solid #e6ebf2; border-radius:18px; padding:16px; background:#fff; }
-        .miniStatusRows { display:grid; gap:14px; }
-        .miniStatusRow { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; color:#475569; font-weight:700; }
-        .storefrontSub { margin-top:8px; font-size:14px; color:#64748b; font-weight:700; }
-        .storefrontLinkBox { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 12px 0 14px; min-height:48px; }
-        .storefrontLinkBox span { font-size:14px; font-weight:800; word-break:break-word; }
-        .copyIconBtn { width:36px; height:36px; border-radius:10px; background:#f8fafc; border:1px solid #dbe2ea; color:#475569; font-size:15px; font-weight:900; }
-        .emptyState { border:1px dashed #dbe2ea; border-radius:18px; padding:22px; text-align:center; color:#64748b; font-size:15px; font-weight:800; }
-        @media (max-width: 1260px) {
-          .dashboardShell { grid-template-columns: 1fr; }
-          .contentGrid, .bottomAnalyticsRow { grid-template-columns: 1fr; }
+
+        .dashboardShell {
+          width: min(1480px, calc(100vw - 28px));
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 242px minmax(0, 1fr);
+          gap: 18px;
+          align-items: start;
         }
+
+        .sidebar,
+        .panel,
+        .kpiCard,
+        .ownerCard,
+        .upgradeCard,
+        .profileCard,
+        .promoCard {
+          background: rgba(255, 255, 255, 0.97);
+          border: 1px solid #e5eaf2;
+          box-shadow: 0 8px 24px rgba(15, 23, 42, 0.035);
+        }
+
+        .sidebar {
+          border-radius: 22px;
+          padding: 14px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          position: sticky;
+          top: 14px;
+        }
+
+        .brandBlock {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 4px 2px 10px;
+        }
+
+        .brandLogo {
+          width: 48px;
+          height: 48px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+          color: #ffffff;
+          display: grid;
+          place-items: center;
+          font-size: 24px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .brandName {
+          font-size: 18px;
+          font-weight: 900;
+          line-height: 1;
+        }
+
+        .brandSub {
+          margin-top: 6px;
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+        }
+
+        .navList {
+          display: grid;
+          gap: 7px;
+        }
+
+        .navBtn {
+          min-height: 44px;
+          border: none;
+          border-radius: 14px;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 0 12px;
+          color: #111827;
+          font-size: 15px;
+          font-weight: 800;
+          text-align: left;
+          cursor: pointer;
+        }
+
+        .navBtn.active {
+          background: #eff3fd;
+          color: #1e40af;
+        }
+
+        .navIconBox {
+          width: 28px;
+          height: 28px;
+          border-radius: 10px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          background: transparent;
+          flex-shrink: 0;
+          font-size: 13px;
+        }
+
+        .navIconBox.active {
+          color: #1e40af;
+        }
+
+        .navAlert {
+          margin-left: auto;
+          min-width: 24px;
+          height: 24px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #ffffff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .newPill {
+          margin-left: auto;
+          min-width: 44px;
+          height: 24px;
+          border-radius: 999px;
+          background: #dcfce7;
+          color: #16a34a;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 10px;
+          font-size: 12px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .ownerCard {
+          border-radius: 18px;
+          padding: 14px;
+        }
+
+        .ownerCardTop {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .ownerThumb,
+        .profileThumb {
+          width: 54px;
+          height: 54px;
+          border-radius: 14px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.05)),
+            linear-gradient(180deg, #2b2f39 0%, #1d212b 100%);
+          box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+          flex-shrink: 0;
+        }
+
+        .ownerInfo {
+          min-width: 0;
+        }
+
+        .ownerName,
+        .profileName {
+          font-size: 15px;
+          font-weight: 900;
+          word-break: break-word;
+        }
+
+        .livePill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 42px;
+          height: 22px;
+          margin-top: 4px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: #ecfdf3;
+          color: #16a34a;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .ownerPlan,
+        .profileRole {
+          margin-top: 6px;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .ownerStats {
+          display: grid;
+          gap: 10px;
+          margin-top: 14px;
+        }
+
+        .ownerStatRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .ownerStatRow strong {
+          color: #111827;
+          font-weight: 900;
+        }
+
+        .blackBtn,
+        .whiteBtn,
+        .lineBtn,
+        .upgradeBtn,
+        .notifyBtn,
+        .filterChip,
+        .selectorBtn,
+        .miniBtn,
+        .quickCard,
+        .copyBtn,
+        .linkButton,
+        .loadMoreBtn {
+          appearance: none;
+          outline: none;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .blackBtn {
+          min-height: 46px;
+          padding: 0 18px;
+          border: 1px solid #0f172a;
+          border-radius: 14px;
+          background: #081225;
+          color: #ffffff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          font-size: 15px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .sidebarStoreBtn,
+        .storefrontBtn {
+          width: 100%;
+          margin-top: 14px;
+        }
+
+        .whiteBtn {
+          min-height: 46px;
+          padding: 0 18px;
+          border: 1px solid #dbe2ea;
+          border-radius: 14px;
+          background: #ffffff;
+          color: #111827;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .lineBtn {
+          min-height: 42px;
+          padding: 0 16px;
+          border: 1px solid #dbe2ea;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #64748b;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .upgradeCard,
+        .profileCard {
+          border-radius: 18px;
+          padding: 14px;
+        }
+
+        .upgradeIcon {
+          width: 30px;
+          height: 30px;
+          border-radius: 10px;
+          color: #4338ca;
+          display: grid;
+          place-items: center;
+          font-size: 14px;
+          font-weight: 900;
+          background: #eef2ff;
+        }
+
+        .upgradeTitle {
+          margin-top: 12px;
+          font-size: 15px;
+          font-weight: 900;
+          color: #111827;
+        }
+
+        .upgradeText {
+          margin-top: 8px;
+          color: #64748b;
+          font-size: 13px;
+          line-height: 1.5;
+          font-weight: 700;
+        }
+
+        .upgradeBtn {
+          width: 100%;
+          min-height: 40px;
+          margin-top: 14px;
+          border: 1px solid #dbe2ea;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #111827;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .profileCard {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .profileInfo {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .profileChevron {
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .mainArea {
+          display: grid;
+          gap: 18px;
+          min-width: 0;
+        }
+
+        .topBar {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 4px 2px 0;
+        }
+
+        .heroText {
+          min-width: 0;
+        }
+
+        .welcomeLine {
+          color: #64748b;
+          font-size: 16px;
+          font-weight: 800;
+        }
+
+        .heroText h1 {
+          margin: 10px 0 6px;
+          color: #111827;
+          font-size: 34px;
+          line-height: 1.05;
+          font-weight: 900;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .heroDot {
+          width: 12px;
+          height: 12px;
+          border-radius: 999px;
+          background: #22c55e;
+          box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
+          flex-shrink: 0;
+        }
+
+        .heroText p {
+          margin: 0;
+          color: #64748b;
+          font-size: 15px;
+          font-weight: 700;
+        }
+
+        .topActions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          min-width: 0;
+        }
+
+        .searchBox {
+          width: 328px;
+          min-height: 46px;
+          border: 1px solid #dbe2ea;
+          border-radius: 14px;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0 14px;
+          color: #64748b;
+          min-width: 0;
+        }
+
+        .searchBox input {
+          width: 100%;
+          min-width: 0;
+          border: none;
+          outline: none;
+          background: transparent;
+          color: #111827;
+          font-size: 14px;
+        }
+
+        .searchIcon {
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+
+        .notifyBtn {
+          width: 38px;
+          height: 38px;
+          border: none;
+          border-radius: 999px;
+          background: transparent;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          color: #64748b;
+          flex-shrink: 0;
+        }
+
+        .notifyBtn strong {
+          position: absolute;
+          top: -4px;
+          right: -5px;
+          min-width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #ffffff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+          font-size: 10px;
+          font-weight: 900;
+        }
+
+        .errorBanner {
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: #fff0f1;
+          border: 1px solid #f5c9ce;
+          color: #a12639;
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .kpiGrid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .kpiCard {
+          min-height: 130px;
+          border-radius: 20px;
+          padding: 22px 20px;
+          display: grid;
+          grid-template-columns: 62px 1fr auto;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .kpiIcon {
+          width: 62px;
+          height: 62px;
+          border-radius: 18px;
+          display: grid;
+          place-items: center;
+          font-size: 28px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .kpiIcon.green {
+          background: #dcfce7;
+          color: #16a34a;
+        }
+
+        .kpiIcon.blue {
+          background: #dbeafe;
+          color: #2563eb;
+        }
+
+        .kpiIcon.orange {
+          background: #ffedd5;
+          color: #f97316;
+        }
+
+        .kpiIcon.purple {
+          background: #ede9fe;
+          color: #8b5cf6;
+        }
+
+        .kpiBody {
+          min-width: 0;
+        }
+
+        .kpiLabel {
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .kpiValue {
+          margin-top: 6px;
+          color: #111827;
+          font-size: 22px;
+          line-height: 1;
+          font-weight: 900;
+        }
+
+        .kpiMeta {
+          margin-top: 10px;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .greenText {
+          color: #16a34a;
+        }
+
+        .redText {
+          color: #ef4444;
+        }
+
+        .sparkSvg {
+          width: 84px;
+          height: 42px;
+          display: block;
+          flex-shrink: 0;
+        }
+
+        .ghostIcon {
+          width: 54px;
+          height: 54px;
+          border-radius: 16px;
+          background: #fff7ed;
+          color: #f59e0b;
+          display: grid;
+          place-items: center;
+          font-size: 22px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .contentGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.5fr) 364px;
+          gap: 18px;
+          align-items: start;
+        }
+
+        .leftColumn,
+        .rightColumn {
+          display: grid;
+          gap: 18px;
+          min-width: 0;
+        }
+
+        .panel {
+          border-radius: 22px;
+          padding: 18px;
+        }
+
+        .panel h2,
+        .panel h3 {
+          margin: 0;
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .panelHeader,
+        .salesTop {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .titleWithBadge {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .softRedBadge {
+          min-width: 66px;
+          height: 28px;
+          border-radius: 999px;
+          background: #fff1f2;
+          color: #ef4444;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 12px;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .linkButton {
+          border: none;
+          background: transparent;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .filterRow {
+          margin-top: 16px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .filterChip {
+          min-height: 38px;
+          padding: 0 14px;
+          border: 1px solid #e6ebf2;
+          border-radius: 999px;
+          background: #f8fafc;
+          color: #111827;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .filterChip strong {
+          font-size: 12px;
+        }
+
+        .filterChip.active {
+          background: #eef2ff;
+          border-color: #dbeafe;
+          color: #1e40af;
+        }
+
+        .ordersList {
+          display: grid;
+          gap: 12px;
+          margin-top: 18px;
+        }
+
+        .orderRow {
+          min-height: 84px;
+          border: 1px solid #e8edf4;
+          border-radius: 18px;
+          background: #ffffff;
+          display: grid;
+          grid-template-columns: 90px 44px minmax(120px, 0.9fr) minmax(150px, 1.1fr) 88px 116px minmax(160px, 1fr);
+          gap: 12px;
+          align-items: center;
+          padding: 12px 14px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .orderRow::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 12px;
+          bottom: 12px;
+          width: 4px;
+          border-radius: 999px;
+        }
+
+        .orderRow.new::before {
+          background: #ef4444;
+        }
+
+        .orderRow.in_progress::before {
+          background: #3b82f6;
+        }
+
+        .orderRow.ready::before {
+          background: #f59e0b;
+        }
+
+        .orderRow.completed::before {
+          background: #22c55e;
+        }
+
+        .orderRow.cancelled::before {
+          background: #94a3b8;
+        }
+
+        .orderIdCol,
+        .customerCol,
+        .itemsCol,
+        .amountCol,
+        .statusCol,
+        .actionsCol {
+          min-width: 0;
+        }
+
+        .orderCode {
+          color: #111827;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .orderAgo {
+          margin-top: 8px;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .avatar {
+          width: 42px;
+          height: 42px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .avatar.new {
+          background: #ffe4e6;
+          color: #ef4444;
+        }
+
+        .avatar.progress {
+          background: #dbeafe;
+          color: #2563eb;
+        }
+
+        .avatar.ready {
+          background: #ffedd5;
+          color: #f59e0b;
+        }
+
+        .avatar.completed {
+          background: #dcfce7;
+          color: #16a34a;
+        }
+
+        .avatar.cancelled {
+          background: #e2e8f0;
+          color: #64748b;
+        }
+
+        .customerName {
+          color: #111827;
+          font-size: 15px;
+          font-weight: 900;
+          word-break: break-word;
+        }
+
+        .customerMeta {
+          margin-top: 6px;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+          word-break: break-word;
+        }
+
+        .itemsSummary {
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.45;
+          font-weight: 700;
+          word-break: break-word;
+        }
+
+        .amountValue {
+          color: #111827;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .statusBadge {
+          min-width: 96px;
+          height: 32px;
+          padding: 0 14px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          white-space: nowrap;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .statusBadge.new {
+          background: #fff1f2;
+          color: #ef4444;
+        }
+
+        .statusBadge.progress {
+          background: #eff6ff;
+          color: #2563eb;
+        }
+
+        .statusBadge.ready {
+          background: #fff7ed;
+          color: #f59e0b;
+        }
+
+        .statusBadge.completed {
+          background: #ecfdf3;
+          color: #16a34a;
+        }
+
+        .statusBadge.cancelled {
+          background: #f1f5f9;
+          color: #64748b;
+        }
+
+        .actionsCol {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 10px;
+          flex-wrap: wrap;
+          min-width: 0;
+        }
+
+        .rowActionBtn {
+          min-height: 42px;
+          padding: 0 16px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .emptyState {
+          border: 1px dashed #dbe2ea;
+          border-radius: 18px;
+          padding: 24px;
+          text-align: center;
+          color: #64748b;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .loadMoreBtn {
+          margin: 12px auto 0;
+          display: block;
+          border: none;
+          background: transparent;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .bottomRow {
+          display: grid;
+          grid-template-columns: minmax(0, 1.36fr) 1fr;
+          gap: 18px;
+        }
+
+        .salesPanel {
+          min-width: 0;
+        }
+
+        .salesValueRow {
+          margin-top: 8px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .salesValueRow strong {
+          color: #111827;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .salesValueRow span {
+          color: #16a34a;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .selectorBtn {
+          min-height: 38px;
+          padding: 0 14px;
+          border: 1px solid #dbe2ea;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .salesContent {
+          margin-top: 16px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 206px;
+          gap: 16px;
+          align-items: stretch;
+        }
+
+        .chartWrap {
+          display: grid;
+          grid-template-columns: 48px 1fr;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .chartYAxis {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 8px 0 24px;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .chartArea {
+          min-width: 0;
+        }
+
+        .chartSvg {
+          width: 100%;
+          height: 196px;
+          display: block;
+        }
+
+        .chartDays {
+          margin-top: 4px;
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          text-align: center;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .salesStatsCard {
+          border: 1px solid #e6ebf2;
+          border-radius: 18px;
+          background: #ffffff;
+          padding: 16px;
+          display: grid;
+          align-content: start;
+          gap: 14px;
+        }
+
+        .salesStatRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .salesStatRow strong {
+          color: #111827;
+          font-weight: 900;
+        }
+
+        .analyticsLinkBtn {
+          margin-top: 6px;
+          border: none;
+          background: transparent;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 900;
+          text-align: left;
+          padding: 0;
+        }
+
+        .topItemsList {
+          margin-top: 16px;
+          display: grid;
+          gap: 14px;
+        }
+
+        .topItemRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .topItemLeft,
+        .topItemRight {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
+        }
+
+        .rankDot {
+          width: 22px;
+          height: 22px;
+          border-radius: 999px;
+          background: #f1f5f9;
+          color: #64748b;
+          display: grid;
+          place-items: center;
+          font-size: 12px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .topItemLeft span {
+          color: #111827;
+          font-size: 14px;
+          font-weight: 800;
+          word-break: break-word;
+        }
+
+        .topItemRight span {
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .topItemRight strong {
+          color: #111827;
+          font-size: 14px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .storeOnlineRow {
+          margin-top: 8px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .greenDot {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: #22c55e;
+          flex-shrink: 0;
+        }
+
+        .stripeCard {
+          margin-top: 16px;
+          border: 1px solid #e6ebf2;
+          border-radius: 18px;
+          background: #ffffff;
+          padding: 14px;
+        }
+
+        .stripeCardTop {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .stripeCardTop strong {
+          color: #111827;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .miniBtn {
+          min-height: 32px;
+          padding: 0 12px;
+          border: 1px solid #dbe2ea;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .stripeRows {
+          margin-top: 14px;
+          display: grid;
+          gap: 14px;
+        }
+
+        .stripeRow {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          color: #475569;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .successPill {
+          min-width: 84px;
+          height: 28px;
+          border-radius: 999px;
+          background: #ecfdf3;
+          color: #16a34a;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 10px;
+          font-size: 12px;
+          font-weight: 900;
+          white-space: nowrap;
+        }
+
+        .nextPayoutCard {
+          margin-top: 12px;
+          border: 1px solid #e6ebf2;
+          border-radius: 18px;
+          background: #ffffff;
+          padding: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+        }
+
+        .nextPayoutCard span {
+          display: block;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .nextPayoutCard strong {
+          display: block;
+          margin-top: 6px;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .nextPayoutDate {
+          max-width: 140px;
+          text-align: right;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .promoCard {
+          border-radius: 22px;
+          padding: 18px;
+          display: grid;
+          grid-template-columns: 1fr 116px;
+          gap: 14px;
+          align-items: center;
+          background: linear-gradient(180deg, #fff8e5 0%, #fff2cd 100%);
+          border-color: #efdfb1;
+        }
+
+        .promoCopy h3 {
+          margin: 0;
+          color: #111827;
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .promoCopy p {
+          margin: 8px 0 0;
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.5;
+          font-weight: 700;
+        }
+
+        .promoBtn {
+          margin-top: 14px;
+          width: auto;
+        }
+
+        .promoPosterWrap {
+          width: 100%;
+          height: 118px;
+          border-radius: 18px;
+          background: linear-gradient(180deg, #fde2a7 0%, #f7b857 100%);
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+        }
+
+        .promoPoster {
+          width: 84px;
+          height: 104px;
+          border-radius: 14px;
+          background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          font-size: 16px;
+          line-height: 1.02;
+          font-weight: 900;
+          transform: rotate(8deg);
+          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.2);
+        }
+
+        .quickGrid {
+          margin-top: 16px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .quickCard {
+          min-height: 78px;
+          border: 1px solid #e6ebf2;
+          border-radius: 16px;
+          background: #ffffff;
+          padding: 14px;
+          display: grid;
+          grid-template-columns: 42px 1fr;
+          align-items: center;
+          gap: 12px;
+          text-align: left;
+        }
+
+        .quickIcon {
+          width: 42px;
+          height: 42px;
+          border-radius: 12px;
+          display: grid;
+          place-items: center;
+          font-size: 18px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        .quickIcon.green {
+          background: #dcfce7;
+          color: #16a34a;
+        }
+
+        .quickIcon.red {
+          background: #ffe4e6;
+          color: #ef4444;
+        }
+
+        .quickIcon.blue {
+          background: #dbeafe;
+          color: #2563eb;
+        }
+
+        .quickIcon.purple {
+          background: #ede9fe;
+          color: #8b5cf6;
+        }
+
+        .quickCard strong {
+          display: block;
+          color: #111827;
+          font-size: 14px;
+          font-weight: 900;
+        }
+
+        .quickCard span:last-child {
+          display: block;
+          margin-top: 4px;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .mutedText {
+          margin: 8px 0 0;
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .storefrontLinkBox {
+          margin-top: 16px;
+          min-height: 50px;
+          border: 1px solid #e6ebf2;
+          border-radius: 16px;
+          background: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 0 12px 0 14px;
+        }
+
+        .storefrontLinkBox span {
+          color: #111827;
+          font-size: 14px;
+          font-weight: 800;
+          word-break: break-word;
+        }
+
+        .copyBtn {
+          width: 38px;
+          height: 38px;
+          border: 1px solid #dbe2ea;
+          border-radius: 12px;
+          background: #f8fafc;
+          color: #64748b;
+          display: grid;
+          place-items: center;
+          font-size: 15px;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        @media (max-width: 1360px) {
+          .contentGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .rightColumn {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .promoCard {
+            grid-column: span 2;
+          }
+        }
+
+        @media (max-width: 1180px) {
+          .dashboardShell {
+            grid-template-columns: 1fr;
+          }
+
+          .sidebar {
+            position: static;
+          }
+
+          .bottomRow {
+            grid-template-columns: 1fr;
+          }
+
+          .salesContent {
+            grid-template-columns: 1fr;
+          }
+        }
+
         @media (max-width: 980px) {
-          .kpiGrid { grid-template-columns: 1fr 1fr; }
-          .topBar { flex-direction: column; align-items: stretch; }
-          .topBarRight { justify-content: stretch; }
-          .searchWrap { width: 100%; }
-          .orderRow { grid-template-columns: 1fr; gap: 10px; }
-          .chartWrap { grid-template-columns: 1fr; }
-          .chartYAxis { display: none; }
+          .topBar {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .topActions {
+            justify-content: stretch;
+          }
+
+          .searchBox {
+            width: 100%;
+          }
+
+          .kpiGrid {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .orderRow {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .actionsCol {
+            justify-content: flex-start;
+          }
+
+          .chartWrap {
+            grid-template-columns: 1fr;
+          }
+
+          .chartYAxis {
+            display: none;
+          }
+
+          .rightColumn,
+          .quickGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .promoCard {
+            grid-template-columns: 1fr;
+          }
         }
+
         @media (max-width: 640px) {
-          .dashboardShell { width: min(100vw - 14px, 1500px); margin: 7px auto; }
-          .kpiGrid { grid-template-columns: 1fr; }
-          .topBar h1 { font-size: 28px; }
-          .timeCard { width: 100%; min-width: 0; }
+          .ownerPage {
+            padding-top: 8px;
+          }
+
+          .dashboardShell {
+            width: min(100vw - 12px, 1480px);
+            gap: 12px;
+          }
+
+          .sidebar,
+          .panel,
+          .kpiCard,
+          .ownerCard,
+          .upgradeCard,
+          .profileCard,
+          .promoCard {
+            border-radius: 20px;
+          }
+
+          .heroText h1 {
+            font-size: 28px;
+          }
+
+          .kpiGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .kpiCard {
+            grid-template-columns: 62px 1fr;
+          }
+
+          .sparkSvg,
+          .ghostIcon {
+            display: none;
+          }
+
+          .blackBtn,
+          .whiteBtn {
+            width: 100%;
+          }
         }
       `}</style>
     </main>
