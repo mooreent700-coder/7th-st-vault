@@ -860,7 +860,14 @@ export default function OwnerDashboardPage() {
         </section>
       </div>
 
-      <style jsx global>{/* same styles from previous message */}</style>
+      <style jsx global>{`
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    background: #f4f6fb;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+`}</style>
     </main>
   );
 }
