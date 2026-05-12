@@ -1,90 +1,80 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export default function LoginPage() {
-  const router = useRouter();
-
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [success, setSuccess] = useState(false);
 
-  async function handleLogin(e: FormEvent<HTMLFormElement>) {
+  async function handleReset(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!email.trim() || !password.trim()) {
-      setMessage('Enter email and password');
+    if (!email.trim()) {
+      setMessage('Enter your email');
       return;
     }
 
     try {
       setLoading(true);
       setMessage('');
+      setSuccess(false);
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        {
+          redirectTo: 'http://localhost:3000/auth/reset-password',
+        }
+      );
 
       if (error) throw error;
 
-      router.push('/dashboard/owner');
+      setSuccess(true);
+      setMessage('Password reset email sent.');
     } catch (err: any) {
-      setMessage(err?.message || 'Login failed');
+      setMessage(err?.message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="loginPage">
-      <section className="loginCard">
+    <main className="forgotPage">
+      <section className="forgotCard">
         <div className="brand">ORDA</div>
 
-        <h1>Welcome back</h1>
+        <h1>Forgot password</h1>
 
         <p className="subtitle">
-          Sign in to manage your store, orders, and payouts
+          Enter your email to receive a password reset link.
         </p>
 
-        <form onSubmit={handleLogin} className="loginForm">
+        <form onSubmit={handleReset} className="forgotForm">
           <input
             type="email"
-            placeholder="Email"
+            placeholder="Email address"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
           <button type="submit" disabled={loading}>
-            {loading ? 'Loading...' : 'Log in'}
+            {loading ? 'Sending...' : 'Send reset link'}
           </button>
         </form>
 
-        <Link href="/auth/forgot-password" className="forgotLink">
-          Forgot password?
+        {message ? (
+          <div className={success ? 'successMessage' : 'errorMessage'}>
+            {message}
+          </div>
+        ) : null}
+
+        <Link href="/auth/login" className="backLink">
+          Back to login
         </Link>
-
-        {message ? <div className="errorMessage">{message}</div> : null}
-
-        <div className="footerText">
-          No account?{' '}
-          <Link href="/auth/signup">
-            Sign up
-          </Link>
-        </div>
       </section>
 
       <style jsx global>{`
@@ -97,21 +87,19 @@ export default function LoginPage() {
           margin: 0;
           background: #0b0c10;
           color: #ffffff;
-          font-family: Inter, ui-sans-serif, system-ui, -apple-system,
-            BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font-family: Inter, sans-serif;
         }
 
-        .loginPage {
+        .forgotPage {
           min-height: 100vh;
-          width: 100%;
-          background: #0b0c10;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 20px;
+          background: #0b0c10;
         }
 
-        .loginCard {
+        .forgotCard {
           width: 100%;
           max-width: 430px;
           padding: 32px;
@@ -121,36 +109,34 @@ export default function LoginPage() {
         }
 
         .brand {
-          color: #ffffff;
           font-size: 20px;
           font-weight: 900;
           margin-bottom: 20px;
-          letter-spacing: 0.04em;
         }
 
-        .loginCard h1 {
-          color: #ffffff;
-          font-size: 42px;
+        h1 {
+          margin: 0;
+          font-size: 48px;
           line-height: 1;
           font-weight: 950;
-          margin: 0;
           letter-spacing: -0.04em;
         }
 
         .subtitle {
+          margin-top: 14px;
           color: #9ca3af;
-          margin: 14px 0 22px;
-          line-height: 1.45;
+          line-height: 1.5;
           font-size: 16px;
           font-weight: 600;
         }
 
-        .loginForm {
+        .forgotForm {
           display: grid;
           gap: 14px;
+          margin-top: 24px;
         }
 
-        .loginForm input {
+        .forgotForm input {
           width: 100%;
           height: 56px;
           border-radius: 14px;
@@ -162,15 +148,15 @@ export default function LoginPage() {
           outline: none;
         }
 
-        .loginForm input::placeholder {
+        .forgotForm input::placeholder {
           color: #9ca3af;
         }
 
-        .loginForm input:focus {
+        .forgotForm input:focus {
           border-color: #ffffff;
         }
 
-        .loginForm button {
+        .forgotForm button {
           width: 100%;
           height: 56px;
           border-radius: 14px;
@@ -182,46 +168,32 @@ export default function LoginPage() {
           cursor: pointer;
         }
 
-        .loginForm button:disabled {
+        .forgotForm button:disabled {
           opacity: 0.65;
           cursor: not-allowed;
         }
 
-        .forgotLink {
-          display: inline-block;
-          margin-top: 18px;
-          color: #ffffff;
-          font-size: 16px;
-          font-weight: 900;
-          text-decoration: none;
-          cursor: pointer;
-          position: relative;
-          z-index: 20;
-        }
-
-        .forgotLink:hover {
-          text-decoration: underline;
-        }
-
         .errorMessage {
-          margin-top: 14px;
+          margin-top: 18px;
           color: #ff4d4f;
           font-weight: 800;
         }
 
-        .footerText {
+        .successMessage {
           margin-top: 18px;
-          color: #8b8f99;
-          font-weight: 700;
+          color: #22c55e;
+          font-weight: 800;
         }
 
-        .footerText a {
+        .backLink {
+          display: inline-block;
+          margin-top: 20px;
           color: #ffffff;
           font-weight: 900;
           text-decoration: none;
         }
 
-        .footerText a:hover {
+        .backLink:hover {
           text-decoration: underline;
         }
       `}</style>

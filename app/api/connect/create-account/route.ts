@@ -1,97 +1,102 @@
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+export const runtime = 'nodejs';
 
-function generateSlug(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-}
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!stripeSecretKey) throw new Error('Missing STRIPE_SECRET_KEY');
+if (!supabaseUrl) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+if (!supabaseServiceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
+
+const stripe = new Stripe(stripeSecretKey);
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
 
-    const { fullName, businessName, email, password } = body;
+    const restaurantId =
+      typeof body?.restaurantId === 'string' && body.restaurantId.trim()
+        ? body.restaurantId.trim()
+        : null;
 
-    if (!email || !password || !businessName) {
+    if (!restaurantId) {
       return NextResponse.json(
-        { success: false, message: 'Missing required fields' },
+        { error: 'Missing restaurantId.' },
         { status: 400 }
       );
     }
 
-    // 1. Create user
-    const { data: signUpData, error: signUpError } =
-      await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-    if (signUpError) {
-      return NextResponse.json(
-        { success: false, message: signUpError.message },
-        { status: 400 }
-      );
-    }
-
-    // 2. Sign in user
-    const { data: signInData, error: signInError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-    if (signInError) {
-      return NextResponse.json(
-        { success: false, message: signInError.message },
-        { status: 400 }
-      );
-    }
-
-    const user = signInData.user;
-
-    if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'User not found after signup' },
-        { status: 400 }
-      );
-    }
-
-    // 3. Create restaurant
-    const slug = generateSlug(businessName);
-
-    const { error: insertError } = await supabase
+    const { data: restaurant, error: restaurantError } = await supabaseAdmin
       .from('restaurants')
-      .insert({
-        owner_id: user.id,
-        owner_email: email,
-        name: businessName,
-        slug,
-      });
+      .select('id, name, owner_email, stripe_account_id')
+      .eq('id', restaurantId)
+      .maybeSingle();
 
-    if (insertError) {
+    if (restaurantError) {
       return NextResponse.json(
-        { success: false, message: insertError.message },
-        { status: 400 }
+        { error: restaurantError.message },
+        { status: 500 }
       );
     }
 
-    // 4. Success
+    if (!restaurant) {
+      return NextResponse.json(
+        { error: 'Restaurant not found.' },
+        { status: 404 }
+      );
+    }
+
+    let stripeAccountId = restaurant.stripe_account_id as string | null;
+
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US',
+        email: restaurant.owner_email || undefined,
+        business_type: 'individual',
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_profile: {
+          name: restaurant.name || 'ORDA Restaurant',
+          product_description: 'Restaurant direct online ordering.',
+        },
+      });
+
+      stripeAccountId = account.id;
+
+      const { error: updateError } = await supabaseAdmin
+        .from('restaurants')
+        .update({
+          stripe_account_id: stripeAccountId,
+          stripe_connected: false,
+          stripe_charges_enabled: false,
+          stripe_payouts_enabled: false,
+        })
+        .eq('id', restaurant.id);
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      redirect: '/dashboard/owner',
+      accountId: stripeAccountId,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, message: err.message },
+      { error: err?.message || 'Could not create Stripe account.' },
       { status: 500 }
     );
   }

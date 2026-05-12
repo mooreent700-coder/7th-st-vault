@@ -1,30 +1,39 @@
-
 'use client';
+
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AdminHoldLogin from '@/components/AdminHoldLogin';
+
 type Lang = 'en' | 'es';
+
+type InfoCard = {
+  title: string;
+  text: string;
+};
+
+type StepCard = {
+  title: string;
+  text: string;
+};
+
+const OWNER_LANG_KEY = 'orda_owner_language';
 
 const content = {
   en: {
     navHow: 'How it works',
     navPricing: 'Pricing',
     navCreate: 'Create Account',
-
     pill: 'Built for real food businesses',
     heroTitle: 'ORDA builds and turns your menu into a website in minutes',
     heroText:
       'Made for restaurants, food trucks, pop-ups, and caterers that want a cleaner direct-ordering experience without building everything themselves.',
     startFree: 'Start Free',
-
     builtTitle: 'Built for real food businesses',
     builtText:
       'A direct-ordering platform that feels premium, alive, and made for restaurants, food trucks, pop-ups, and caterers that want customers ordering directly.',
-
     systemTitle: 'Your system, fully built for you.',
     systemText:
       'Everything you need to take orders, present your brand, and run your business — already built, clean, mobile-first, and ready to go.',
-
     pricingEyebrow: 'Pricing',
     pricingTitle: 'Simple pricing that grows with you',
     starter: 'Starter',
@@ -41,12 +50,10 @@ const content = {
     getStarted: 'Get Started',
     chooseGrowth: 'Choose Growth',
     goPremium: 'Go Premium',
-
     showcaseEyebrow: 'Made to feel real',
     showcaseTitle: 'A storefront that feels like a real business, not a basic page.',
     showcaseText:
       'ORDA gives restaurants, food trucks, pop-ups, and caterers a cleaner, stronger online presence with direct ordering built in.',
-
     cards: [
       {
         title: 'Restaurant-ready presentation',
@@ -60,8 +67,7 @@ const content = {
         title: 'Built for catering and repeat business',
         text: 'Present your menu, booking flow, and ordering experience in a way that feels professional and ready to scale.',
       },
-    ],
-
+    ] as InfoCard[],
     howEyebrow: 'How it works',
     howTitle: 'You enter the info. ORDA generates the rest.',
     steps: [
@@ -77,32 +83,26 @@ const content = {
         title: 'Start taking direct orders',
         text: 'Share your link and start accepting orders through your own branded system.',
       },
-    ],
-
+    ] as StepCard[],
     finalTitle: 'Launch your ordering system without building it yourself.',
     finalText:
       'ORDA turns your menu into a clean, premium ordering experience in minutes for restaurants, food trucks, pop-ups, and caterers.',
   },
-
   es: {
     navHow: 'Cómo funciona',
     navPricing: 'Precios',
     navCreate: 'Crear Cuenta',
-
     pill: 'Hecho para negocios reales de comida',
     heroTitle: 'ORDA crea y convierte tu menú en un sitio web en minutos',
     heroText:
       'Hecho para restaurantes, food trucks, pop-ups y catering que quieren una experiencia de pedidos directos más limpia sin tener que construir todo por su cuenta.',
     startFree: 'Empieza Gratis',
-
     builtTitle: 'Hecho para negocios reales de comida',
     builtText:
       'Una plataforma de pedidos directos que se siente premium, viva y hecha para restaurantes, food trucks, pop-ups y catering que quieren que sus clientes ordenen directamente.',
-
     systemTitle: 'Tu sistema, completamente hecho para ti.',
     systemText:
       'Todo lo que necesitas para tomar pedidos, presentar tu marca y operar tu negocio — ya construido, limpio, mobile-first y listo para usar.',
-
     pricingEyebrow: 'Precios',
     pricingTitle: 'Precios simples que crecen contigo',
     starter: 'Starter',
@@ -119,12 +119,10 @@ const content = {
     getStarted: 'Comenzar',
     chooseGrowth: 'Elegir Growth',
     goPremium: 'Ir Premium',
-
     showcaseEyebrow: 'Hecho para sentirse real',
     showcaseTitle: 'Una tienda que se siente como un negocio real, no una página básica.',
     showcaseText:
       'ORDA les da a restaurantes, food trucks, pop-ups y catering una presencia online más limpia y fuerte con pedidos directos integrados.',
-
     cards: [
       {
         title: 'Presentación lista para restaurante',
@@ -138,8 +136,7 @@ const content = {
         title: 'Hecho para catering y ventas repetidas',
         text: 'Presenta tu menú, tu flujo de reserva y tu experiencia de pedidos de una manera que se sienta profesional y lista para crecer.',
       },
-    ],
-
+    ] as InfoCard[],
     howEyebrow: 'Cómo funciona',
     howTitle: 'Tú ingresas la información. ORDA genera lo demás.',
     steps: [
@@ -155,116 +152,167 @@ const content = {
         title: 'Empieza a recibir pedidos directos',
         text: 'Comparte tu enlace y empieza a aceptar pedidos a través de tu propio sistema de marca.',
       },
-    ],
-
+    ] as StepCard[],
     finalTitle: 'Lanza tu sistema de pedidos sin tener que construirlo tú mismo.',
     finalText:
       'ORDA convierte tu menú en una experiencia de pedidos limpia y premium en minutos para restaurantes, food trucks, pop-ups y catering.',
   },
 } as const;
 
-const heroImage =
-  'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=1800&q=80';
+const heroImage = '/orda-hero-kitchen.png';
 
-const peopleImages = [
-  'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?auto=format&fit=crop&w=1400&q=80',
-  'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1400&q=80',
+const showcaseImages = [
+  'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1400&q=90',
+  'https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?auto=format&fit=crop&w=1400&q=90',
+  'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1400&q=90',
 ];
+
+function isLang(value: string | null): value is Lang {
+  return value === 'en' || value === 'es';
+}
+
+function saveOwnerLanguage(nextLang: Lang) {
+  if (typeof window === 'undefined') return;
+
+  window.localStorage.setItem(OWNER_LANG_KEY, nextLang);
+  window.localStorage.setItem('orda_language', nextLang);
+  window.localStorage.setItem('orda_order_language', nextLang);
+
+  document.cookie = `orda_owner_language=${nextLang}; path=/; max-age=31536000; SameSite=Lax`;
+  document.cookie = `orda_order_language=${nextLang}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+function getSavedOwnerLanguage(): Lang {
+  if (typeof window === 'undefined') return 'en';
+
+  const params = new URLSearchParams(window.location.search);
+  const queryLang = params.get('lang');
+
+  if (isLang(queryLang)) {
+    saveOwnerLanguage(queryLang);
+    return queryLang;
+  }
+
+  const saved = window.localStorage.getItem(OWNER_LANG_KEY);
+
+  if (isLang(saved)) return saved;
+
+  return 'en';
+}
 
 export default function HomePage() {
   const [lang, setLang] = useState<Lang>('en');
+
+  useEffect(() => {
+    const saved = getSavedOwnerLanguage();
+    setLang(saved);
+    saveOwnerLanguage(saved);
+  }, []);
+
   const t = content[lang];
+
+  const links = useMemo(() => {
+    const query = `lang=${lang}&owner_language=${lang}&order_language=${lang}`;
+
+    return {
+      signupStarter: `/auth/signup?plan=starter&${query}`,
+      signupBase: `/auth/signup?${query}`,
+      checkoutGrowth: `/auth/checkout?plan=growth&${query}`,
+      checkoutPremium: `/auth/checkout?plan=premium&${query}`,
+    };
+  }, [lang]);
+
+  function changeLanguage(nextLang: Lang) {
+    setLang(nextLang);
+    saveOwnerLanguage(nextLang);
+  }
 
   return (
     <main className="page">
       <header className="header">
         <div className="headerInner">
-       <div className="logoWrap">
-  <AdminHoldLogin>
-  <div
-    className="logoWrap"
-    onClick={() => window.location.href = '/'}
-    style={{ cursor: 'pointer' }}
-  >
-   <img src="/orda-logo-new.png" style={{ width: '200px' }} />
-  </div>
-</AdminHoldLogin>
+          <div className="logoArea">
+            <AdminHoldLogin>
+              <Link href="/" className="logoWrap" aria-label="ORDA home">
+                <img src="/orda-logo-new.png" alt="ORDA" className="logoImage" />
+              </Link>
+            </AdminHoldLogin>
+          </div>
 
-  <AdminHoldLogin>
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        zIndex: 5,
-        background: 'transparent'
-      }}
-    />
-  </AdminHoldLogin>
-</div>
-
-          <div className="headerRight">
+          <nav className="headerRight" aria-label="Main navigation">
             <a href="#how" className="navLink">
               {t.navHow}
             </a>
+
             <a href="#pricing" className="navLink">
               {t.navPricing}
             </a>
 
-            <div className="langWrap">
+            <div className="langWrap" aria-label="Language switcher">
               <button
                 type="button"
-                onClick={() => setLang('en')}
+                onClick={() => changeLanguage('en')}
                 className={lang === 'en' ? 'langButton active' : 'langButton'}
               >
                 EN
               </button>
+
               <button
                 type="button"
-                onClick={() => setLang('es')}
+                onClick={() => changeLanguage('es')}
                 className={lang === 'es' ? 'langButton active' : 'langButton'}
               >
                 ES
               </button>
             </div>
 
-            <Link href="/auth/signup" className="navButton">
+            <Link href={links.signupBase} className="navButton" onClick={() => saveOwnerLanguage(lang)}>
               {t.navCreate}
             </Link>
-          </div>
+          </nav>
         </div>
       </header>
 
       <section className="hero">
-        <img src={heroImage} alt="Chef cooking in a busy kitchen" className="heroImage" />
+        <img src={heroImage} alt="Chef cooking in a premium restaurant kitchen" className="heroImage" />
         <div className="heroOverlay" />
+        <div className="heroShadow" />
+
         <div className="heroContent">
           <div className="pill">{t.pill}</div>
           <h1 className="heroTitle">{t.heroTitle}</h1>
           <p className="heroText">{t.heroText}</p>
+
           <div className="heroButtons">
-            <Link href="/auth/signup?plan=starter" className="primaryBtn">
-              {t.startFree}
+            <Link href={links.signupStarter} className="primaryBtn" onClick={() => saveOwnerLanguage(lang)}>
+              <span>{t.startFree}</span>
+              <span className="arrow">›</span>
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="section">
-        <div className="container smallCenter">
-          <h2 className="sectionTitle">{t.builtTitle}</h2>
-          <p className="sectionText">{t.builtText}</p>
+      <section className="introBand">
+        <div className="container introGrid">
+          <article className="introItem">
+            <div className="introIcon">▤</div>
+            <div>
+              <h2 className="introTitle">{t.builtTitle}</h2>
+              <p className="introText">{t.builtText}</p>
+            </div>
+          </article>
+
+          <article className="introItem bordered">
+            <div className="introIcon">⌁</div>
+            <div>
+              <h2 className="introTitle">{t.systemTitle}</h2>
+              <p className="introText">{t.systemText}</p>
+            </div>
+          </article>
         </div>
       </section>
 
-      <section className="section soft">
-        <div className="container smallCenter">
-          <h2 className="sectionTitle">{t.systemTitle}</h2>
-          <p className="sectionText">{t.systemText}</p>
-        </div>
-      </section>
-
-      <section id="pricing" className="section">
+      <section id="pricing" className="pricingSection">
         <div className="container">
           <div className="smallCenter">
             <div className="eyebrow">{t.pricingEyebrow}</div>
@@ -272,45 +320,51 @@ export default function HomePage() {
           </div>
 
           <div className="pricingGrid">
-            <div className="priceCard">
+            <article className="priceCard">
               <div className="priceBody">
                 <h3 className="priceName">{t.starter}</h3>
                 <div className="priceTop">{t.starterTop}</div>
                 <div className="priceSub">{t.starterPrice}</div>
+                <div className="priceDivider" />
                 <div className="priceFee">{t.starterFee}</div>
               </div>
-              <Link href="/auth/signup?plan=starter" className="cardBtn">
+
+              <Link href={links.signupStarter} className="cardBtn" onClick={() => saveOwnerLanguage(lang)}>
                 {t.getStarted}
               </Link>
-            </div>
+            </article>
 
-            <div className="priceCard featured">
+            <article className="priceCard featured silverGrowthCard">
               <div className="priceBody">
                 <div className="badge">{t.mostPopular}</div>
-                <h3 className="priceName light">{t.growth}</h3>
-                <div className="priceTop light">{t.growthTop}</div>
-                <div className="priceFee light">{t.growthFee}</div>
+                <h3 className="priceName featuredText">{t.growth}</h3>
+                <div className="priceTop featuredText">{t.growthTop}</div>
+                <div className="priceDivider silverLine" />
+                <div className="priceFee featuredText mutedSilver">{t.growthFee}</div>
               </div>
-              <Link href="/auth/checkout?plan=growth" className="cardBtnLight">
+
+              <Link href={links.checkoutGrowth} className="cardBtnGrowth" onClick={() => saveOwnerLanguage(lang)}>
                 {t.chooseGrowth}
               </Link>
-            </div>
+            </article>
 
-            <div className="priceCard">
+            <article className="priceCard">
               <div className="priceBody">
                 <h3 className="priceName">{t.premium}</h3>
                 <div className="priceTop">{t.premiumTop}</div>
+                <div className="priceDivider" />
                 <div className="priceFee">{t.premiumFee}</div>
               </div>
-              <Link href="/auth/checkout?plan=premium" className="cardBtn">
+
+              <Link href={links.checkoutPremium} className="cardBtn" onClick={() => saveOwnerLanguage(lang)}>
                 {t.goPremium}
               </Link>
-            </div>
+            </article>
           </div>
         </div>
       </section>
 
-      <section className="section soft">
+      <section className="showcaseSection">
         <div className="container">
           <div className="smallCenter">
             <div className="eyebrow">{t.showcaseEyebrow}</div>
@@ -319,20 +373,21 @@ export default function HomePage() {
           </div>
 
           <div className="imageGrid">
-            {peopleImages.map((src, index) => (
-              <div key={src} className="imageCard">
-                <img src={src} alt={`Food business showcase ${index + 1}`} className="imageCardImg" />
+            {showcaseImages.map((src, index) => (
+              <article key={src} className="imageCard">
+                <img src={src} alt={t.cards[index].title} className="imageCardImg" />
+
                 <div className="imageCardBody">
                   <h3 className="imageCardTitle">{t.cards[index].title}</h3>
                   <p className="imageCardText">{t.cards[index].text}</p>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="how" className="section">
+      <section id="how" className="howSection">
         <div className="container">
           <div className="smallCenter">
             <div className="eyebrow">{t.howEyebrow}</div>
@@ -341,30 +396,38 @@ export default function HomePage() {
 
           <div className="stepGrid">
             {t.steps.map((step, index) => (
-              <div key={step.title} className="stepCard">
+              <article key={step.title} className="stepCard">
                 <div className="stepNumber">{index + 1}</div>
-                <h3 className="stepTitle">{step.title}</h3>
-                <p className="stepText">{step.text}</p>
-              </div>
+                <div className="stepContent">
+                  <h3 className="stepTitle">{step.title}</h3>
+                  <p className="stepText">{step.text}</p>
+                </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section soft">
-        <div className="container smallCenter">
-          <h2 className="sectionTitle">{t.finalTitle}</h2>
-          <p className="sectionText">{t.finalText}</p>
-          <Link href="/auth/signup?plan=starter" className="primaryBtn linea">
-            {t.startFree}
-          </Link>
+      <section className="finalSection">
+        <div className="container">
+          <div className="finalCard">
+            <div>
+              <h2 className="finalTitle">{t.finalTitle}</h2>
+              <p className="finalText">{t.finalText}</p>
+            </div>
+
+            <Link href={links.signupStarter} className="finalBtn" onClick={() => saveOwnerLanguage(lang)}>
+              <span>{t.startFree}</span>
+              <span className="arrow">›</span>
+            </Link>
+          </div>
         </div>
       </section>
 
       <style jsx>{`
         .page {
           background: #f8f8f5;
-          color: #142132;
+          color: #111827;
           min-height: 100vh;
           overflow-x: hidden;
           font-family:
@@ -382,114 +445,131 @@ export default function HomePage() {
           top: 0;
           z-index: 50;
           background: rgba(248, 248, 245, 0.92);
-          backdrop-filter: blur(14px);
-          border-bottom: 1px solid rgba(20, 33, 50, 0.08);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid rgba(17, 24, 39, 0.08);
         }
 
         .headerInner {
-          max-width: 1200px;
+          width: 100%;
+          max-width: 1240px;
           margin: 0 auto;
-          padding: 14px 16px;
+          padding: 15px 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
-          flex-wrap: wrap;
+          gap: 18px;
+        }
+
+        .logoArea {
+          display: flex;
+          align-items: center;
+          flex-shrink: 0;
         }
 
         .logoWrap {
-          display: flex;
+          display: inline-flex;
           align-items: center;
-          gap: 12px;
           text-decoration: none;
-          color: #142132;
+          cursor: pointer;
         }
 
-        .logoMark {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%) 0%, #2b3f5f 100%);
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
-          font-size: 18px;
-          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
-        }
-
-        .logoText {
-          font-size: 22px;
-          font-weight: 800;
-          letter-spacing: -0.03em;
+        .logoImage {
+          width: 176px;
+          height: auto;
+          display: block;
+          object-fit: contain;
         }
 
         .headerRight {
           display: flex;
           align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
           justify-content: flex-end;
+          gap: 22px;
+          flex-wrap: wrap;
         }
 
         .navLink {
           text-decoration: none;
-          color: #324154;
-          font-weight: 600;
+          color: #1f2937;
           font-size: 15px;
+          font-weight: 750;
+          letter-spacing: -0.01em;
+        }
+
+        .navLink:hover {
+          color: #000000;
         }
 
         .langWrap {
-          display: flex;
-          border: 1px solid rgba(20, 33, 50, 0.1);
-          background: rgba(255, 255, 255, 0.9);
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
           padding: 4px;
+          background: rgba(255, 255, 255, 0.85);
+          border: 1px solid rgba(17, 24, 39, 0.12);
           border-radius: 14px;
+          box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
         }
 
         .langButton {
+          appearance: none;
           border: none;
-          background: transparent;
-          color: #5c6b7d;
-          padding: 8px 12px;
+          min-width: 44px;
+          height: 38px;
           border-radius: 10px;
-          font-weight: 800;
+          background: transparent;
+          color: #1f2937;
+          font-size: 14px;
+          font-weight: 850;
           cursor: pointer;
         }
 
         .langButton.active {
-          background: #142132;
-          color: #fff;
+          background: #101820;
+          color: #ffffff;
+          box-shadow: 0 10px 18px rgba(15, 23, 42, 0.16);
         }
 
         .navButton,
         .primaryBtn,
         .cardBtn,
-        .cardBtnLight {
+        .cardBtnGrowth,
+        .finalBtn {
           text-decoration: none;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          font-weight: 800;
-          border-radius: 14px;
-          transition: transform 0.18s ease, box-shadow 0.18s ease;
+          gap: 10px;
+          font-weight: 850;
+          transition:
+            transform 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease;
         }
 
         .navButton {
-          background: #142132;
-          color: #fff;
-          padding: 10px 16px;
-          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+          min-height: 44px;
+          padding: 0 18px;
+          border-radius: 12px;
+          background: #ffffff;
+          color: #111827;
+          border: 1px solid rgba(17, 24, 39, 0.12);
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+        }
+
+        .navButton:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
         }
 
         .hero {
+          min-height: 82svh;
           position: relative;
-          min-height: 78svh;
           display: flex;
           align-items: center;
-          justify-content: center;
           overflow: hidden;
+          background: #05070a;
         }
 
         .heroImage {
@@ -499,156 +579,227 @@ export default function HomePage() {
           height: 100%;
           object-fit: cover;
           object-position: center center;
+          transform: scale(1.02);
         }
 
         .heroOverlay {
           position: absolute;
           inset: 0;
-          background: linear-gradient(
-            180deg,
-            rgba(13, 21, 33, 0.14) 0%,
-            rgba(13, 21, 33, 0.28) 40%,
-            rgba(13, 21, 33, 0.52) 100%
-          );
+          background:
+            radial-gradient(circle at 76% 40%, rgba(255, 255, 255, 0.06), transparent 26%),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.48) 46%, rgba(0, 0, 0, 0.16) 100%),
+            linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.62) 100%);
+        }
+
+        .heroShadow {
+          position: absolute;
+          inset: auto 0 0;
+          height: 36%;
+          background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.78) 100%);
         }
 
         .heroContent {
           position: relative;
           z-index: 2;
-          max-width: 920px;
-          padding: 146px 20px 44px;
-          text-align: center;
-          color: #fff;
+          width: 100%;
+          max-width: 1240px;
+          margin: 0 auto;
+          padding: 118px 18px 72px;
+          color: #ffffff;
         }
 
         .pill {
-          position: absolute;
-          top: 24px;
-          left: 50%;
-          transform: translateX(-50%);
           display: inline-flex;
-          padding: 10px 16px;
+          align-items: center;
+          width: fit-content;
+          min-height: 38px;
+          padding: 0 16px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.16);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          color: #fff;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.28);
+          color: #ffffff;
           font-size: 14px;
-          font-weight: 700;
-          backdrop-filter: blur(8px);
-          white-space: nowrap;
+          font-weight: 800;
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
         }
 
         .heroTitle {
-          margin: 18px auto 0;
-          max-width: 880px;
-          font-size: clamp(40px, 8vw, 76px);
-          line-height: 0.98;
-          font-weight: 900;
-          letter-spacing: -0.055em;
+          margin: 22px 0 0;
+          max-width: 760px;
+          font-size: clamp(44px, 7vw, 78px);
+          line-height: 0.96;
+          font-weight: 950;
+          letter-spacing: -0.06em;
           text-wrap: balance;
-          text-shadow: 0 2px 18px rgba(0, 0, 0, 0.18);
+          text-shadow: 0 2px 22px rgba(0, 0, 0, 0.28);
         }
 
         .heroText {
-          margin: 18px auto 0;
-          max-width: 760px;
-          font-size: 18px;
-          line-height: 1.7;
-          color: rgba(255, 255, 255, 0.94);
-          text-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+          margin: 22px 0 0;
+          max-width: 620px;
+          font-size: clamp(17px, 1.8vw, 21px);
+          line-height: 1.55;
+          color: rgba(255, 255, 255, 0.92);
+          text-shadow: 0 2px 16px rgba(0, 0, 0, 0.24);
         }
 
         .heroButtons {
           margin-top: 28px;
           display: flex;
-          justify-content: center;
+          align-items: center;
           gap: 12px;
-          flex-wrap: wrap;
         }
 
         .primaryBtn {
+          min-height: 56px;
+          padding: 0 28px;
+          border-radius: 12px;
           background: #ffffff;
-          color: #142132;
-          padding: 14px 22px;
-          box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18);
+          color: #111827;
+          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
         }
 
-        .linea {
-          background: #142132;
-          color: #fff;
-          margin-top: 22px;
+        .primaryBtn:hover,
+        .finalBtn:hover,
+        .cardBtn:hover,
+        .cardBtnGrowth:hover {
+          transform: translateY(-2px);
         }
 
-        .section {
-          padding: 58px 0;
-        }
-
-        .soft {
-          background: #eef1ee;
+        .arrow {
+          font-size: 28px;
+          line-height: 1;
+          transform: translateY(-1px);
         }
 
         .container {
-          max-width: 1160px;
+          width: 100%;
+          max-width: 1140px;
           margin: 0 auto;
-          padding: 0 16px;
+          padding: 0 18px;
+        }
+
+        .introBand {
+          background: #f8f8f5;
+          border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+        }
+
+        .introGrid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0;
+        }
+
+        .introItem {
+          min-height: 180px;
+          display: grid;
+          grid-template-columns: 84px 1fr;
+          gap: 26px;
+          align-items: center;
+          padding: 34px 34px 34px 0;
+        }
+
+        .introItem.bordered {
+          border-left: 1px solid rgba(17, 24, 39, 0.14);
+          padding-left: 34px;
+          padding-right: 0;
+        }
+
+        .introIcon {
+          width: 72px;
+          height: 72px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          background: #0f1720;
+          color: #d8b177;
+          font-size: 30px;
+          font-weight: 900;
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
+        }
+
+        .introTitle {
+          margin: 0;
+          color: #111827;
+          font-size: 24px;
+          line-height: 1.16;
+          font-weight: 900;
+          letter-spacing: -0.03em;
+        }
+
+        .introText {
+          margin: 10px 0 0;
+          color: #374151;
+          font-size: 16px;
+          line-height: 1.65;
+        }
+
+        .pricingSection,
+        .showcaseSection,
+        .howSection,
+        .finalSection {
+          padding: 64px 0;
+          background: #f8f8f5;
+        }
+
+        .showcaseSection,
+        .finalSection {
+          background: #f1f2ef;
         }
 
         .smallCenter {
-          max-width: 860px;
+          max-width: 900px;
           margin: 0 auto;
           text-align: center;
         }
 
         .eyebrow {
-          color: #8a744f;
+          color: #bd8b50;
           font-size: 13px;
-          font-weight: 800;
-          letter-spacing: 0.16em;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: 0.19em;
           text-transform: uppercase;
         }
 
         .sectionTitle {
-          margin: 10px 0 0;
-          font-size: clamp(32px, 5vw, 52px);
-          line-height: 1.08;
-          font-weight: 900;
-          letter-spacing: -0.045em;
-          color: #142132;
+          margin: 12px 0 0;
+          color: #111827;
+          font-size: clamp(32px, 5vw, 50px);
+          line-height: 1.05;
+          font-weight: 950;
+          letter-spacing: -0.05em;
           text-wrap: balance;
         }
 
         .sectionText {
-          margin-top: 14px;
+          margin: 16px auto 0;
+          max-width: 820px;
+          color: #374151;
           font-size: 17px;
-          line-height: 1.8;
-          color: #506073;
+          line-height: 1.75;
         }
 
-        .pricingGrid,
-        .imageGrid,
-        .stepGrid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 18px;
+        .pricingGrid {
           margin-top: 34px;
-        }
-
-        .priceCard,
-        .imageCard,
-        .stepCard {
-          background: rgba(255, 255, 255, 0.94);
-          border: 1px solid rgba(20, 33, 50, 0.08);
-          border-radius: 24px;
-          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 28px;
+          align-items: stretch;
         }
 
         .priceCard {
-          padding: 24px;
-          min-height: 340px;
+          min-height: 298px;
+          padding: 28px;
+          border-radius: 20px;
+          background: rgba(255, 255, 255, 0.94);
+          border: 1px solid rgba(17, 24, 39, 0.1);
+          box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          gap: 22px;
+          gap: 24px;
         }
 
         .priceBody {
@@ -656,158 +807,339 @@ export default function HomePage() {
           flex-direction: column;
         }
 
-        .priceCard.featured {
-          background: #142132;
-          color: #fff;
-          box-shadow: 0 24px 52px rgba(15, 23, 42, 0.18);
-        }
-
-        .badge {
-          display: inline-flex;
-          width: fit-content;
-          padding: 8px 12px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.12);
-          color: #fff;
-          font-size: 12px;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.12em;
-          margin-bottom: 12px;
-        }
-
         .priceName {
           margin: 0;
-          font-size: 24px;
-          font-weight: 800;
-          color: #142132;
-        }
-
-        .light {
-          color: #fff;
+          color: #111827;
+          font-size: 26px;
+          line-height: 1.1;
+          font-weight: 950;
+          letter-spacing: -0.035em;
         }
 
         .priceTop {
-          margin-top: 10px;
-          font-size: clamp(34px, 7vw, 44px);
-          line-height: 1;
-          font-weight: 900;
-          letter-spacing: -0.04em;
-          color: #142132;
+          margin-top: 14px;
+          color: #111827;
+          font-size: clamp(31px, 4vw, 42px);
+          line-height: 1.03;
+          font-weight: 950;
+          letter-spacing: -0.055em;
         }
 
         .priceSub {
           margin-top: 8px;
-          font-size: 16px;
-          font-weight: 700;
-          color: #5b6a7b;
+          color: #374151;
+          font-size: 17px;
+          font-weight: 650;
+        }
+
+        .priceDivider {
+          width: 100%;
+          height: 1px;
+          background: rgba(17, 24, 39, 0.1);
+          margin: 22px 0 0;
         }
 
         .priceFee {
-          margin-top: 14px;
+          margin-top: 18px;
+          color: #374151;
           font-size: 16px;
+          line-height: 1.5;
           font-weight: 700;
-          line-height: 1.6;
-          color: #506073;
+        }
+
+        .cardBtn,
+        .cardBtnGrowth {
+          width: 100%;
+          min-height: 48px;
+          border-radius: 8px;
+          padding: 0 16px;
+          font-size: 15px;
         }
 
         .cardBtn {
-          width: 100%;
-          min-height: 52px;
-          background: #142132;
-          color: #fff;
-          padding: 13px 16px;
+          background: #0f1720;
+          color: #ffffff;
         }
 
-        .cardBtnLight {
-          width: 100%;
-          min-height: 52px;
-          background: #fff;
-          color: #142132;
-          padding: 13px 16px;
+        .cardBtnGrowth {
+          background: linear-gradient(145deg, #ffffff 0%, #f3f4f6 45%, #e5e7eb 100%);
+          color: #111827;
+          border: 1px solid rgba(17, 24, 39, 0.12);
+          box-shadow:
+            inset 0 1px 2px rgba(255, 255, 255, 0.84),
+            0 8px 18px rgba(15, 23, 42, 0.1);
+        }
+
+        .featured {
+          transform: translateY(-10px);
+        }
+
+        .silverGrowthCard {
+          background:
+            radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.9), transparent 24%),
+            linear-gradient(
+              145deg,
+              #ffffff 0%,
+              #eef0f2 18%,
+              #c9ced4 35%,
+              #8f98a3 52%,
+              #d7dbe0 72%,
+              #ffffff 100%
+            );
+          border: 1px solid rgba(115, 125, 137, 0.65);
+          color: #111827;
+          box-shadow:
+            inset 0 2px 4px rgba(255, 255, 255, 0.92),
+            inset 0 -4px 10px rgba(0, 0, 0, 0.16),
+            0 24px 54px rgba(15, 23, 42, 0.15);
+        }
+
+        .badge {
+          width: fit-content;
+          display: inline-flex;
+          min-height: 32px;
+          align-items: center;
+          justify-content: center;
+          padding: 0 14px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.72);
+          color: #111827;
+          border: 1px solid rgba(17, 24, 39, 0.08);
+          box-shadow:
+            inset 0 1px 2px rgba(255, 255, 255, 0.86),
+            0 6px 14px rgba(15, 23, 42, 0.08);
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          margin-bottom: 16px;
+        }
+
+        .featuredText {
+          color: #111827;
+        }
+
+        .mutedSilver {
+          color: #1f2937;
+        }
+
+        .silverLine {
+          background: rgba(17, 24, 39, 0.18);
+        }
+
+        .imageGrid {
+          margin-top: 34px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 26px;
         }
 
         .imageCard {
           overflow: hidden;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid rgba(17, 24, 39, 0.1);
+          box-shadow: 0 18px 42px rgba(15, 23, 42, 0.07);
         }
 
         .imageCardImg {
           width: 100%;
-          height: 240px;
+          height: 188px;
           object-fit: cover;
           object-position: center;
           display: block;
         }
 
         .imageCardBody {
-          padding: 22px;
+          padding: 18px;
         }
 
         .imageCardTitle {
           margin: 0;
-          font-size: 22px;
-          line-height: 1.2;
-          font-weight: 800;
-          color: #142132;
+          color: #111827;
+          font-size: 18px;
+          line-height: 1.25;
+          font-weight: 900;
+          letter-spacing: -0.025em;
         }
 
         .imageCardText {
-          margin-top: 10px;
-          color: #506073;
-          line-height: 1.75;
+          margin: 10px 0 0;
+          color: #374151;
           font-size: 15px;
+          line-height: 1.62;
+        }
+
+        .stepGrid {
+          margin-top: 38px;
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 24px;
+          align-items: start;
         }
 
         .stepCard {
-          padding: 22px;
+          position: relative;
+          display: grid;
+          grid-template-columns: 56px 1fr;
+          gap: 16px;
+          align-items: start;
+        }
+
+        .stepCard:not(:last-child)::after {
+          content: '';
+          position: absolute;
+          top: 28px;
+          right: -16px;
+          width: 28px;
+          height: 1px;
+          background: rgba(17, 24, 39, 0.22);
         }
 
         .stepNumber {
-          width: 44px;
-          height: 44px;
+          width: 52px;
+          height: 52px;
           border-radius: 999px;
-          background: #142132;
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-size: 18px;
-          box-shadow: 0 14px 24px rgba(15, 23, 42, 0.12);
+          display: grid;
+          place-items: center;
+          background: #0f1720;
+          color: #ffffff;
+          font-size: 19px;
+          font-weight: 950;
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
         }
 
         .stepTitle {
-          margin: 16px 0 0;
-          font-size: 22px;
-          font-weight: 800;
-          color: #142132;
+          margin: 0;
+          color: #111827;
+          font-size: 17px;
+          line-height: 1.24;
+          font-weight: 950;
+          letter-spacing: -0.025em;
         }
 
         .stepText {
-          margin-top: 10px;
-          color: #506073;
-          line-height: 1.75;
-          font-size: 15px;
+          margin: 8px 0 0;
+          color: #374151;
+          font-size: 14px;
+          line-height: 1.65;
         }
 
-        @media (max-width: 767px) {
-          .header {
-            position: static;
-          }
+        .finalCard {
+          min-height: 188px;
+          border-radius: 20px;
+          padding: 34px 54px;
+          background:
+            radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.08), transparent 24%),
+            linear-gradient(135deg, #0a0f14 0%, #111827 50%, #06080b 100%);
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 34px;
+          box-shadow: 0 24px 56px rgba(15, 23, 42, 0.18);
+        }
 
+        .finalTitle {
+          margin: 0;
+          max-width: 580px;
+          font-size: clamp(30px, 4vw, 42px);
+          line-height: 1.05;
+          font-weight: 950;
+          letter-spacing: -0.045em;
+        }
+
+        .finalText {
+          margin: 12px 0 0;
+          max-width: 590px;
+          color: rgba(255, 255, 255, 0.86);
+          font-size: 16px;
+          line-height: 1.6;
+        }
+
+        .finalBtn {
+          flex-shrink: 0;
+          min-width: 196px;
+          min-height: 58px;
+          padding: 0 26px;
+          border-radius: 10px;
+          background: #ffffff;
+          color: #111827;
+          box-shadow: 0 18px 36px rgba(0, 0, 0, 0.24);
+        }
+
+        @media (max-width: 980px) {
           .headerInner {
             align-items: flex-start;
+            flex-direction: column;
           }
 
           .headerRight {
             width: 100%;
+            justify-content: space-between;
+            gap: 10px;
+          }
+
+          .heroContent {
+            padding-top: 80px;
+          }
+
+          .introGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .introItem,
+          .introItem.bordered {
+            border-left: none;
+            padding: 30px 0;
+          }
+
+          .introItem.bordered {
+            border-top: 1px solid rgba(17, 24, 39, 0.1);
+          }
+
+          .pricingGrid,
+          .imageGrid,
+          .stepGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .featured {
+            transform: none;
+          }
+
+          .stepCard:not(:last-child)::after {
+            display: none;
+          }
+
+          .finalCard {
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 30px;
+          }
+
+          .finalBtn {
+            width: 100%;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .header {
+            position: static;
+          }
+
+          .logoImage {
+            width: 148px;
+          }
+
+          .headerRight {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            align-items: center;
           }
 
           .navLink {
-            min-height: 44px;
+            min-height: 42px;
             display: inline-flex;
             align-items: center;
           }
@@ -815,7 +1147,6 @@ export default function HomePage() {
           .langWrap {
             grid-column: 1 / -1;
             width: 100%;
-            justify-content: stretch;
           }
 
           .langButton {
@@ -825,88 +1156,62 @@ export default function HomePage() {
           .navButton {
             grid-column: 1 / -1;
             width: 100%;
-            min-height: 46px;
-          }
-
-          .section {
-            padding: 48px 0;
           }
 
           .hero {
-            min-height: 76svh;
+            min-height: 74svh;
           }
 
           .heroImage {
-            object-position: center 26%;
+            object-position: center center;
+          }
+
+          .heroOverlay {
+            background:
+              linear-gradient(90deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.4)),
+              linear-gradient(180deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.68));
           }
 
           .heroContent {
-            padding: 178px 16px 40px;
-            max-width: 680px;
+            padding: 64px 18px 50px;
           }
 
           .pill {
-            top: 14px;
+            min-height: 34px;
             font-size: 13px;
-            padding: 10px 14px;
           }
 
           .heroTitle {
-            max-width: 360px;
-            font-size: clamp(26px, 8.2vw, 40px);
-            line-height: 1.03;
-            letter-spacing: -0.04em;
-            margin-top: 0;
+            font-size: clamp(38px, 12vw, 52px);
           }
 
           .heroText {
-            max-width: 345px;
             font-size: 16px;
-            line-height: 1.66;
-            margin-top: 16px;
           }
 
-          .heroButtons {
-            margin-top: 22px;
-            flex-direction: column;
-            align-items: center;
-          }
-
-          .heroButtons a {
+          .primaryBtn {
             width: 100%;
             max-width: 260px;
           }
 
-          .sectionText {
-            font-size: 16px;
-            line-height: 1.72;
+          .introItem {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+
+          .pricingSection,
+          .showcaseSection,
+          .howSection,
+          .finalSection {
+            padding: 52px 0;
           }
 
           .priceCard {
-            min-height: 0;
-          }
-        }
-
-        @media (min-width: 768px) {
-          .pricingGrid,
-          .stepGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            padding: 24px;
           }
 
-          .imageGrid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-
-        @media (min-width: 1100px) {
-          .pricingGrid,
-          .imageGrid,
-          .stepGrid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-          }
-
-          .hero {
-            min-height: 86svh;
+          .finalCard {
+            padding: 26px 20px;
           }
         }
       `}</style>

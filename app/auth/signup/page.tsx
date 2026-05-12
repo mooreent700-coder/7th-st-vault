@@ -1,27 +1,65 @@
 'use client';
 
-import { FormEvent, Suspense, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 type Lang = 'en' | 'es';
 
+const OWNER_LANG_KEY = 'orda_owner_language';
+
+function isLang(value: string | null): value is Lang {
+  return value === 'en' || value === 'es';
+}
+
+function saveOwnerLanguage(nextLang: Lang) {
+  if (typeof window === 'undefined') return;
+
+  window.localStorage.setItem(OWNER_LANG_KEY, nextLang);
+  window.localStorage.setItem('orda_language', nextLang);
+  window.localStorage.setItem('orda_order_language', nextLang);
+
+  document.cookie = `orda_owner_language=${nextLang}; path=/; max-age=31536000; SameSite=Lax`;
+  document.cookie = `orda_order_language=${nextLang}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+function getStartupLanguage(searchParams: URLSearchParams): Lang {
+  const queryLang = searchParams.get('lang') || searchParams.get('owner_language') || searchParams.get('order_language');
+
+  if (isLang(queryLang)) {
+    saveOwnerLanguage(queryLang);
+    return queryLang;
+  }
+
+  if (typeof window !== 'undefined') {
+    const saved =
+      window.localStorage.getItem(OWNER_LANG_KEY) ||
+      window.localStorage.getItem('orda_language') ||
+      window.localStorage.getItem('orda_order_language');
+
+    if (isLang(saved)) return saved;
+  }
+
+  return 'en';
+}
+
 function generateSlug(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-') || `store-${Date.now()}`
+  );
 }
 
 const copy = {
   en: {
     brand: 'ORDA',
     heroTitle: 'Create your ORDA account and start building your restaurant storefront.',
-    heroText:
-      'Set up your business profile, choose your plan, and move straight into your ORDA dashboard.',
+    heroText: 'Set up your business profile, choose your plan, and move straight into your ORDA dashboard.',
     builder: 'Storefront Builder',
     builderText: 'Create your hero section, menu, pricing, phone, and map in one place.',
     checkout: 'Checkout Ready',
@@ -47,8 +85,7 @@ const copy = {
   es: {
     brand: 'ORDA',
     heroTitle: 'Crea tu cuenta de ORDA y empieza a construir la tienda de tu restaurante.',
-    heroText:
-      'Configura el perfil de tu negocio, elige tu plan y entra directamente a tu panel de ORDA.',
+    heroText: 'Configura el perfil de tu negocio, elige tu plan y entra directamente a tu panel de ORDA.',
     builder: 'Constructor de Tienda',
     builderText: 'Crea tu portada, menú, precios, teléfono y mapa en un solo lugar.',
     checkout: 'Listo para Checkout',
@@ -87,6 +124,17 @@ function SignupPageContent() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const nextLang = getStartupLanguage(searchParams);
+    setLang(nextLang);
+    saveOwnerLanguage(nextLang);
+  }, [searchParams]);
+
+  function changeLanguage(nextLang: Lang) {
+    setLang(nextLang);
+    saveOwnerLanguage(nextLang);
+  }
+
   const ensureRestaurantRow = async (userId: string) => {
     const { data: existing, error: existingError } = await supabase
       .from('restaurants')
@@ -95,21 +143,42 @@ function SignupPageContent() {
       .maybeSingle();
 
     if (existingError) throw existingError;
-    if (existing?.id) return;
+    if (existing?.id) {
+      await supabase
+        .from('restaurants')
+        .update({
+          owner_language: lang,
+          order_language: lang,
+        })
+        .eq('id', existing.id);
 
-    const slug = generateSlug(businessName) || generateSlug(fullName) || `store-${Date.now()}`;
+      return;
+    }
+
+    const slug = generateSlug(businessName) || generateSlug(fullName);
 
     const { error: insertError } = await supabase.from('restaurants').insert({
       owner_id: userId,
-      owner_email: email,
+      user_id: userId,
+      owner_email: email.trim(),
       name: businessName.trim(),
       slug,
       plan: selectedPlan,
       phone: null,
       address: null,
       hours: null,
-      hero_url: null,
-      logo_url: null,
+      hero_image: null,
+      logo_image: null,
+      storefront_theme: 'dark',
+      storefront_accent: 'gold',
+      storefront_language: 'en',
+      owner_language: lang,
+      order_language: lang,
+      pickup_enabled: true,
+      delivery_enabled: false,
+      delivery_fee: 0,
+      delivery_radius: 5,
+      delivery_minimum: 0,
     });
 
     if (insertError) throw insertError;
@@ -118,6 +187,7 @@ function SignupPageContent() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    saveOwnerLanguage(lang);
 
     try {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -128,6 +198,8 @@ function SignupPageContent() {
             full_name: fullName.trim(),
             business_name: businessName.trim(),
             plan: selectedPlan,
+            owner_language: lang,
+            order_language: lang,
           },
         },
       });
@@ -157,51 +229,46 @@ function SignupPageContent() {
         return;
       }
 
-      try {
-        await ensureRestaurantRow(user.id);
-      } catch (restaurantError: any) {
-        alert(restaurantError?.message || t.createStoreFailed);
-        return;
-      }
+      await ensureRestaurantRow(user.id);
 
       router.push('/dashboard/owner');
     } catch (error: any) {
-      alert(error?.message || t.signupFailed);
+      alert(error?.message || t.createStoreFailed);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 text-slate-950">
+    <main className="min-h-screen bg-slate-50 text-slate-950">
       <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-2">
-        <section className="relative hidden overflow-hidden border-r border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white lg:flex">
-          <div className="absolute inset-0 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)][radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_38%)]" />
+        <section className="relative hidden overflow-hidden border-r border-slate-200 bg-white lg:flex">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_38%)]" />
 
           <div className="relative flex h-full w-full flex-col justify-between p-10">
             <div>
               <div className="mb-6 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setLang('en')}
+                  onClick={() => changeLanguage('en')}
                   className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                    lang === 'en' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
+                    lang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
                   }`}
                 >
                   EN
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLang('es')}
+                  onClick={() => changeLanguage('es')}
                   className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                    lang === 'es' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
+                    lang === 'es' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
                   }`}
                 >
                   ES
                 </button>
               </div>
 
-              <div className="inline-flex rounded-full border border-blue-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
+              <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
                 {t.brand}
               </div>
 
@@ -213,12 +280,12 @@ function SignupPageContent() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <div className="rounded-3xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-5 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.builder}</p>
                 <p className="mt-2 text-sm text-slate-600">{t.builderText}</p>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-5 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.checkout}</p>
                 <p className="mt-2 text-sm text-slate-600">{t.checkoutText}</p>
               </div>
@@ -231,18 +298,18 @@ function SignupPageContent() {
             <div className="mb-4 flex gap-2 lg:hidden">
               <button
                 type="button"
-                onClick={() => setLang('en')}
+                onClick={() => changeLanguage('en')}
                 className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                  lang === 'en' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
+                  lang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
                 }`}
               >
                 EN
               </button>
               <button
                 type="button"
-                onClick={() => setLang('es')}
+                onClick={() => changeLanguage('es')}
                 className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                  lang === 'es' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
+                  lang === 'es' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
                 }`}
               >
                 ES
@@ -250,18 +317,18 @@ function SignupPageContent() {
             </div>
 
             <div className="mb-8 lg:hidden">
-              <div className="inline-flex rounded-full border border-blue-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
+              <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
                 {t.brand}
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-6 shadow-2xl shadow-slate-200/70 sm:p-8">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-200/70 sm:p-8">
               <div className="mb-8">
                 <h2 className="text-3xl font-black text-slate-950 sm:text-4xl">{t.title}</h2>
                 <p className="mt-2 text-sm text-slate-600 sm:text-base">{t.subtitle}</p>
                 <p className="mt-3 text-sm font-semibold text-slate-800">
                   {t.selected}{' '}
-                  <span className="rounded-full bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-3 py-1 text-blue-700">
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
                     {selectedPlan.toUpperCase()}
                   </span>
                 </p>
@@ -275,7 +342,7 @@ function SignupPageContent() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder={t.fullNamePlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
                     required
                   />
                 </div>
@@ -287,7 +354,7 @@ function SignupPageContent() {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     placeholder={t.businessNamePlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
                     required
                   />
                 </div>
@@ -299,7 +366,7 @@ function SignupPageContent() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t.emailPlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
                     required
                   />
                 </div>
@@ -311,7 +378,7 @@ function SignupPageContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t.passwordPlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
                     required
                   />
                 </div>
@@ -319,7 +386,7 @@ function SignupPageContent() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-2xl bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? t.creating : t.create}
                 </button>
@@ -327,7 +394,7 @@ function SignupPageContent() {
 
               <div className="mt-6 text-center text-sm text-slate-600">
                 {t.already}{' '}
-                <Link href="/auth/login" className="font-semibold text-blue-700 hover:text-blue-800">
+                <Link href={`/auth/login?lang=${lang}`} className="font-semibold text-blue-700 hover:text-blue-800">
                   {t.signIn}
                 </Link>
               </div>
@@ -341,7 +408,7 @@ function SignupPageContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50" />}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
       <SignupPageContent />
     </Suspense>
   );
