@@ -18,16 +18,16 @@ function generateSlug(name: string) {
 
 const copy = {
   en: {
-    brand: 'MenuFlow',
-    heroTitle: 'Create your MenuFlow account and start building your restaurant storefront.',
+    brand: 'ORDA',
+    heroTitle: 'Create your ORDA account and start building your restaurant storefront.',
     heroText:
-      'Set up your business profile, choose your plan, and move straight into your MenuFlow dashboard.',
+      'Set up your business profile, choose your plan, and move straight into your ORDA dashboard.',
     builder: 'Storefront Builder',
     builderText: 'Create your hero section, menu, pricing, phone, and map in one place.',
     checkout: 'Checkout Ready',
-    checkoutText: 'Move from setup to customer orders with a direct MenuFlow checkout experience.',
+    checkoutText: 'Move from setup to customer orders with a direct ORDA checkout experience.',
     title: 'Create Account',
-    subtitle: 'Start your MenuFlow setup and build your storefront.',
+    subtitle: 'Start your ORDA setup and build your storefront.',
     selected: 'Selected plan:',
     fullName: 'Full Name',
     fullNamePlaceholder: 'Your full name',
@@ -45,16 +45,16 @@ const copy = {
     createStoreFailed: 'Failed to create store',
   },
   es: {
-    brand: 'MenuFlow',
-    heroTitle: 'Crea tu cuenta de MenuFlow y empieza a construir la tienda de tu restaurante.',
+    brand: 'ORDA',
+    heroTitle: 'Crea tu cuenta de ORDA y empieza a construir la tienda de tu restaurante.',
     heroText:
-      'Configura el perfil de tu negocio, elige tu plan y entra directamente a tu panel de MenuFlow.',
+      'Configura el perfil de tu negocio, elige tu plan y entra directamente a tu panel de ORDA.',
     builder: 'Constructor de Tienda',
     builderText: 'Crea tu portada, menú, precios, teléfono y mapa en un solo lugar.',
     checkout: 'Listo para Checkout',
-    checkoutText: 'Pasa de la configuración a los pedidos de clientes con una experiencia de checkout directo de MenuFlow.',
+    checkoutText: 'Pasa de la configuración a los pedidos de clientes con una experiencia de checkout directo de ORDA.',
     title: 'Crear Cuenta',
-    subtitle: 'Comienza tu configuración de MenuFlow y crea tu tienda.',
+    subtitle: 'Comienza tu configuración de ORDA y crea tu tienda.',
     selected: 'Plan seleccionado:',
     fullName: 'Nombre Completo',
     fullNamePlaceholder: 'Tu nombre completo',
@@ -173,10 +173,10 @@ function SignupPageContent() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
+    <main className="min-h-screen bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 text-slate-950">
       <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 lg:grid-cols-2">
-        <section className="relative hidden overflow-hidden border-r border-slate-200 bg-white lg:flex">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_38%)]" />
+        <section className="relative hidden overflow-hidden border-r border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white lg:flex">
+          <div className="absolute inset-0 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)][radial-gradient(circle_at_top,rgba(59,130,246,0.16),transparent_38%)]" />
 
           <div className="relative flex h-full w-full flex-col justify-between p-10">
             <div>
@@ -185,7 +185,7 @@ function SignupPageContent() {
                   type="button"
                   onClick={() => setLang('en')}
                   className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                    lang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                    lang === 'en' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
                   }`}
                 >
                   EN
@@ -194,14 +194,14 @@ function SignupPageContent() {
                   type="button"
                   onClick={() => setLang('es')}
                   className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                    lang === 'es' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                    lang === 'es' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
                   }`}
                 >
                   ES
                 </button>
               </div>
 
-              <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
+              <div className="inline-flex rounded-full border border-blue-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
                 {t.brand}
               </div>
 
@@ -213,12 +213,12 @@ function SignupPageContent() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.builder}</p>
                 <p className="mt-2 text-sm text-slate-600">{t.builderText}</p>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-3xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-5 shadow-sm">
                 <p className="text-lg font-bold text-slate-950">{t.checkout}</p>
                 <p className="mt-2 text-sm text-slate-600">{t.checkoutText}</p>
               </div>
@@ -233,7 +233,7 @@ function SignupPageContent() {
                 type="button"
                 onClick={() => setLang('en')}
                 className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                  lang === 'en' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                  lang === 'en' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
                 }`}
               >
                 EN
@@ -242,7 +242,7 @@ function SignupPageContent() {
                 type="button"
                 onClick={() => setLang('es')}
                 className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
-                  lang === 'es' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                  lang === 'es' ? 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 text-white' : 'bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-100 text-slate-700'
                 }`}
               >
                 ES
@@ -250,18 +250,18 @@ function SignupPageContent() {
             </div>
 
             <div className="mb-8 lg:hidden">
-              <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
+              <div className="inline-flex rounded-full border border-blue-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-4 py-1.5 text-sm font-medium text-blue-700">
                 {t.brand}
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-200/70 sm:p-8">
+            <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white p-6 shadow-2xl shadow-slate-200/70 sm:p-8">
               <div className="mb-8">
                 <h2 className="text-3xl font-black text-slate-950 sm:text-4xl">{t.title}</h2>
                 <p className="mt-2 text-sm text-slate-600 sm:text-base">{t.subtitle}</p>
                 <p className="mt-3 text-sm font-semibold text-slate-800">
                   {t.selected}{' '}
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                  <span className="rounded-full bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-50 px-3 py-1 text-blue-700">
                     {selectedPlan.toUpperCase()}
                   </span>
                 </p>
@@ -275,7 +275,7 @@ function SignupPageContent() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder={t.fullNamePlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
                     required
                   />
                 </div>
@@ -287,7 +287,7 @@ function SignupPageContent() {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     placeholder={t.businessNamePlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
                     required
                   />
                 </div>
@@ -299,7 +299,7 @@ function SignupPageContent() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t.emailPlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
                     required
                   />
                 </div>
@@ -311,7 +311,7 @@ function SignupPageContent() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={t.passwordPlaceholder}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white"
+                    className="w-full rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50 px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]white"
                     required
                   />
                 </div>
@@ -319,7 +319,7 @@ function SignupPageContent() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-2xl bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-600 px-6 py-4 text-base font-bold text-white transition hover:bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? t.creating : t.create}
                 </button>
@@ -341,7 +341,7 @@ function SignupPageContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]slate-50" />}>
       <SignupPageContent />
     </Suspense>
   );

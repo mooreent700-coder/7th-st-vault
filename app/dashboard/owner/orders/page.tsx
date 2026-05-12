@@ -123,7 +123,7 @@ export default function OwnerOrdersPage() {
       <section className="shell">
         <div className="topRow">
           <div>
-            <div className="eyebrow">MenuFlow Owner</div>
+            <div className="eyebrow">ORDA Owner</div>
             <h1>Orders</h1>
             <p>Track paid, pending, failed, and expired orders.</p>
           </div>
@@ -219,7 +219,7 @@ export default function OwnerOrdersPage() {
         }
         h1 {
           margin: 0;
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           font-size: clamp(34px, 6vw, 60px);
           line-height: 0.94;
           letter-spacing: -0.05em;
@@ -239,7 +239,7 @@ export default function OwnerOrdersPage() {
           justify-content: center;
           padding: 0 18px;
           border-radius: 16px;
-          background: #0f172a;
+          background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           color: #fff;
           font-size: 16px;
           font-weight: 900;
@@ -271,7 +271,7 @@ export default function OwnerOrdersPage() {
         }
         .statValue {
           margin-top: 10px;
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           font-size: 36px;
           line-height: 1;
           font-weight: 900;
@@ -280,7 +280,7 @@ export default function OwnerOrdersPage() {
         .panel {
           padding: 18px 20px;
           margin-bottom: 14px;
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           font-size: 16px;
           font-weight: 800;
         }
@@ -301,7 +301,7 @@ export default function OwnerOrdersPage() {
           padding: 16px 18px;
           text-align: left;
           border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           font-size: 15px;
           font-weight: 700;
           vertical-align: top;

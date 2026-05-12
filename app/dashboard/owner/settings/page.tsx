@@ -353,7 +353,7 @@ export default function OwnerSettingsPage() {
 
         h1 {
           margin: 0;
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           font-size: 2.2rem;
           line-height: 1;
           font-weight: 800;
@@ -436,7 +436,7 @@ export default function OwnerSettingsPage() {
           border-radius: 18px;
           border: 1px solid #dfe5ec;
           background: #fff;
-          color: #0f172a;
+          color: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           padding: 0 18px;
           font-size: 1rem;
           font-weight: 600;
@@ -475,7 +475,7 @@ export default function OwnerSettingsPage() {
           height: 56px;
           border: 0;
           border-radius: 18px;
-          background: #0f172a;
+          background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%);
           color: #fff;
           font-size: 1rem;
           font-weight: 800;

@@ -12,7 +12,7 @@ const content = {
     navCreate: 'Create Account',
 
     pill: 'Built for real food businesses',
-    heroTitle: 'MenuFlow builds and turns your menu into a website in minutes',
+    heroTitle: 'ORDA builds and turns your menu into a website in minutes',
     heroText:
       'Made for restaurants, food trucks, pop-ups, and caterers that want a cleaner direct-ordering experience without building everything themselves.',
     startFree: 'Start Free',
@@ -45,7 +45,7 @@ const content = {
     showcaseEyebrow: 'Made to feel real',
     showcaseTitle: 'A storefront that feels like a real business, not a basic page.',
     showcaseText:
-      'MenuFlow gives restaurants, food trucks, pop-ups, and caterers a cleaner, stronger online presence with direct ordering built in.',
+      'ORDA gives restaurants, food trucks, pop-ups, and caterers a cleaner, stronger online presence with direct ordering built in.',
 
     cards: [
       {
@@ -63,14 +63,14 @@ const content = {
     ],
 
     howEyebrow: 'How it works',
-    howTitle: 'You enter the info. MenuFlow generates the rest.',
+    howTitle: 'You enter the info. ORDA generates the rest.',
     steps: [
       {
         title: 'Enter your business information',
         text: 'Add your business name, menu, photos, phone number, location, and brand details.',
       },
       {
-        title: 'MenuFlow generates your storefront',
+        title: 'ORDA generates your storefront',
         text: 'Your menu, presentation, checkout, and direct-ordering flow are created for you automatically.',
       },
       {
@@ -81,7 +81,7 @@ const content = {
 
     finalTitle: 'Launch your ordering system without building it yourself.',
     finalText:
-      'MenuFlow turns your menu into a clean, premium ordering experience in minutes for restaurants, food trucks, pop-ups, and caterers.',
+      'ORDA turns your menu into a clean, premium ordering experience in minutes for restaurants, food trucks, pop-ups, and caterers.',
   },
 
   es: {
@@ -90,7 +90,7 @@ const content = {
     navCreate: 'Crear Cuenta',
 
     pill: 'Hecho para negocios reales de comida',
-    heroTitle: 'MenuFlow crea y convierte tu menú en un sitio web en minutos',
+    heroTitle: 'ORDA crea y convierte tu menú en un sitio web en minutos',
     heroText:
       'Hecho para restaurantes, food trucks, pop-ups y catering que quieren una experiencia de pedidos directos más limpia sin tener que construir todo por su cuenta.',
     startFree: 'Empieza Gratis',
@@ -123,7 +123,7 @@ const content = {
     showcaseEyebrow: 'Hecho para sentirse real',
     showcaseTitle: 'Una tienda que se siente como un negocio real, no una página básica.',
     showcaseText:
-      'MenuFlow les da a restaurantes, food trucks, pop-ups y catering una presencia online más limpia y fuerte con pedidos directos integrados.',
+      'ORDA les da a restaurantes, food trucks, pop-ups y catering una presencia online más limpia y fuerte con pedidos directos integrados.',
 
     cards: [
       {
@@ -141,14 +141,14 @@ const content = {
     ],
 
     howEyebrow: 'Cómo funciona',
-    howTitle: 'Tú ingresas la información. MenuFlow genera lo demás.',
+    howTitle: 'Tú ingresas la información. ORDA genera lo demás.',
     steps: [
       {
         title: 'Ingresa la información de tu negocio',
         text: 'Agrega el nombre de tu negocio, menú, fotos, número de teléfono, ubicación y detalles de tu marca.',
       },
       {
-        title: 'MenuFlow genera tu tienda',
+        title: 'ORDA genera tu tienda',
         text: 'Tu menú, presentación, checkout y flujo de pedidos directos se crean automáticamente.',
       },
       {
@@ -159,7 +159,7 @@ const content = {
 
     finalTitle: 'Lanza tu sistema de pedidos sin tener que construirlo tú mismo.',
     finalText:
-      'MenuFlow convierte tu menú en una experiencia de pedidos limpia y premium en minutos para restaurantes, food trucks, pop-ups y catering.',
+      'ORDA convierte tu menú en una experiencia de pedidos limpia y premium en minutos para restaurantes, food trucks, pop-ups y catering.',
   },
 } as const;
 
@@ -187,8 +187,7 @@ export default function HomePage() {
     onClick={() => window.location.href = '/'}
     style={{ cursor: 'pointer' }}
   >
-    <div className="logoMark">M</div>
-    <div className="logoText">MenuFlow</div>
+   <img src="/orda-logo-new.png" style={{ width: '200px' }} />
   </div>
 </AdminHoldLogin>
 
@@ -356,7 +355,7 @@ export default function HomePage() {
         <div className="container smallCenter">
           <h2 className="sectionTitle">{t.finalTitle}</h2>
           <p className="sectionText">{t.finalText}</p>
-          <Link href="/auth/signup?plan=starter" className="primaryBtn darkBtn">
+          <Link href="/auth/signup?plan=starter" className="primaryBtn linea">
             {t.startFree}
           </Link>
         </div>
@@ -410,7 +409,7 @@ export default function HomePage() {
           width: 40px;
           height: 40px;
           border-radius: 12px;
-          background: linear-gradient(135deg, #0f172a 0%, #2b3f5f 100%);
+          background: linear-gradient(135deg, linear-gradient(180deg, #f8fafc 0%, #cbd5e1 45%, #64748b 100%) 0%, #2b3f5f 100%);
           color: #fff;
           display: flex;
           align-items: center;
@@ -574,7 +573,7 @@ export default function HomePage() {
           box-shadow: 0 18px 34px rgba(15, 23, 42, 0.18);
         }
 
-        .darkBtn {
+        .linea {
           background: #142132;
           color: #fff;
           margin-top: 22px;

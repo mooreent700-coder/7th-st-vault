@@ -43,7 +43,7 @@ export default function LoginPage() {
   return (
     <main style={page}>
       <div style={card}>
-        <div style={logo}>MENUFLOW</div>
+        <div style={logo}>ORDA</div>
 
         <h1 style={title}>Welcome back</h1>
 

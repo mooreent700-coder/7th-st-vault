@@ -84,18 +84,18 @@ export default function AgreementPage() {
   return (
     <div style={wrap}>
       <div style={card}>
-        <h1 style={title}>MenuFlow Terms Agreement</h1>
+        <h1 style={title}>ORDA Terms Agreement</h1>
         <p style={sub}>Please read and accept before continuing</p>
 
         <div style={content}>
           <p>
-            MenuFlow is a technology platform that provides website creation,
+            ORDA is a technology platform that provides website creation,
             menu hosting, direct online ordering, and Stripe Connect payouts for restaurants and food businesses.
           </p>
 
           <h3>1. Payments</h3>
           <p>
-            Customer payments are processed through Stripe. MenuFlow may charge a platform fee based on the restaurant plan.
+            Customer payments are processed through Stripe. ORDA may charge a platform fee based on the restaurant plan.
             Restaurants are responsible for completing Stripe onboarding so they can receive payouts.
           </p>
 
@@ -107,24 +107,24 @@ export default function AgreementPage() {
 
           <h3>3. Platform Fees</h3>
           <p>
-            MenuFlow may deduct a platform fee from customer orders based on your selected plan. Current fee structure may include:
+            ORDA may deduct a platform fee from customer orders based on your selected plan. Current fee structure may include:
             starter/free plan 10%, growth plan 5%, and premium plan 3%.
           </p>
 
           <h3>4. No Guarantees</h3>
           <p>
-            MenuFlow does not guarantee sales, traffic, or business performance.
+            ORDA does not guarantee sales, traffic, or business performance.
           </p>
 
           <h3>5. Limitation of Liability</h3>
           <p>
-            MenuFlow is not liable for business losses, disputes, chargebacks,
+            ORDA is not liable for business losses, disputes, chargebacks,
             or damages arising from use of the platform.
           </p>
 
           <h3>6. Platform Usage</h3>
           <p>
-            You agree to use MenuFlow legally and not for fraudulent or harmful
+            You agree to use ORDA legally and not for fraudulent or harmful
             activity.
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function AgreementPage() {
             onChange={(e) => setAgree(e.target.checked)}
           />
           <span>
-            I have read, understand, and agree to the MenuFlow Terms
+            I have read, understand, and agree to the ORDA Terms
           </span>
         </div>
 

@@ -1,3 +1,3 @@
 export async function GET() {
-  return Response.json({ ok: true, app: 'MenuFlow' });
+  return Response.json({ ok: true, app: 'ORDA' });
 }

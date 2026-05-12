@@ -218,7 +218,7 @@ export default function AdminDashboardPage() {
       <div className="shell">
         <section className="hero">
           <div className="heroLeft">
-            <div className="eyebrow">MenuFlow Admin</div>
+            <div className="eyebrow">ORDA Admin</div>
             <h1>Command Center</h1>
             <p>
               Payments, owner support, pause control, store health, flyer activity, and order
@@ -528,7 +528,7 @@ export default function AdminDashboardPage() {
                                   }`}
                                 >
                                   <div className="bubbleMeta">
-                                    <span>{msg.sender_role === 'admin' ? 'MenuFlow Admin' : 'Owner'}</span>
+                                    <span>{msg.sender_role === 'admin' ? 'ORDA Admin' : 'Owner'}</span>
                                     <small>{formatDateTime(msg.created_at)}</small>
                                   </div>
                                   <p>{msg.message}</p>

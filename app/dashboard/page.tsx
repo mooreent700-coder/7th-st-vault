@@ -46,7 +46,7 @@ function getOrderAmount(order: OrderRow) {
 }
 
 function getStoreName(store: StoreRecord | null) {
-  return store?.name?.trim() || 'MenuFlow Store';
+  return store?.name?.trim() || 'ORDA Store';
 }
 
 function getStoreSlug(store: StoreRecord | null) {
@@ -62,7 +62,7 @@ function getStoreUrl(store: StoreRecord | null) {
   const base =
     typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
-      : process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
+      : process.env.NEXT_PUBLIC_APP_URL || 'https://ORDA-app-mu.vercel.app';
   return `${base}/store/${getStoreSlug(store)}`;
 }
 
@@ -440,15 +440,14 @@ export default function OwnerDashboardPage() {
       </main>
     );
   }
-
   return (
     <main className="ownerPage">
       <div className="dashboardShell">
         <aside className="sidebar">
           <div className="brandBlock">
-            <div className="brandLogo">M</div>
+            <div className="brandLogo">O</div>
             <div>
-              <div className="brandName">MenuFlow</div>
+              <div className="brandName">ORDA</div>
               <div className="brandSub">OWNER PANEL</div>
             </div>
           </div>

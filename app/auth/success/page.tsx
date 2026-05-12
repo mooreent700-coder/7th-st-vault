@@ -20,17 +20,17 @@ const planCopy: Record<
 > = {
   starter: {
     title: 'Starter plan confirmed',
-    detail: 'Your first month is free. Continue to create your account and start building your MenuFlow setup.',
+    detail: 'Your first month is free. Continue to create your account and start building your ORDA setup.',
     button: 'Continue to Account Setup',
   },
   growth: {
     title: 'Growth plan payment received',
-    detail: 'Your Growth plan payment was successful. Continue to create your account and move into your MenuFlow onboarding flow.',
+    detail: 'Your Growth plan payment was successful. Continue to create your account and move into your ORDA onboarding flow.',
     button: 'Continue to Account Setup',
   },
   premium: {
     title: 'Premium plan payment received',
-    detail: 'Your Premium plan payment was successful. Continue to create your account and move into your MenuFlow onboarding flow.',
+    detail: 'Your Premium plan payment was successful. Continue to create your account and move into your ORDA onboarding flow.',
     button: 'Continue to Account Setup',
   },
 };
@@ -181,7 +181,7 @@ export default function SuccessPage() {
               lineHeight: 1.2,
             }}
           >
-            Create your MenuFlow account
+            Create your ORDA account
           </div>
 
           <div

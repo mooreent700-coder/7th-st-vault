@@ -53,11 +53,11 @@ type FlyerOption = {
   src: string;
 };
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://menuflow-app-mu.vercel.app';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://ORDA-app-mu.vercel.app';
 
 const FALLBACK_STORE: StoreRecord = {
-  name: 'MenuFlow Kitchen',
-  slug: 'menuflow-kitchen',
+  name: 'ORDA Kitchen',
+  slug: 'ORDA-kitchen',
   phone: '',
   address: '',
 };
@@ -84,11 +84,11 @@ const CATEGORIES: { key: FlyerCategoryKey; label: string; emoji: string; folder:
 ];
 
 function getName(store: StoreRecord | null) {
-  return store?.name?.trim() || 'MenuFlow Kitchen';
+  return store?.name?.trim() || 'ORDA Kitchen';
 }
 
 function getSlug(store: StoreRecord | null) {
-  return (store?.slug?.trim() || 'menuflow-kitchen').toLowerCase();
+  return (store?.slug?.trim() || 'ORDA-kitchen').toLowerCase();
 }
 
 function getPhone(store: StoreRecord | null) {

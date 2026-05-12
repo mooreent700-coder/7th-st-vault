@@ -100,7 +100,7 @@ export default function OwnerInfoPage() {
     }
   }
 
-  const fullLink = `https://menuflow-app-mu.vercel.app/store/${slug}`;
+  const fullLink = `https://ORDA-app-mu.vercel.app/store/${slug}`;
 
   if (loading) return <div className="center">Loading...</div>;
 

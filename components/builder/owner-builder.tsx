@@ -88,7 +88,7 @@ export default function OwnerBuilder() {
   };
 
   return (
-    <div className="p-6 text-white bg-black min-h-screen">
+    <div className="p-6 text-white bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]gradient-to-b from-gray-200 to-gray-400 text-black border border-gray-300 shadow-md min-h-screen">
 
       {/* LANGUAGE TOGGLE */}
       <div className="flex gap-3 mb-6">
@@ -128,7 +128,7 @@ export default function OwnerBuilder() {
 
       <button onClick={addItem}>Add Item</button>
 
-      <button onClick={save} className="mt-6 bg-green-500 px-4 py-2">
+      <button onClick={save} className="mt-6 bg-[linear-gradient(145deg,#f8fafc_0%,#e2e8f0_25%,#cbd5e1_50%,#94a3b8_75%,#475569_100%)]green-500 px-4 py-2">
         Save
       </button>
     </div>

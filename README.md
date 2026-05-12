@@ -1,6 +1,6 @@
-# MenuFlow Real App Starter
+# ORDA Real App Starter
 
-This is the real-app starter version of MenuFlow.
+This is the real-app starter version of ORDA.
 
 ## What it includes
 - Next.js app router project

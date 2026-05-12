@@ -1,0 +1,17 @@
+# Query: sanitizeSlug
+# ContextLines: 1
+
+2 results - 1 file
+
+lib/owner-restaurant.ts:
+   2  
+   3:function sanitizeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+  44  

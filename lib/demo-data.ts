@@ -20,8 +20,8 @@ export type RestaurantData = {
 };
 
 export const demoRestaurant: RestaurantData = {
-  name: "MenuFlow Demo",
-  slug: "menuflow-demo",
+  name: "ORDA Demo",
+  slug: "ORDA-demo",
   description: "Your digital menu",
 
   logo: "",
