@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     const orderType = cleanText(body.orderType || body.order_type, 'pickup');
 
     const cart = Array.isArray(body.cart)
-      ? body.cart.map(normalizeCartItem).filter((item) => item.quantity > 0 && moneyToCents(item.unitTotal) > 0)
+      ? body.cart.map(normalizeCartItem).filter((item: any) => item.quantity > 0 && moneyToCents(item.unitTotal) > 0)
       : [];
 
     if (!restaurantId) {
