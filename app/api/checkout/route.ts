@@ -16,6 +16,15 @@ type CartItem = {
   unitTotal?: number;
 };
 
+type NormalizedCartItem = {
+  itemId: string;
+  name: string;
+  imageUrl?: string;
+  quantity: number;
+  unitTotal: number;
+  total: number;
+};
+
 function moneyToCents(value: unknown): number {
   return Math.max(50, Math.round(Number(value || 0) * 100));
 }
@@ -43,17 +52,9 @@ function getOrigin(req: Request): string {
   return site.replace(/\/$/, '');
 }
 
-function normalizeCartItem(item: CartItem): {
-  itemId: string;
-  name: string;
-  imageUrl?: string;
-  quantity: number;
-  unitTotal: number;
-  total: number;
-} {
+function normalizeCartItem(item: CartItem): NormalizedCartItem {
   const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
   const unitTotal = Number(item.unitTotal || item.total || 0);
-  const total = unitTotal * quantity;
 
   return {
     itemId: safeText(item.itemId, ''),
@@ -61,7 +62,7 @@ function normalizeCartItem(item: CartItem): {
     imageUrl: safeHttpsImage(item.imageUrl || item.image_url || item.itemImage),
     quantity,
     unitTotal,
-    total,
+    total: unitTotal * quantity,
   };
 }
 
@@ -77,14 +78,15 @@ export async function POST(req: Request) {
     }
 
     const stripe = new Stripe(stripeSecretKey);
-
     const body = await req.json();
 
     const restaurantId = safeText(body.restaurantId, '');
     const slug = safeText(body.slug, '');
 
-    const cart = Array.isArray(body.cart)
-      ? body.cart.map((item: CartItem) => normalizeCartItem(item)).filter((item) => item.quantity > 0 && item.unitTotal > 0)
+    const cart: NormalizedCartItem[] = Array.isArray(body.cart)
+      ? body.cart
+          .map((item: CartItem): NormalizedCartItem => normalizeCartItem(item))
+          .filter((item: NormalizedCartItem): boolean => item.quantity > 0 && item.unitTotal > 0)
       : [];
 
     if (!cart.length) {
@@ -98,34 +100,36 @@ export async function POST(req: Request) {
 
     const subtotal = Number(
       body.subtotal ??
-        cart.reduce((sum: number, item: { total: number }) => sum + item.total, 0)
+        cart.reduce((sum: number, item: NormalizedCartItem): number => sum + item.total, 0)
     );
 
     const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0);
     const discount = Number(body.discount ?? 0);
     const total = Number(body.total ?? Math.max(0, subtotal + deliveryFee - discount));
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item) => {
-      const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
-        name: item.name,
-        metadata: {
-          itemId: item.itemId,
-        },
-      };
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map(
+      (item: NormalizedCartItem): Stripe.Checkout.SessionCreateParams.LineItem => {
+        const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
+          name: item.name,
+          metadata: {
+            itemId: item.itemId,
+          },
+        };
 
-      if (item.imageUrl) {
-        productData.images = [item.imageUrl];
+        if (item.imageUrl) {
+          productData.images = [item.imageUrl];
+        }
+
+        return {
+          quantity: item.quantity,
+          price_data: {
+            currency: 'usd',
+            unit_amount: moneyToCents(item.unitTotal),
+            product_data: productData,
+          },
+        };
       }
-
-      return {
-        quantity: item.quantity,
-        price_data: {
-          currency: 'usd',
-          unit_amount: moneyToCents(item.unitTotal),
-          product_data: productData,
-        },
-      };
-    });
+    );
 
     if (deliveryFee > 0) {
       line_items.push({
@@ -166,12 +170,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Checkout failed.';
-
     console.error('CHECKOUT ERROR:', message);
 
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
