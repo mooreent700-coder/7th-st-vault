@@ -4,49 +4,92 @@ import Stripe from 'stripe';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-
 type CartItem = {
   itemId?: string;
   itemName?: string;
   name?: string;
   imageUrl?: string;
+  image_url?: string;
+  itemImage?: string;
   quantity?: number;
   total?: number;
   unitTotal?: number;
 };
 
-function moneyToCents(value: unknown) {
-  return Math.max(0, Math.round(Number(value || 0) * 100));
+function moneyToCents(value: unknown): number {
+  return Math.max(50, Math.round(Number(value || 0) * 100));
 }
 
-function getOrigin(req: Request) {
-  return (
-    req.headers.get('origin') ||
+function safeText(value: unknown, fallback: string): string {
+  const text = String(value || '').trim();
+  return text || fallback;
+}
+
+function safeHttpsImage(value: unknown): string | undefined {
+  const url = String(value || '').trim();
+  if (!url.startsWith('https://')) return undefined;
+  return url;
+}
+
+function getOrigin(req: Request): string {
+  const origin = req.headers.get('origin');
+  if (origin) return origin.replace(/\/$/, '');
+
+  const site =
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    'https://ordadirect.com'
-  );
+    'https://ordadirect.com';
+
+  return site.replace(/\/$/, '');
+}
+
+function normalizeCartItem(item: CartItem): {
+  itemId: string;
+  name: string;
+  imageUrl?: string;
+  quantity: number;
+  unitTotal: number;
+  total: number;
+} {
+  const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
+  const unitTotal = Number(item.unitTotal || item.total || 0);
+  const total = unitTotal * quantity;
+
+  return {
+    itemId: safeText(item.itemId, ''),
+    name: safeText(item.name || item.itemName, 'ORDA Item').slice(0, 120),
+    imageUrl: safeHttpsImage(item.imageUrl || item.image_url || item.itemImage),
+    quantity,
+    unitTotal,
+    total,
+  };
 }
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+    if (!stripeSecretKey) {
       return NextResponse.json(
         { error: 'Missing STRIPE_SECRET_KEY on Vercel.' },
         { status: 500 }
       );
     }
 
+    const stripe = new Stripe(stripeSecretKey);
+
     const body = await req.json();
 
-    const cart: CartItem[] = Array.isArray(body.cart)
-      ? body.cart
+    const restaurantId = safeText(body.restaurantId, '');
+    const slug = safeText(body.slug, '');
+
+    const cart = Array.isArray(body.cart)
+      ? body.cart.map((item: CartItem) => normalizeCartItem(item)).filter((item) => item.quantity > 0 && item.unitTotal > 0)
       : [];
 
     if (!cart.length) {
       return NextResponse.json(
-        { error: 'Cart is empty.' },
+        { error: 'Cart is empty or item price is missing.' },
         { status: 400 }
       );
     }
@@ -55,95 +98,80 @@ export async function POST(req: Request) {
 
     const subtotal = Number(
       body.subtotal ??
-        cart.reduce(
-          (sum: number, item: CartItem) =>
-            sum + Number(item.total || 0),
-          0
-        )
+        cart.reduce((sum: number, item: { total: number }) => sum + item.total, 0)
     );
 
-    const deliveryFee = Number(
-      body.deliveryFee ??
-      body.delivery_fee ??
-      0
-    );
+    const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0);
+    const discount = Number(body.discount ?? 0);
+    const total = Number(body.total ?? Math.max(0, subtotal + deliveryFee - discount));
 
-    const discount = Number(
-      body.discount ?? 0
-    );
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item) => {
+      const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
+        name: item.name,
+        metadata: {
+          itemId: item.itemId,
+        },
+      };
 
-    const total = Number(
-      body.total ??
-      Math.max(0, subtotal + deliveryFee - discount)
-    );
+      if (item.imageUrl) {
+        productData.images = [item.imageUrl];
+      }
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] =
-      cart.map((item: CartItem) => ({
-        quantity: Number(item.quantity || 1),
-
+      return {
+        quantity: item.quantity,
         price_data: {
           currency: 'usd',
+          unit_amount: moneyToCents(item.unitTotal),
+          product_data: productData,
+        },
+      };
+    });
 
-          unit_amount: moneyToCents(
-            item.unitTotal ||
-            item.total ||
-            0
-          ),
-
+    if (deliveryFee > 0) {
+      line_items.push({
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: moneyToCents(deliveryFee),
           product_data: {
-            name: String(
-              item.name ||
-              item.itemName ||
-              'ORDA Item'
-            ).slice(0, 120),
-
-            images: item.imageUrl
-              ? [String(item.imageUrl)]
-              : undefined,
-
-            metadata: {
-              itemId: String(item.itemId || ''),
-            },
+            name: 'Delivery Fee',
           },
         },
-      }));
-
-    const session =
-      await stripe.checkout.sessions.create({
-        mode: 'payment',
-
-        line_items,
-
-        success_url: `${origin}/store/${body.slug || ''}?success=true`,
-
-        cancel_url: `${origin}/store/${body.slug || ''}?canceled=true`,
-
-        metadata: {
-          restaurantId: String(body.restaurantId || ''),
-          slug: String(body.slug || ''),
-          orderType: String(body.orderType || 'pickup'),
-          subtotal: String(subtotal),
-          deliveryFee: String(deliveryFee),
-          discount: String(discount),
-          total: String(total),
-        },
       });
+    }
 
-    return NextResponse.json({
-      url: session.url,
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items,
+      success_url: `${origin}/store/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/store/${slug}?canceled=true`,
+      metadata: {
+        restaurantId,
+        slug,
+        orderType: safeText(body.orderType, 'pickup'),
+        subtotal: String(subtotal),
+        deliveryFee: String(deliveryFee),
+        discount: String(discount),
+        total: String(total),
+      },
     });
-  } catch (error: any) {
-    console.error('CHECKOUT ERROR:', error);
+
+    if (!session.url) {
+      return NextResponse.json(
+        { error: 'Stripe did not return a checkout URL.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ url: session.url });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Checkout failed.';
+
+    console.error('CHECKOUT ERROR:', message);
 
     return NextResponse.json(
-      {
-        error:
-          error?.message ||
-          'Checkout failed.',
-      },
-      {
-        status: 500,
-      }
+      { error: message },
+      { status: 500 }
     );
   }
 }
