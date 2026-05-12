@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,129 +15,142 @@ type CartItem = {
   quantity?: number;
   total?: number;
   unitTotal?: number;
+  selections?: unknown;
 };
 
-type NormalizedCartItem = {
-  itemId: string;
-  name: string;
-  imageUrl?: string;
-  quantity: number;
-  unitTotal: number;
-  total: number;
-};
-
-function moneyToCents(value: unknown): number {
+function cents(value: unknown) {
   return Math.max(50, Math.round(Number(value || 0) * 100));
 }
 
-function safeText(value: unknown, fallback: string): string {
+function safeText(value: unknown, fallback: string) {
   const text = String(value || '').trim();
   return text || fallback;
 }
 
-function safeHttpsImage(value: unknown): string | undefined {
+function safeQty(value: unknown) {
+  return Math.max(1, Math.round(Number(value || 1)));
+}
+
+function safeImage(value: unknown) {
   const url = String(value || '').trim();
-  if (!url.startsWith('https://')) return undefined;
+  if (!url) return undefined;
+  if (!/^https:\/\//i.test(url)) return undefined;
   return url;
-}
-
-function getOrigin(req: Request): string {
-  const origin = req.headers.get('origin');
-  if (origin) return origin.replace(/\/$/, '');
-
-  const site =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'https://ordadirect.com';
-
-  return site.replace(/\/$/, '');
-}
-
-function normalizeCartItem(item: CartItem): NormalizedCartItem {
-  const quantity = Math.max(1, Math.floor(Number(item.quantity || 1)));
-  const unitTotal = Number(item.unitTotal || item.total || 0);
-
-  return {
-    itemId: safeText(item.itemId, ''),
-    name: safeText(item.name || item.itemName, 'ORDA Item').slice(0, 120),
-    imageUrl: safeHttpsImage(item.imageUrl || item.image_url || item.itemImage),
-    quantity,
-    unitTotal,
-    total: unitTotal * quantity,
-  };
 }
 
 export async function POST(req: Request) {
   try {
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-
-    if (!stripeSecretKey) {
-      return NextResponse.json(
-        { error: 'Missing STRIPE_SECRET_KEY on Vercel.' },
-        { status: 500 }
-      );
-    }
-
-    const stripe = new Stripe(stripeSecretKey);
     const body = await req.json();
 
+    const cart = Array.isArray(body.cart) ? (body.cart as CartItem[]) : [];
     const restaurantId = safeText(body.restaurantId, '');
     const slug = safeText(body.slug, '');
+    const orderType = safeText(body.orderType, 'pickup');
 
-    const cart: NormalizedCartItem[] = Array.isArray(body.cart)
-      ? body.cart
-          .map((item: CartItem): NormalizedCartItem => normalizeCartItem(item))
-          .filter((item: NormalizedCartItem): boolean => item.quantity > 0 && item.unitTotal > 0)
-      : [];
-
-    if (!cart.length) {
-      return NextResponse.json(
-        { error: 'Cart is empty or item price is missing.' },
-        { status: 400 }
-      );
+    if (!restaurantId) {
+      return NextResponse.json({ error: 'Missing restaurantId.' }, { status: 400 });
     }
 
-    const origin = getOrigin(req);
+    if (!cart.length) {
+      return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 });
+    }
 
-    const subtotal = Number(
-      body.subtotal ??
-        cart.reduce((sum: number, item: NormalizedCartItem): number => sum + item.total, 0)
-    );
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0);
-    const discount = Number(body.discount ?? 0);
-    const total = Number(body.total ?? Math.max(0, subtotal + deliveryFee - discount));
+    if (!stripeKey) {
+      return NextResponse.json({ error: 'Missing STRIPE_SECRET_KEY.' }, { status: 500 });
+    }
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map(
-      (item: NormalizedCartItem): Stripe.Checkout.SessionCreateParams.LineItem => {
-        const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
-          name: item.name,
-          metadata: {
-            itemId: item.itemId,
+    if (!supabaseUrl || !serviceKey) {
+      return NextResponse.json({ error: 'Missing Supabase server env keys.' }, { status: 500 });
+    }
+
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: '2024-06-20',
+    });
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:3000';
+
+    const subtotal = Number(body.subtotal || 0);
+    const deliveryFee = Number(body.deliveryFee || 0);
+    const discount = Number(body.discount || 0);
+    const total = Number(body.total || subtotal + deliveryFee - discount);
+
+    const itemsSummary =
+      safeText(body.owner_items_summary, '') ||
+      safeText(body.items_summary, '') ||
+      cart
+        .map((item) => `${safeQty(item.quantity)}x ${safeText(item.itemName || item.name, 'Item')}`)
+        .join(' · ');
+
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        restaurant_id: restaurantId,
+        status: 'new',
+        order_type: orderType,
+        subtotal,
+        delivery_fee: deliveryFee,
+        discount,
+        total,
+        amount_total: total,
+        items_summary: itemsSummary,
+        owner_items_summary: safeText(body.owner_items_summary, itemsSummary),
+        customer_items_summary: safeText(body.customer_items_summary, itemsSummary),
+        items: cart,
+        order_items: cart,
+        order_media: body.order_media || null,
+        promo: body.promo || null,
+        customer_language: safeText(body.customerLanguage, 'en'),
+        owner_language: safeText(body.ownerLanguage || body.orderLanguage, 'en'),
+        slug,
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (orderError) {
+      return NextResponse.json({ error: orderError.message }, { status: 500 });
+    }
+
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item) => {
+      const name = safeText(item.itemName || item.name, 'ORDA Item');
+      const qty = safeQty(item.quantity);
+      const unitAmount = cents(item.unitTotal || Number(item.total || 0) / qty || 0);
+      const image = safeImage(item.imageUrl || item.image_url || item.itemImage);
+
+      return {
+        quantity: qty,
+        price_data: {
+          currency: 'usd',
+          unit_amount: unitAmount,
+          product_data: {
+            name,
+            images: image ? [image] : undefined,
           },
-        };
-
-        if (item.imageUrl) {
-          productData.images = [item.imageUrl];
-        }
-
-        return {
-          quantity: item.quantity,
-          price_data: {
-            currency: 'usd',
-            unit_amount: moneyToCents(item.unitTotal),
-            product_data: productData,
-          },
-        };
-      }
-    );
+        },
+      };
+    });
 
     if (deliveryFee > 0) {
       line_items.push({
         quantity: 1,
         price_data: {
           currency: 'usd',
-          unit_amount: moneyToCents(deliveryFee),
+          unit_amount: cents(deliveryFee),
           product_data: {
             name: 'Delivery Fee',
           },
@@ -147,31 +161,37 @@ export async function POST(req: Request) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items,
-      success_url: `${origin}/store/${slug}?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/store/${slug}?canceled=true`,
+      success_url: `${appUrl}/store/${slug}?success=1&order=${order.id}`,
+      cancel_url: `${appUrl}/store/${slug}?cancelled=1`,
       metadata: {
-        restaurantId,
+        order_id: order.id,
+        restaurant_id: restaurantId,
         slug,
-        orderType: safeText(body.orderType, 'pickup'),
-        subtotal: String(subtotal),
-        deliveryFee: String(deliveryFee),
-        discount: String(discount),
-        total: String(total),
+        order_type: orderType,
       },
     });
 
     if (!session.url) {
-      return NextResponse.json(
-        { error: 'Stripe did not return a checkout URL.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Stripe checkout URL was not created.' }, { status: 500 });
     }
 
-    return NextResponse.json({ url: session.url });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Checkout failed.';
-    console.error('CHECKOUT ERROR:', message);
+    await supabaseAdmin
+      .from('orders')
+      .update({
+        stripe_checkout_session_id: session.id,
+        checkout_url: session.url,
+      })
+      .eq('id', order.id);
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({
+      url: session.url,
+      orderId: order.id,
+      sessionId: session.id,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || 'Checkout failed.' },
+      { status: 500 }
+    );
   }
 }
