@@ -121,7 +121,7 @@ export async function POST(req: Request) {
     }
 
     const origin = getOrigin(req);
-    const subtotal = Number(body.subtotal ?? cart.reduce((sum, item) => sum + item.total, 0));
+    const subtotal = Number(body.subtotal ?? cart.reduce((sum: number, item: any) => sum + Number(item.total || 0), 0));
     const deliveryFee = Number(body.deliveryFee ?? body.delivery_fee ?? 0);
     const discount = Number(body.discount ?? 0);
     const total = Number(body.total ?? Math.max(0, subtotal + deliveryFee - discount));
