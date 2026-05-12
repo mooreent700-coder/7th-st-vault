@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     const discount = Number(body.discount ?? 0);
     const total = Number(body.total ?? Math.max(0, subtotal + deliveryFee - discount));
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item) => {
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item: any) => ({
       const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
         name: item.name,
         metadata: {
