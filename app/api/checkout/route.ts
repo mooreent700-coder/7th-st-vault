@@ -6,151 +6,192 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type CartItem = {
+  id?: string;
   itemId?: string;
   itemName?: string;
   name?: string;
+  image?: string;
   imageUrl?: string;
   image_url?: string;
   itemImage?: string;
+  item_image?: string;
+  videoUrl?: string;
+  video_url?: string;
+  itemVideo?: string;
+  item_video?: string;
+  mediaType?: string;
   quantity?: number;
   total?: number;
   unitTotal?: number;
   selections?: unknown;
 };
 
-function cents(value: unknown) {
-  return Math.max(50, Math.round(Number(value || 0) * 100));
+function safeText(value: unknown, fallback = '') {
+  const clean = String(value || '').trim();
+  return clean || fallback;
 }
 
-function safeText(value: unknown, fallback: string) {
-  const text = String(value || '').trim();
-  return text || fallback;
+function safeNumber(value: unknown, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
 }
 
-function safeQty(value: unknown) {
-  return Math.max(1, Math.round(Number(value || 1)));
+function toCents(value: unknown) {
+  return Math.max(50, Math.round(safeNumber(value, 1) * 100));
 }
 
-function safeImage(value: unknown) {
-  const url = String(value || '').trim();
-  if (!url) return undefined;
-  if (!/^https:\/\//i.test(url)) return undefined;
+function safeStripeImage(value: unknown) {
+  const url = safeText(value);
+  if (!url) return '';
+  if (!/^https:\/\//i.test(url)) return '';
   return url;
 }
 
 export async function POST(req: Request) {
   try {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!stripeSecretKey || !stripeSecretKey.startsWith('sk_')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid STRIPE_SECRET_KEY' },
+        { status: 500 }
+      );
+    }
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { error: 'Missing Supabase server keys' },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
 
-    const cart = Array.isArray(body.cart) ? (body.cart as CartItem[]) : [];
-    const restaurantId = safeText(body.restaurantId, '');
-    const slug = safeText(body.slug, '');
-    const orderType = safeText(body.orderType, 'pickup');
-
-    if (!restaurantId) {
-      return NextResponse.json({ error: 'Missing restaurantId.' }, { status: 400 });
-    }
+    const cart: CartItem[] = Array.isArray(body.cart) ? body.cart : [];
 
     if (!cart.length) {
-      return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 });
+      return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    const stripeKey = process.env.STRIPE_SECRET_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const restaurantId = safeText(body.restaurantId);
+    const slug = safeText(body.slug, 'store');
+    const orderType = safeText(body.orderType, 'pickup');
 
-    if (!stripeKey) {
-      return NextResponse.json({ error: 'Missing STRIPE_SECRET_KEY.' }, { status: 500 });
-    }
+    const subtotal = safeNumber(body.subtotal);
+    const deliveryFee = safeNumber(body.deliveryFee);
+    const discount = safeNumber(body.discount);
+    const total = safeNumber(body.total);
 
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ error: 'Missing Supabase server env keys.' }, { status: 500 });
-    }
+    const stripe = new Stripe(stripeSecretKey);
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: '2024-06-20',
-    });
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
     });
 
-    const appUrl =
+    const origin =
       process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.VERCEL_URL
+      (process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : 'http://localhost:3000';
+        : new URL(req.url).origin);
 
-    const subtotal = Number(body.subtotal || 0);
-    const deliveryFee = Number(body.deliveryFee || 0);
-    const discount = Number(body.discount || 0);
-    const total = Number(body.total || subtotal + deliveryFee - discount);
+    const cleanedCart = cart.map((item) => {
+      const quantity = Math.max(1, safeNumber(item.quantity, 1));
+      const unitTotal = safeNumber(item.unitTotal, safeNumber(item.total, 1) / quantity);
 
-    const itemsSummary =
-      safeText(body.owner_items_summary, '') ||
-      safeText(body.items_summary, '') ||
-      cart
-        .map((item) => `${safeQty(item.quantity)}x ${safeText(item.itemName || item.name, 'Item')}`)
-        .join(' · ');
+      const imageUrl = safeText(
+        item.imageUrl ||
+          item.image_url ||
+          item.itemImage ||
+          item.item_image ||
+          item.image
+      );
 
-    const { data: order, error: orderError } = await supabaseAdmin
+      const videoUrl = safeText(
+        item.videoUrl ||
+          item.video_url ||
+          item.itemVideo ||
+          item.item_video
+      );
+
+      return {
+        id: item.id || null,
+        item_id: safeText(item.itemId),
+        item_name: safeText(item.itemName || item.name, 'Menu Item'),
+        name: safeText(item.itemName || item.name, 'Menu Item'),
+        image_url: imageUrl,
+        imageUrl,
+        item_image: imageUrl,
+        video_url: videoUrl,
+        media_type: safeText(item.mediaType, imageUrl ? 'image' : 'video'),
+        quantity,
+        unit_total: unitTotal,
+        unitTotal,
+        total: unitTotal * quantity,
+        selections: item.selections || [],
+      };
+    });
+
+    const orderPayload: Record<string, unknown> = {
+      restaurant_id: restaurantId,
+      status: 'pending',
+      payment_status: 'unpaid',
+      order_type: orderType,
+      subtotal,
+      delivery_fee: deliveryFee,
+      discount,
+      total,
+      items: cleanedCart,
+      items_summary: safeText(body.items_summary),
+      owner_items_summary: safeText(body.owner_items_summary || body.items_summary),
+      customer_items_summary: safeText(body.customer_items_summary || body.items_summary),
+      promo: body.promo || null,
+      created_at: new Date().toISOString(),
+    };
+
+    let orderId = '';
+
+    const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        restaurant_id: restaurantId,
-        status: 'new',
-        order_type: orderType,
-        subtotal,
-        delivery_fee: deliveryFee,
-        discount,
-        total,
-        amount_total: total,
-        items_summary: itemsSummary,
-        owner_items_summary: safeText(body.owner_items_summary, itemsSummary),
-        customer_items_summary: safeText(body.customer_items_summary, itemsSummary),
-        items: cart,
-        order_items: cart,
-        order_media: body.order_media || null,
-        promo: body.promo || null,
-        customer_language: safeText(body.customerLanguage, 'en'),
-        owner_language: safeText(body.ownerLanguage || body.orderLanguage, 'en'),
-        slug,
-        created_at: new Date().toISOString(),
-      })
+      .insert(orderPayload)
       .select('id')
       .single();
 
-    if (orderError) {
-      return NextResponse.json({ error: orderError.message }, { status: 500 });
+    if (!orderError && order?.id) {
+      orderId = String(order.id);
     }
 
-    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = cart.map((item) => {
-      const name = safeText(item.itemName || item.name, 'ORDA Item');
-      const qty = safeQty(item.quantity);
-      const unitAmount = cents(item.unitTotal || Number(item.total || 0) / qty || 0);
-      const image = safeImage(item.imageUrl || item.image_url || item.itemImage);
+    const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] =
+      cleanedCart.map((item) => {
+        const stripeImage = safeStripeImage(item.image_url);
 
-      return {
-        quantity: qty,
-        price_data: {
-          currency: 'usd',
-          unit_amount: unitAmount,
-          product_data: {
-            name,
-            images: image ? [image] : undefined,
+        return {
+          quantity: item.quantity,
+          price_data: {
+            currency: 'usd',
+            unit_amount: toCents(item.unit_total),
+            product_data: {
+              name: item.item_name,
+              images: stripeImage ? [stripeImage] : [],
+              metadata: {
+                item_id: item.item_id,
+                image_url: item.image_url,
+              },
+            },
           },
-        },
-      };
-    });
+        };
+      });
 
     if (deliveryFee > 0) {
       line_items.push({
         quantity: 1,
         price_data: {
           currency: 'usd',
-          unit_amount: cents(deliveryFee),
+          unit_amount: toCents(deliveryFee),
           product_data: {
             name: 'Delivery Fee',
           },
@@ -160,37 +201,38 @@ export async function POST(req: Request) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
+      payment_method_types: ['card'],
       line_items,
-      success_url: `${appUrl}/store/${slug}?success=1&order=${order.id}`,
-      cancel_url: `${appUrl}/store/${slug}?cancelled=1`,
+      success_url: `${origin}/store/${slug}?checkout=success${orderId ? `&order=${orderId}` : ''}`,
+      cancel_url: `${origin}/store/${slug}?checkout=cancelled${orderId ? `&order=${orderId}` : ''}`,
       metadata: {
-        order_id: order.id,
+        order_id: orderId,
         restaurant_id: restaurantId,
         slug,
         order_type: orderType,
       },
     });
 
-    if (!session.url) {
-      return NextResponse.json({ error: 'Stripe checkout URL was not created.' }, { status: 500 });
+    if (orderId) {
+      await supabase
+        .from('orders')
+        .update({
+          stripe_session_id: session.id,
+          stripe_checkout_url: session.url,
+        })
+        .eq('id', orderId);
     }
 
-    await supabaseAdmin
-      .from('orders')
-      .update({
-        stripe_checkout_session_id: session.id,
-        checkout_url: session.url,
-      })
-      .eq('id', order.id);
-
     return NextResponse.json({
+      success: true,
       url: session.url,
-      orderId: order.id,
-      sessionId: session.id,
+      orderId,
     });
-  } catch (err: any) {
+  } catch (error: any) {
+    console.error('CHECKOUT ERROR:', error);
+
     return NextResponse.json(
-      { error: err?.message || 'Checkout failed.' },
+      { error: error?.message || 'Checkout failed' },
       { status: 500 }
     );
   }
