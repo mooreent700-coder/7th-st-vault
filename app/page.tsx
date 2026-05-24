@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import AdminHoldLogin from '@/components/AdminHoldLogin';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type Lang = 'en' | 'es';
@@ -197,15 +196,7 @@ function normalizeLandingTheme(value: string | null | undefined): LandingTheme |
 }
 
 function getSavedLandingTheme(): LandingTheme | null {
-  if (typeof window === 'undefined') return null;
-
-  const saved =
-    window.localStorage.getItem('landing_theme') ||
-    window.localStorage.getItem('landing_page_theme') ||
-    window.localStorage.getItem('vault_landing_theme') ||
-    window.localStorage.getItem('platform_landing_theme');
-
-  return normalizeLandingTheme(saved);
+  return null;
 }
 
 function applyLandingThemeToDocument(theme: LandingTheme) {
@@ -420,48 +411,163 @@ function readMediaSetting(rows: PlatformSettingRow[], keys: string[]) {
 }
 
 function getSavedHeroMedia() {
-  if (typeof window === 'undefined') return { url: '', type: 'image' as HeroMediaType };
-
-  const savedType = window.localStorage.getItem('landing_hero_media_type');
-  const type: HeroMediaType = savedType === 'video' ? 'video' : 'image';
-  const url =
-    window.localStorage.getItem('landing_hero_url') ||
-    window.localStorage.getItem('landing_hero_media_url') ||
-    window.localStorage.getItem(type === 'video' ? 'landing_hero_video_url' : 'landing_hero_image_url') ||
-    window.localStorage.getItem('platform_settings:landing_hero_url') ||
-    window.localStorage.getItem('platform_settings:landing_hero_media_url') ||
-    window.localStorage.getItem(type === 'video' ? 'platform_settings:landing_hero_video_url' : 'platform_settings:landing_hero_image_url') ||
-    '';
-
-  return { url: normalizeSettingValue(url), type };
+  return { url: '', type: 'image' as HeroMediaType };
 }
 
 function getSavedHeroCopy() {
-  if (typeof window === 'undefined') return { title: '', text: '' };
+  return { title: '', text: '' };
+}
 
-  const title =
-    window.localStorage.getItem('landing_hero_title') ||
-    window.localStorage.getItem('landing_page_hero_title') ||
-    window.localStorage.getItem('hero_title') ||
-    window.localStorage.getItem('platform_settings:landing_hero_title') ||
-    '';
 
-  const text =
-    window.localStorage.getItem('landing_hero_text') ||
-    window.localStorage.getItem('landing_hero_subtitle') ||
-    window.localStorage.getItem('landing_hero_description') ||
-    window.localStorage.getItem('landing_page_hero_text') ||
-    window.localStorage.getItem('landing_page_hero_subtitle') ||
-    window.localStorage.getItem('hero_text') ||
-    window.localStorage.getItem('hero_subtitle') ||
-    window.localStorage.getItem('hero_description') ||
-    window.localStorage.getItem('platform_settings:landing_hero_text') ||
-    '';
+const ADMIN_DASHBOARD_PATH = process.env.NEXT_PUBLIC_ADMIN_PATH || '/admin';
+const ADMIN_HOLD_MS = 850;
+const ADMIN_PASSCODE =
+  process.env.NEXT_PUBLIC_ADMIN_PASSCODE ||
+  process.env.NEXT_PUBLIC_7SV_ADMIN_PASSCODE ||
+  process.env.NEXT_PUBLIC_VAULT_ADMIN_PASSCODE ||
+  '';
 
-  return {
-    title: normalizeSettingValue(title),
-    text: normalizeSettingValue(text),
-  };
+function cleanPasscode(value: string) {
+  return String(value || '').trim();
+}
+
+function AdminHoldLogin({ children }: { children: ReactNode }) {
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdOpenedRef = useRef(false);
+  const [open, setOpen] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  function clearHoldTimer() {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }
+
+  function openAdminLogin() {
+    clearHoldTimer();
+    holdOpenedRef.current = true;
+    setError('');
+    setPasscode('');
+    setOpen(true);
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate?.(35);
+    }
+  }
+
+  function closeAdminLogin() {
+    setOpen(false);
+    setError('');
+    setPasscode('');
+    setLoading(false);
+  }
+
+  function startHold() {
+    clearHoldTimer();
+    holdOpenedRef.current = false;
+    holdTimerRef.current = setTimeout(openAdminLogin, ADMIN_HOLD_MS);
+  }
+
+  function cancelHold() {
+    clearHoldTimer();
+    window.setTimeout(() => {
+      holdOpenedRef.current = false;
+    }, 100);
+  }
+
+  function submitAdminPasscode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const savedPasscode = cleanPasscode(ADMIN_PASSCODE);
+    const enteredPasscode = cleanPasscode(passcode);
+
+    if (!savedPasscode) {
+      setError('Admin passcode is not set. Add NEXT_PUBLIC_ADMIN_PASSCODE in Vercel.');
+      return;
+    }
+
+    if (!enteredPasscode) {
+      setError('Enter passcode.');
+      return;
+    }
+
+    if (enteredPasscode !== savedPasscode) {
+      setError('Wrong passcode.');
+      setPasscode('');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      window.sessionStorage.setItem('7sv_admin_hold_login', '1');
+      window.localStorage.setItem('7sv_admin_hold_login', '1');
+      document.cookie = '7sv_admin_hold_login=1; path=/; max-age=86400; SameSite=Lax';
+      window.location.assign(ADMIN_DASHBOARD_PATH);
+    } catch {
+      window.location.href = ADMIN_DASHBOARD_PATH;
+    }
+  }
+
+  return (
+    <>
+      <span
+        className="adminHoldLogoTarget"
+        title="Hold for admin passcode"
+        onPointerDown={startHold}
+        onPointerUp={cancelHold}
+        onPointerCancel={cancelHold}
+        onPointerLeave={cancelHold}
+        onTouchStart={startHold}
+        onTouchEnd={cancelHold}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          openAdminLogin();
+        }}
+        onClickCapture={(event) => {
+          if (holdOpenedRef.current || open) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      >
+        {children}
+      </span>
+
+      {open ? (
+        <div className="adminHoldOverlay" role="dialog" aria-modal="true" aria-label="Admin passcode">
+          <div className="adminHoldPanel">
+            <button type="button" className="adminHoldClose" onClick={closeAdminLogin} aria-label="Close admin passcode">×</button>
+            <img src="/7sv-logo.png" alt="7th St Vault" className="adminHoldLogo" />
+            <h2>Admin</h2>
+            <p>Enter your private passcode.</p>
+            <form onSubmit={submitAdminPasscode} className="adminHoldForm">
+              <label>
+                Passcode
+                <input
+                  value={passcode}
+                  onChange={(event) => {
+                    setPasscode(event.target.value);
+                    if (error) setError('');
+                  }}
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="Passcode"
+                  autoFocus
+                />
+              </label>
+              {error ? <div className="adminHoldError">{error}</div> : null}
+              <button type="submit" disabled={loading}>{loading ? 'Opening...' : 'Enter Admin'}</button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 export default function HomePage() {
@@ -527,15 +633,12 @@ export default function HomePage() {
       if (!active) return;
 
       if (error) {
-        const fallbackTheme = getSavedLandingTheme() || 'light';
-        const savedHero = getSavedHeroMedia();
-        const savedCopy = getSavedHeroCopy();
-        setLandingTheme(fallbackTheme);
-        applyLandingThemeToDocument(fallbackTheme);
-        setHeroMediaUrl(savedHero.url || defaultHeroImage);
-        setHeroMediaType(savedHero.type);
-        setHeroTitle(savedCopy.title || defaultHeroTitle);
-        setHeroText(savedCopy.text || defaultHeroText);
+        setLandingTheme('light');
+        applyLandingThemeToDocument('light');
+        setHeroMediaUrl(defaultHeroImage);
+        setHeroMediaType('image');
+        setHeroTitle(defaultHeroTitle);
+        setHeroText(defaultHeroText);
         setHeroTitleColor('#ffffff');
         setHeroTextColor('#ffffff');
         landingLoadedOnceRef.current = true;
@@ -821,5 +924,7 @@ export default function HomePage() {
 }
 
 const styles = `
+.adminHoldLogoTarget{display:inline-flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-user-select:none;user-select:none}.adminHoldOverlay{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(2,6,23,.72);backdrop-filter:blur(18px);padding:18px}.adminHoldPanel{position:relative;width:min(430px,100%);border-radius:28px;padding:30px;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid rgba(15,23,42,.1);box-shadow:0 28px 80px rgba(0,0,0,.35);color:#0f172a}.adminHoldClose{position:absolute;top:16px;right:16px;width:38px;height:38px;border:0;border-radius:999px;background:#0f172a;color:#fff;font-size:25px;line-height:1;cursor:pointer}.adminHoldLogo{width:180px;max-width:62%;display:block;margin:2px auto 18px}.adminHoldPanel h2{margin:0;text-align:center;font-size:28px;line-height:1;font-weight:950;letter-spacing:-.04em}.adminHoldPanel p{margin:10px 0 22px;text-align:center;color:#64748b;font-size:14px;font-weight:800}.adminHoldForm{display:grid;gap:14px}.adminHoldForm label{display:grid;gap:7px;color:#334155;font-size:13px;font-weight:950}.adminHoldForm input{width:100%;height:48px;border-radius:14px;border:1px solid rgba(15,23,42,.14);background:#fff;padding:0 14px;color:#0f172a;font-size:15px;font-weight:800;outline:none}.adminHoldForm input:focus{border-color:#0f172a;box-shadow:0 0 0 4px rgba(15,23,42,.08)}.adminHoldForm button[type=submit]{height:52px;border:0;border-radius:16px;background:#0f172a;color:#fff;font-size:15px;font-weight:950;cursor:pointer}.adminHoldForm button[type=submit]:disabled{opacity:.65;cursor:not-allowed}.adminHoldError{border-radius:14px;background:#fee2e2;color:#991b1b;padding:11px 12px;font-size:13px;font-weight:900}.landing-dark .adminHoldPanel{background:linear-gradient(180deg,#111827,#020617);border-color:rgba(255,255,255,.12);color:#f8fafc}.landing-dark .adminHoldPanel p{color:#cbd5e1}.landing-dark .adminHoldForm label{color:#e2e8f0}.landing-dark .adminHoldForm input{background:#020617;border-color:rgba(255,255,255,.16);color:#f8fafc}.landing-dark .adminHoldClose,.landing-dark .adminHoldForm button[type=submit]{background:#fff;color:#0f172a}
+
 .page{background:#f8f8f5;color:#111827;min-height:100vh;overflow-x:hidden;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.page.landing-dark{background:#05070a;color:#f8fafc}.header{position:sticky;top:0;z-index:50;background:rgba(248,248,245,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(17,24,39,.08)}.landing-dark .header{background:rgba(5,7,10,.9);border-bottom:1px solid rgba(255,255,255,.1)}.headerInner{width:100%;max-width:1240px;margin:0 auto;padding:6px 18px;display:flex;align-items:center;justify-content:space-between;gap:18px}.logoArea{display:flex;align-items:center;flex-shrink:0;min-width:270px;min-height:64px}.logoWrap{display:inline-flex;align-items:center;text-decoration:none;cursor:pointer}.logoImage{width:260px;max-width:260px;height:auto;display:block;object-fit:contain}.vaultLogo{display:grid;line-height:.9;color:#111827;text-decoration:none;letter-spacing:-.04em}.landing-dark .vaultLogo{color:#fff}.vaultLogo span{font-size:13px;font-weight:1000;letter-spacing:.22em}.vaultLogo b{font-size:34px;font-weight:1000;letter-spacing:-.08em}.headerRight{display:flex;align-items:center;justify-content:flex-end;gap:22px;flex-wrap:wrap}.navLink{text-decoration:none;color:#1f2937;font-size:15px;font-weight:750;letter-spacing:-.01em}.landing-dark .navLink{color:#e5e7eb}.navLink:hover{color:#000}.landing-dark .navLink:hover{color:#fff}.langWrap{display:inline-flex;align-items:center;gap:3px;padding:4px;background:rgba(255,255,255,.85);border:1px solid rgba(17,24,39,.12);border-radius:14px;box-shadow:0 8px 20px rgba(15,23,42,.05)}.landing-dark .langWrap{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}.langButton{appearance:none;border:none;min-width:44px;height:34px;border-radius:10px;background:transparent;color:#1f2937;font-size:14px;font-weight:850;cursor:pointer}.landing-dark .langButton{color:#f8fafc}.langButton.active{background:#101820;color:#fff;box-shadow:0 10px 18px rgba(15,23,42,.16)}.landing-dark .langButton.active{background:#fff;color:#101820}.navButton,.primaryBtn,.cardBtn,.cardBtnGrowth,.finalBtn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:850;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}.navButton{min-height:38px;padding:0 18px;border-radius:12px;background:#fff;color:#111827;border:1px solid rgba(17,24,39,.12);box-shadow:0 10px 22px rgba(15,23,42,.08)}.landing-dark .navButton{background:#111827;color:#fff;border-color:rgba(255,255,255,.14)}.navButton:hover{transform:translateY(-1px)}.hero{position:relative;width:100%;aspect-ratio:16/9;min-height:auto;max-height:calc(100vh - 72px);display:flex;align-items:center;overflow:hidden;background:#05070a}.heroImage,.heroBlackBg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;background:#05070a}.heroImage{opacity:1}.heroImage.mediaReady{opacity:1}.heroOverlay{position:absolute;inset:0;background:radial-gradient(circle at 76% 40%,rgba(255,255,255,.06),transparent 26%),linear-gradient(90deg,rgba(0,0,0,.7) 0%,rgba(0,0,0,.44) 46%,rgba(0,0,0,.12) 100%),linear-gradient(180deg,rgba(0,0,0,.08) 0%,rgba(0,0,0,.68) 100%)}.heroShadow{position:absolute;inset:auto 0 0;height:36%;background:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.78) 100%)}.heroContent{position:relative;z-index:2;width:100%;max-width:1240px;height:100%;margin:0 auto;padding:clamp(78px,7vw,112px) 22px clamp(38px,5vw,68px);color:#fff;display:flex;flex-direction:column;justify-content:flex-end}.heroContent:not(.ready){opacity:0}.pill{display:inline-flex;align-items:center;width:fit-content;min-height:38px;padding:0 16px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:14px;font-weight:800;backdrop-filter:blur(10px)}.heroTitle{margin:18px 0 0;max-width:670px;font-size:clamp(38px,5.1vw,72px);line-height:.94;font-weight:950;letter-spacing:-.06em;text-wrap:balance;text-shadow:0 2px 22px rgba(0,0,0,.28)}.heroText{margin:17px 0 0;max-width:560px;font-size:clamp(16px,1.5vw,20px);line-height:1.48;color:rgba(255,255,255,.92);text-shadow:0 2px 16px rgba(0,0,0,.24)}.heroTextSkeleton{min-height:260px}.heroButtons{margin-top:22px;display:flex}.primaryBtn{min-height:54px;padding:0 28px;border-radius:12px;background:#fff;color:#111827;box-shadow:0 18px 36px rgba(0,0,0,.22)}.primaryBtn:hover,.finalBtn:hover,.cardBtn:hover,.cardBtnGrowth:hover{transform:translateY(-2px)}.arrow{font-size:28px;line-height:1;transform:translateY(-1px)}.container{width:100%;max-width:1140px;margin:0 auto;padding:0 18px}.introBand{background:#f8f8f5;border-bottom:1px solid rgba(17,24,39,.08)}.landing-dark .introBand{background:#080b10;border-bottom-color:rgba(255,255,255,.09)}.introGrid{display:grid;grid-template-columns:1fr 1fr;gap:0}.introItem{min-height:180px;display:grid;grid-template-columns:84px 1fr;gap:26px;align-items:center;padding:34px 34px 34px 0}.introItem.bordered{border-left:1px solid rgba(17,24,39,.14);padding-left:34px;padding-right:0}.landing-dark .introItem.bordered{border-left-color:rgba(255,255,255,.12)}.introIcon{width:72px;height:72px;border-radius:999px;display:grid;place-items:center;background:#0f1720;color:#d8b177;font-size:30px;font-weight:900;box-shadow:0 16px 34px rgba(15,23,42,.14)}.introTitle{margin:0;color:#111827;font-size:24px;line-height:1.16;font-weight:900;letter-spacing:-.03em}.landing-dark .introTitle{color:#f9fafb}.introText{margin:10px 0 0;color:#374151;font-size:16px;line-height:1.65}.landing-dark .introText{color:#cbd5e1}.discoverSection{padding:74px 0;background:radial-gradient(circle at 84% 20%,rgba(37,99,235,.18),transparent 26%),linear-gradient(135deg,#07090d 0%,#111827 50%,#050608 100%);color:#fff;overflow:hidden}.discoverGrid{display:grid;grid-template-columns:minmax(0,.95fr) minmax(340px,.85fr);gap:44px;align-items:center}.eyebrow{color:#bd8b50;font-size:13px;line-height:1;font-weight:950;letter-spacing:.19em;text-transform:uppercase}.discoverCopy .eyebrow{color:#2563eb}.discoverTitle{margin:14px 0 0;font-size:clamp(34px,5.5vw,62px);line-height:.95;font-weight:950;letter-spacing:-.06em}.discoverText{margin:18px 0 0;color:rgba(255,255,255,.8);font-size:18px;line-height:1.7;max-width:620px}.discoverCtaGrid{margin-top:30px;display:grid;grid-template-columns:minmax(320px,430px) minmax(320px,430px);gap:30px;align-items:center;width:min(100%,910px);position:relative;z-index:6}.discoverInfoPanel{padding:18px;border-radius:28px;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.045));border:1px solid rgba(255,255,255,.14);display:grid;gap:12px}.discoverCleanPoint{min-height:74px;display:grid;grid-template-columns:48px 1fr;gap:14px;align-items:center;padding:13px 15px;border-radius:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.10)}.discoverCleanIcon{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;font-size:19px;font-weight:1000}.discoverCleanPoint strong{display:block;color:#fff;font-size:17px;line-height:1.15;font-weight:950}.discoverCleanPoint small{display:block;margin-top:5px;color:rgba(255,255,255,.68);font-size:13px;line-height:1.35}.discoverVisual{display:block;text-decoration:none;color:inherit}.discoverPictureButtonRow{width:100%;display:flex;justify-content:center;align-items:center;margin-top:24px;position:relative;z-index:50;grid-column:2}.discoverFashionButton{position:relative;min-height:72px;min-width:280px;padding:0 24px;border-radius:22px;display:inline-flex;align-items:center;justify-content:center;gap:14px;text-decoration:none;overflow:hidden;border:2px solid rgba(255,255,255,.62);background:radial-gradient(circle at 18% 18%,rgba(255,255,255,.42),transparent 24%),linear-gradient(135deg,#2563eb 0%,#1d4ed8 50%,#1e40af 100%);box-shadow:0 0 20px rgba(37,99,235,.95),0 0 46px rgba(37,99,235,.85),0 0 84px rgba(37,99,235,.55),0 14px 34px rgba(0,0,0,.35);animation:discoverBubbleGlow 1.9s ease-in-out infinite}.discoverFashionButton::before{content:'';position:absolute;inset:0;background:linear-gradient(120deg,transparent 0%,rgba(255,255,255,.48) 42%,transparent 74%);transform:translateX(-135%);animation:discoverBubbleShine 3s infinite}.discoverFashionArrow{position:relative;z-index:3;color:#fff;font-size:38px;font-weight:1000;line-height:1;transform:rotate(-12deg) translateY(-1px)}.discoverFashionText{position:relative;z-index:3;color:#fff;font-size:20px;font-weight:950;line-height:1.05;letter-spacing:-.035em;text-align:left}@keyframes discoverBubbleGlow{0%,100%{box-shadow:0 0 20px rgba(37,99,235,.88),0 0 46px rgba(37,99,235,.74),0 0 84px rgba(37,99,235,.46),0 14px 34px rgba(0,0,0,.35)}50%{box-shadow:0 0 30px rgba(37,99,235,1),0 0 76px rgba(37,99,235,1),0 0 128px rgba(37,99,235,.72),0 18px 44px rgba(0,0,0,.4)}}@keyframes discoverBubbleShine{0%{transform:translateX(-135%)}100%{transform:translateX(165%)}}.phoneMock{width:min(100%,440px);margin-left:auto;border-radius:38px;padding:14px;background:#05070b;border:1px solid rgba(255,255,255,.14);box-shadow:0 34px 90px rgba(0,0,0,.36),0 0 70px rgba(37,99,235,.16);transform:rotate(2deg)}.phoneTop{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 12px;color:#fff}.phoneTop span{color:#2563eb;font-size:22px;font-weight:950;letter-spacing:.14em}.phoneTop b{font-size:12px;text-transform:uppercase;letter-spacing:.16em}.miniExplore{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:118px;gap:5px;overflow:hidden;border-radius:26px}.miniTile{position:relative;overflow:hidden;background:#111827}.largeMiniTile{grid-column:span 2;grid-row:span 2}.miniTile img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(1.08) contrast(1.05)}.miniShade{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.46),transparent 58%)}.miniTile i{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:999px;background:rgba(0,0,0,.56);color:#fff;display:grid;place-items:center;font-size:12px;font-style:normal}.pricingSection,.showcaseSection,.howSection,.finalSection{padding:64px 0;background:#f8f8f5}.landing-dark .pricingSection,.landing-dark .howSection{background:#05070a}.showcaseSection,.finalSection{background:#f1f2ef}.landing-dark .showcaseSection,.landing-dark .finalSection{background:#080b10}.smallCenter{max-width:900px;margin:0 auto;text-align:center}.sectionTitle{margin:12px 0 0;color:#111827;font-size:clamp(32px,5vw,50px);line-height:1.05;font-weight:950;letter-spacing:-.05em;text-wrap:balance}.landing-dark .sectionTitle{color:#f9fafb}.sectionText{margin:16px auto 0;max-width:820px;color:#374151;font-size:17px;line-height:1.75}.landing-dark .sectionText{color:#cbd5e1}.pricingGrid{margin-top:34px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;align-items:stretch}.priceCard{min-height:298px;padding:28px;border-radius:20px;background:rgba(255,255,255,.94);border:1px solid rgba(17,24,39,.1);box-shadow:0 18px 44px rgba(15,23,42,.06);display:flex;flex-direction:column;justify-content:space-between;gap:24px}.landing-dark .priceCard{background:rgba(17,24,39,.92);border-color:rgba(255,255,255,.1);box-shadow:0 22px 54px rgba(0,0,0,.32)}.priceBody{display:flex;flex-direction:column}.priceName{margin:0;color:#111827;font-size:26px;line-height:1.1;font-weight:950;letter-spacing:-.035em}.landing-dark .priceName{color:#f9fafb}.priceTop{margin-top:14px;color:#111827;font-size:clamp(31px,4vw,42px);line-height:1.03;font-weight:950;letter-spacing:-.055em}.landing-dark .priceTop{color:#f9fafb}.priceSub{margin-top:8px;color:#374151;font-size:17px;font-weight:650}.landing-dark .priceSub,.landing-dark .priceFee{color:#cbd5e1}.priceDivider{width:100%;height:1px;background:rgba(17,24,39,.1);margin:22px 0 0}.landing-dark .priceDivider{background:rgba(255,255,255,.12)}.priceFee{margin-top:18px;color:#374151;font-size:16px;line-height:1.5;font-weight:700}.cardBtn,.cardBtnGrowth{width:100%;min-height:48px;border-radius:8px;padding:0 16px;font-size:15px}.cardBtn{background:#0f1720;color:#fff}.landing-dark .cardBtn{background:#fff;color:#0f1720}.cardBtnGrowth{background:linear-gradient(145deg,#fff 0%,#f3f4f6 45%,#e5e7eb 100%);color:#111827;border:1px solid rgba(17,24,39,.12)}.landing-dark .cardBtnGrowth{background:linear-gradient(145deg,#ffffff 0%,#f3f4f6 45%,#d1d5db 100%);color:#111827;border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 30px rgba(0,0,0,.25)}.featured{transform:translateY(-10px)}.silverGrowthCard{background:radial-gradient(circle at 18% 12%,rgba(255,255,255,.9),transparent 24%),linear-gradient(145deg,#fff 0%,#eef0f2 18%,#c9ced4 35%,#8f98a3 52%,#d7dbe0 72%,#fff 100%);border:1px solid rgba(115,125,137,.65);color:#111827;box-shadow:inset 0 2px 4px rgba(255,255,255,.92),inset 0 -4px 10px rgba(0,0,0,.16),0 24px 54px rgba(15,23,42,.15)}.landing-dark .silverGrowthCard{background:radial-gradient(circle at 18% 12%,rgba(255,255,255,.16),transparent 24%),linear-gradient(145deg,#f8fafc 0%,#e5e7eb 24%,#cbd5e1 48%,#94a3b8 72%,#f8fafc 100%);border:1px solid rgba(255,255,255,.22)}.featuredText{color:#111827!important}.landing-dark .featuredText{color:#0f172a!important;text-shadow:none!important;opacity:1!important;visibility:visible!important}.mutedSilver{color:#1f2937!important}.landing-dark .mutedSilver{color:#111827!important;opacity:1!important;visibility:visible!important}.silverLine{background:rgba(17,24,39,.18)!important}.landing-dark .silverLine{background:rgba(15,23,42,.24)!important}.landing-dark .silverGrowthCard,.landing-dark .silverGrowthCard *{color:#0f172a!important}.landing-dark .silverGrowthCard .badge{background:rgba(255,255,255,.78)!important;color:#0f172a!important;border-color:rgba(15,23,42,.14)!important}.landing-dark .silverGrowthCard .cardBtnGrowth{background:linear-gradient(145deg,#ffffff 0%,#f3f4f6 45%,#d1d5db 100%)!important;color:#111827!important;border:1px solid rgba(15,23,42,.14)!important;box-shadow:0 10px 30px rgba(0,0,0,.25)!important}.badge{width:fit-content;display:inline-flex;min-height:32px;align-items:center;justify-content:center;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.72);color:#111827;border:1px solid rgba(17,24,39,.08);font-size:12px;font-weight:950;letter-spacing:.12em;text-transform:uppercase;margin-bottom:16px}.imageGrid{margin-top:34px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px}.imageCard{overflow:hidden;border-radius:18px;background:#fff;border:1px solid rgba(17,24,39,.1);box-shadow:0 18px 42px rgba(15,23,42,.07)}.landing-dark .imageCard{background:#111827;border-color:rgba(255,255,255,.1)}.imageCardImg{width:100%;height:188px;object-fit:cover;object-position:center;display:block}.imageCardBody{padding:18px}.imageCardTitle{margin:0;color:#111827;font-size:18px;line-height:1.25;font-weight:900;letter-spacing:-.025em}.landing-dark .imageCardTitle{color:#f9fafb}.imageCardText{margin:10px 0 0;color:#374151;font-size:15px;line-height:1.62}.landing-dark .imageCardText{color:#cbd5e1}.stepGrid{margin-top:38px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;align-items:start}.stepCard{position:relative;display:grid;grid-template-columns:56px 1fr;gap:16px;align-items:start}.stepCard:not(:last-child)::after{content:'';position:absolute;top:28px;right:-16px;width:28px;height:1px;background:rgba(17,24,39,.22)}.landing-dark .stepCard:not(:last-child)::after{background:rgba(255,255,255,.18)}.stepNumber{width:52px;height:52px;border-radius:999px;display:grid;place-items:center;background:#0f1720;color:#fff;font-size:19px;font-weight:950;box-shadow:0 16px 34px rgba(15,23,42,.14)}.landing-dark .stepNumber{background:#fff;color:#0f1720}.stepTitle{margin:0;color:#111827;font-size:17px;line-height:1.24;font-weight:950;letter-spacing:-.025em}.landing-dark .stepTitle{color:#f9fafb}.stepText{margin:8px 0 0;color:#374151;font-size:14px;line-height:1.65}.landing-dark .stepText{color:#cbd5e1}.finalCard{min-height:188px;border-radius:20px;padding:34px 54px;background:radial-gradient(circle at 82% 20%,rgba(255,255,255,.08),transparent 24%),linear-gradient(135deg,#0a0f14 0%,#111827 50%,#06080b 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:34px;box-shadow:0 24px 56px rgba(15,23,42,.18)}.finalTitle{margin:0;max-width:580px;font-size:clamp(30px,4vw,42px);line-height:1.05;font-weight:950;letter-spacing:-.045em}.finalText{margin:12px 0 0;max-width:590px;color:rgba(255,255,255,.86);font-size:16px;line-height:1.6}.finalBtn{flex-shrink:0;min-width:196px;min-height:58px;padding:0 26px;border-radius:10px;background:#fff;color:#111827;box-shadow:0 18px 36px rgba(0,0,0,.24)}@media(max-width:980px){.headerInner{align-items:center;flex-direction:row}.headerRight{width:auto;justify-content:flex-end;gap:10px}.introGrid,.discoverGrid{grid-template-columns:1fr}.phoneMock{margin:0 auto;transform:none}.discoverPictureButtonRow{width:100%;margin:20px auto 0;grid-column:1}.discoverFashionButton{width:100%;min-width:0;min-height:70px}.discoverFashionText{font-size:18px}.discoverFashionArrow{font-size:34px}.introItem,.introItem.bordered{border-left:none;padding:30px 0}.introItem.bordered{border-top:1px solid rgba(17,24,39,.1)}.landing-dark .introItem.bordered{border-top-color:rgba(255,255,255,.12)}.pricingGrid,.imageGrid,.stepGrid{grid-template-columns:1fr}.featured{transform:none}.stepCard:not(:last-child)::after{display:none}.finalCard{flex-direction:column;align-items:flex-start;padding:30px}.finalBtn{width:100%}}@media(max-width:640px){.header{position:static}.logoArea{min-width:auto}.logoImage{width:210px;max-width:210px}.vaultLogo b{font-size:28px}.vaultLogo span{font-size:11px}.headerRight{display:grid;grid-template-columns:1fr 1fr;align-items:center}.navLink{min-height:42px;display:inline-flex;align-items:center}.langWrap{grid-column:1/-1;width:100%}.langButton{flex:1}.navButton{grid-column:1/-1;width:100%}.hero{aspect-ratio:4/3;min-height:auto;max-height:none}.heroOverlay{background:linear-gradient(90deg,rgba(0,0,0,.58),rgba(0,0,0,.26)),linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.72))}.heroContent{height:100%;padding:20px 18px 12px;justify-content:flex-end}.pill{min-height:22px;padding:0 9px;font-size:9px;margin-bottom:5px}.heroTitle{margin-top:0;max-width:195px;font-size:clamp(15px,4.8vw,21px);line-height:.92;letter-spacing:-.05em}.heroText{margin-top:5px;max-width:215px;font-size:10px;line-height:1.18}.heroTextSkeleton{min-height:70px}.heroButtons{margin-top:8px;display:grid;width:100%;max-width:150px}.primaryBtn{width:100%;max-width:150px;min-height:32px;padding:0 12px;border-radius:8px;font-size:11px}.arrow{font-size:22px}.introItem{grid-template-columns:1fr;gap:16px}.discoverSection{padding:42px 0 44px;overflow-x:hidden}.discoverSection .container{max-width:100%;padding-left:16px;padding-right:16px;overflow:hidden}.discoverGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;overflow:hidden}.discoverCopy{min-width:0;max-width:100%;overflow:hidden}.discoverTitle{max-width:100%;font-size:clamp(27px,8.5vw,40px);line-height:.98;letter-spacing:-.055em}.discoverText{max-width:100%;font-size:15px;line-height:1.48}.discoverCtaGrid{width:100%;grid-template-columns:minmax(0,1fr);gap:14px;margin-top:22px}.discoverInfoPanel{width:100%;max-width:100%;padding:12px;border-radius:22px}.discoverCleanPoint{min-height:64px;grid-template-columns:42px minmax(0,1fr);gap:12px;padding:11px 12px;border-radius:18px}.discoverCleanIcon{width:42px;height:42px;border-radius:14px;font-size:17px}.discoverCleanPoint strong{font-size:15px;line-height:1.12}.discoverCleanPoint small{font-size:12px;line-height:1.25}.discoverVisual{width:100%;max-width:100%;overflow:hidden;display:flex;justify-content:center}.phoneMock{width:min(78vw,318px);max-width:318px;margin:0 auto;padding:10px;border-radius:30px;transform:none}.phoneTop{height:42px;padding:0 6px 8px}.phoneTop span{font-size:18px}.phoneTop b{font-size:10px}.miniExplore{grid-auto-rows:78px;gap:4px;border-radius:20px}.discoverPictureButtonRow{width:100%;max-width:100%;margin:18px auto 0;grid-column:1;justify-content:center;overflow:hidden}.discoverFashionButton{width:100%;max-width:100%;min-width:0;min-height:58px;padding:0 16px;border-radius:20px;gap:11px}.discoverFashionText{font-size:16px;line-height:1.04;white-space:normal}.discoverFashionArrow{font-size:30px;flex-shrink:0}.pricingSection,.showcaseSection,.howSection,.finalSection{padding:52px 0}.priceCard{padding:24px}.finalCard{padding:26px 20px}}@media(max-width:430px){.logoArea{min-width:auto}.heroContent{padding:14px 16px 10px}.pill{font-size:8.5px;min-height:21px}.heroTitle{max-width:180px;font-size:clamp(14px,4.5vw,19px)}.heroText{max-width:200px;font-size:9.5px}.heroButtons{max-width:142px}.primaryBtn{min-height:30px;max-width:142px}.logoImage{width:190px;max-width:190px}.vaultLogo b{font-size:25px}.vaultLogo span{font-size:10px}.discoverSection{padding:36px 0 40px}.discoverSection .container{padding-left:14px;padding-right:14px}.discoverTitle{font-size:clamp(25px,8vw,36px)}.discoverText{font-size:14px}.phoneMock{width:min(80vw,298px);max-width:298px;margin-left:auto;margin-right:auto}.miniExplore{grid-auto-rows:72px}.discoverFashionButton{min-height:54px}.discoverFashionText{font-size:15px}.discoverFashionArrow{font-size:28px}}
 `;
