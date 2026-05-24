@@ -419,7 +419,7 @@ function getSavedHeroCopy() {
 }
 
 
-const ADMIN_DASHBOARD_PATH = process.env.NEXT_PUBLIC_ADMIN_PATH || '/admin';
+const ADMIN_DASHBOARD_PATH = process.env.NEXT_PUBLIC_ADMIN_PATH || '/dashboard/admin';
 const ADMIN_HOLD_MS = 850;
 const ADMIN_PASSCODE =
   process.env.NEXT_PUBLIC_ADMIN_PASSCODE ||
